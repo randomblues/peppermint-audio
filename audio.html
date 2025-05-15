@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Peppermint Audio</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Pacifico&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --mint: #00bfa5;
+      --mint-dark: #008f7a;
+      --bg: #f0f4f8;
+      --card-bg: rgba(255, 255, 255, 0.75);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: #1a1a1a;
+      line-height: 1.6;
+    }
+
+    header {
+      background: linear-gradient(135deg, var(--mint), var(--mint-dark));
+      color: white;
+      padding: 4rem 1rem 3rem;
+      text-align: center;
+    }
+
+    header h1 {
+      font-family: 'Pacifico', cursive;
+      font-size: 3rem;
+      margin-bottom: 0.5rem;
+    }
+
+    header p {
+      font-size: 1.25rem;
+      opacity: 0.95;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: -50px auto 2rem;
+      padding: 1rem;
+    }
+
+    section {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 2rem;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+      margin-bottom: 2rem;
+      transition: transform 0.3s ease;
+    }
+
+    section:hover {
+      transform: translateY(-4px);
+    }
+
+    h2 {
+      color: var(--mint-dark);
+      margin-bottom: 1rem;
+      font-size: 1.5rem;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    li {
+      padding: 0.75rem 0;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+    }
+
+    li::before {
+      content: '✓';
+      color: var(--mint-dark);
+      font-weight: bold;
+      margin-right: 0.6rem;
+    }
+
+    .contact a {
+      color: var(--mint-dark);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .contact a:hover {
+      text-decoration: underline;
+    }
+
+    footer {
+      text-align: center;
+      font-size: 0.95rem;
+      padding: 2rem 1rem;
+      color: #666;
+    }
+
+    @media (max-width: 600px) {
+      header h1 {
+        font-size: 2.2rem;
+      }
+
+      header p {
+        font-size: 1.1rem;
+      }
+
+      section {
+        padding: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Peppermint Audio</h1>
+    <p>Audio Equipment Hire for Weddings, Parties & Events</p>
+  </header>
+
+  <main class="container">
+    <section class="services">
+      <h2>Our Services</h2>
+      <ul>
+        <li>Speaker Systems</li>
+        <li>Microphones</li>
+        <li>Audio Mixers & Control</li>
+        <li>Delivery & Setup Available</li>
+      </ul>
+    </section>
+
+    <section class="contact">
+      <h2>Contact Us</h2>
+      <p>Email: <a href="mailto:info@peppermintaudio.com">info@peppermintaudio.com</a></p>
+      <p>Phone: 0400 123 456</p>
+    </section>
+  </main>
+
+  <footer>
+    &copy; 2025 Peppermint Audio — All rights reserved.
+  </footer>
+</body>
+</html>
