@@ -4,13 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Peppermint Audio</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Pacifico&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Pacifico&display=swap" rel="stylesheet">
   <style>
     :root {
-      --mint: #00bfa5;
-      --mint-dark: #008f7a;
-      --bg: #f0f4f8;
-      --card-bg: rgba(255, 255, 255, 0.75);
+      --mint: #00d4b5;
+      --mint-dark: #009f85;
+      --bg: #f8fafc;
+      --text: #121212;
+      --white: #ffffff;
+      --accent: #e6f4f1;
     }
 
     * {
@@ -22,132 +24,325 @@
     body {
       font-family: 'Inter', sans-serif;
       background: var(--bg);
-      color: #1a1a1a;
-      line-height: 1.6;
+      color: var(--text);
+      line-height: 1.7;
     }
 
     header {
-      background: linear-gradient(135deg, var(--mint), var(--mint-dark));
-      color: white;
-      padding: 4rem 1rem 3rem;
+      background: linear-gradient(145deg, var(--mint), var(--mint-dark));
+      color: var(--white);
+      padding: 6rem 2rem 8rem;
       text-align: center;
+      position: relative;
+      clip-path: polygon(0 0, 100% 0, 100% 85%, 0 100%);
     }
 
-    header h1 {
+    .header-content {
+      animation: fadeUp 1.2s ease-out;
+    }
+
+    h1 {
       font-family: 'Pacifico', cursive;
-      font-size: 3rem;
-      margin-bottom: 0.5rem;
+      font-size: 4rem;
+      margin-bottom: 0.6rem;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
 
     header p {
-      font-size: 1.25rem;
+      font-size: 1.4rem;
+      font-weight: 600;
       opacity: 0.95;
+      letter-spacing: 0.5px;
     }
 
-    .container {
-      max-width: 960px;
-      margin: -50px auto 2rem;
-      padding: 1rem;
+    main {
+      max-width: 1100px;
+      margin: -4rem auto 0;
+      padding: 2rem 1rem;
     }
 
     section {
-      background: var(--card-bg);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      padding: 2rem;
-      border-radius: 16px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-      margin-bottom: 2rem;
-      transition: transform 0.3s ease;
+      background: var(--white);
+      padding: 3rem;
+      border-radius: 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+      margin-bottom: 3rem;
+      position: relative;
+      overflow: hidden;
+      animation: scaleIn 0.8s ease-out forwards;
+      opacity: 0;
     }
 
-    section:hover {
-      transform: translateY(-4px);
-    }
+    .services { animation-delay: 0.3s; }
+    .testimonials { animation-delay: 0.4s; }
+    .contact { animation-delay: 0.5s; }
 
     h2 {
       color: var(--mint-dark);
+      font-family: 'Pacifico', cursive;
+      font-size: 2.5rem;
+      margin-bottom: 2rem;
+      text-align: center;
+      position: relative;
+    }
+
+    h2::after {
+      content: '';
+      width: 60px;
+      height: 3px;
+      background: var(--mint);
+      position: absolute;
+      bottom: -0.8rem;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 2rem;
+    }
+
+    .service-card {
+      background: var(--accent);
+      padding: 2rem;
+      border-radius: 16px;
+      text-align: center;
+      transition: all 0.4s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .service-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(180deg, rgba(0,212,181,0.1), transparent);
+      transition: opacity 0.4s ease;
+      opacity: 0;
+    }
+
+    .service-card:hover::before { opacity: 1; }
+    .service-card:hover {
+      transform: scale(1.05);
+      box-shadow: 0 12px 32px rgba(0,159,133,0.25);
+    }
+
+    .service-card span {
+      font-size: 3rem;
+      color: var(--mint-dark);
       margin-bottom: 1rem;
-      font-size: 1.5rem;
+      display: block;
     }
 
-    ul {
-      list-style: none;
-      padding: 0;
-    }
-
-    li {
-      padding: 0.75rem 0;
-      font-size: 1.1rem;
-      display: flex;
-      align-items: center;
-    }
-
-    li::before {
-      content: '✓';
-      color: var(--mint-dark);
-      font-weight: bold;
-      margin-right: 0.6rem;
-    }
-
-    .contact a {
-      color: var(--mint-dark);
-      text-decoration: none;
+    .service-card p {
+      font-size: 1.15rem;
       font-weight: 600;
     }
 
-    .contact a:hover {
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
+    }
+
+    .testimonial-card {
+      background: var(--accent);
+      padding: 2rem;
+      border-radius: 16px;
+      position: relative;
+      transition: transform 0.3s ease;
+    }
+
+    .testimonial-card:hover {
+      transform: translateY(-5px);
+    }
+
+    .testimonial-card p {
+      font-size: 1.1rem;
+      color: var(--text);
+      margin-bottom: 1rem;
+      font-style: italic;
+    }
+
+    .testimonial-card cite {
+      font-size: 1rem;
+      color: var(--mint-dark);
+      font-weight: 600;
+      font-style: normal;
+    }
+
+    .contact-info {
+      display: flex;
+      justify-content: center;
+      gap: 4rem;
+      flex-wrap: wrap;
+    }
+
+    .contact-item {
+      display: flex;
+      align-items: center;
+      font-size: 1.2rem;
+      padding: 1rem;
+      background: var(--accent);
+      border-radius: 12px;
+      transition: transform 0.3s ease;
+    }
+
+    .contact-item:hover {
+      transform: translateY(-5px);
+    }
+
+    .contact-item span {
+      font-size: 1.8rem;
+      color: var(--mint);
+      margin-right: 1rem;
+    }
+
+    .contact-item a {
+      color: var(--mint-dark);
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .contact-item a:hover {
+      color: var(--mint);
       text-decoration: underline;
     }
 
     footer {
       text-align: center;
-      font-size: 0.95rem;
-      padding: 2rem 1rem;
-      color: #666;
+      padding: 2.5rem 1rem;
+      color: #555;
+      font-size: 1rem;
+      background: var(--white);
+      border-top: 2px solid var(--accent);
     }
 
-    @media (max-width: 600px) {
-      header h1 {
-        font-size: 2.2rem;
+    @keyframes fadeUp {
+      from { transform: translateY(50px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    @keyframes scaleIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    @media (max-width: 768px) {
+      header {
+        padding: 4rem 1rem 6rem;
+        clip-path: polygon(0 0, 100% 0, 100% 90%, 0 100%);
+      }
+
+      h1 {
+        font-size: 3rem;
       }
 
       header p {
-        font-size: 1.1rem;
+        font-size: 1.2rem;
       }
 
       section {
-        padding: 1.5rem;
+        padding: 2rem;
+      }
+
+      .services-grid, .testimonials-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .contact-info {
+        flex-direction: column;
+        gap: 2rem;
       }
     }
   </style>
 </head>
 <body>
   <header>
-    <h1>Peppermint Audio</h1>
-    <p>Audio Equipment Hire for Weddings, Parties & Events</p>
+    <div class="header-content">
+      <h1>Peppermint Audio</h1>
+      <p>Audio Equipment Hire for Weddings, Parties & Events</p>
+    </div>
   </header>
 
-  <main class="container">
+  <main>
     <section class="services">
       <h2>Our Services</h2>
-      <ul>
-        <li>Speaker Systems</li>
-        <li>Microphones</li>
-        <li>Audio Mixers & Control</li>
-        <li>Delivery & Setup Available</li>
-      </ul>
+      <div class="services-grid">
+        <div class="service-card">
+          <span>🔊</span>
+          <p>Speaker Systems</p>
+        </div>
+        <div class="service-card">
+          <span>🎤</span>
+          <p>Microphones</p>
+        </div>
+        <div class="service-card">
+          <span>🎛️</span>
+          <p>Audio Mixers & Control</p>
+        </div>
+        <div class="service-card">
+          <span>🚚</span>
+          <p>Delivery & Setup Available</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="testimonials">
+      <h2>What Our Clients Say</h2>
+      <div class="testimonials-grid">
+        <div class="testimonial-card">
+          <p>"Exceptional service and top-quality equipment from Shane. Everything was perfect for our event!"</p>
+          <cite>Dennis Katsoulakos</cite>
+        </div>
+        <div class="testimonial-card">
+          <p>"Outstanding service—reliable and trustworthy. Highly recommend Peppermint Audio!"</p>
+          <cite>Joe Franklin Genesis Lumintang</cite>
+        </div>
+        <div class="testimonial-card">
+          <p>"Shane is a true professional—honest, punctual, and made everything effortless. Will definitely hire again!"</p>
+          <cite>Amir Hosseini</cite>
+        </div>
+        <div class="testimonial-card">
+          <p>"Highly recommend Peppermint Audio for top-notch audio equipment rentals!"</p>
+          <cite>Armando Morales</cite>
+        </div>
+        <div class="testimonial-card">
+          <p>"Fantastic service at affordable rates. Perfect for weddings and parties!"</p>
+          <cite>Parmar Chirag</cite>
+        </div>
+        <div class="testimonial-card">
+          <p>"The best in the business! Shane’s expertise made our events seamless every time."</p>
+          <cite>Amala Priya Shankar</cite>
+        </div>
+        <div class="testimonial-card">
+          <p>"Incredibly easy process. Shane’s kindness and attention to detail, from delivery to pack-down, were unmatched. 10/10!"</p>
+          <cite>Sky Hong</cite>
+        </div>
+      </div>
     </section>
 
     <section class="contact">
       <h2>Contact Us</h2>
-      <p>Email: <a href="mailto:peppermint.audio.au@gmail.com">peppermint.audio.au@gmail.com</a></p>
-      <p>Phone: 0452 316 823</p>
+      <div class="contact-info">
+        <div class="contact-item">
+          <span>✉️</span>
+          <p><a href="mailto:peppermint.audio.au@gmail.com">peppermint.audio.au@gmail.com</a></p>
+        </div>
+        <div class="contact-item">
+          <span>📞</span>
+          <p>0452 316 823</p>
+        </div>
+      </div>
     </section>
   </main>
 
   <footer>
-    &copy; 2025 Peppermint Audio — All rights reserved.
+    <p>© 2025 Peppermint Audio — All rights reserved.</p>
   </footer>
 </body>
 </html>
