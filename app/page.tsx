@@ -12,7 +12,17 @@ export default function Home() {
   return (
     <>
       <section className="relative isolate overflow-hidden border-b">
-        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-muted/40 via-background to-background" />
+        <div className="pointer-events-none absolute inset-0 -z-20">
+          <Image
+            src={business.heroImage}
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="scale-105 object-cover object-[75%_center] opacity-55"
+          />
+        </div>
+        <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-r from-background/90 via-background/65 to-background/25" />
         <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-18 sm:px-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center lg:px-8">
           <div className="max-w-2xl">
             <Badge variant="secondary">Pickup from Abbotsford 3067</Badge>
@@ -24,7 +34,13 @@ export default function Home() {
               <Button size="lg" nativeButton={false} render={<Link href="/contact" />}>
                 Get a Quote
               </Button>
-              <Button variant="outline" size="lg" nativeButton={false} render={<Link href="/packages" />}>
+              <Button
+                variant="outline"
+                size="lg"
+                className="border-white/25 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+                nativeButton={false}
+                render={<Link href="/packages" />}
+              >
                 View Packages
               </Button>
             </div>
@@ -40,22 +56,13 @@ export default function Home() {
               <span>Live gigs</span>
             </div>
           </div>
-          <Card className="border">
+          <Card className="border bg-background/85 backdrop-blur-md">
             <CardHeader>
               <p className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
                 Why Peppermint Audio?
               </p>
             </CardHeader>
             <CardContent className="space-y-5 text-sm">
-              <div className="relative h-36 overflow-hidden rounded-lg">
-                <Image
-                  src={business.heroImage}
-                  alt="DJ mixing desk at a Melbourne event"
-                  fill
-                  sizes="(max-width: 1024px) 100vw, 40vw"
-                  className="object-cover"
-                />
-              </div>
               <div className="divide-y rounded-lg border">
                 <div className="p-3">
                   <p className="font-medium text-foreground">Complete from the start</p>
@@ -66,7 +73,7 @@ export default function Home() {
                 <div className="p-3">
                   <p className="font-medium text-foreground">Easy to run</p>
                   <p className="mt-1 text-muted-foreground">
-                    Everything you need to get started, with plug-and-play setup and a walkthrough at pickup.
+                    Everything you need to get started with a straightforward plug-and-play setup.
                   </p>
                 </div>
                 <div className="p-3">
@@ -124,11 +131,29 @@ export default function Home() {
         </ol>
       </Section>
 
-      <Section title="Ready to lock in your date?" description="Tell us your event details and we will confirm package availability.">
-        <Button size="lg" nativeButton={false} render={<Link href="/contact" />}>
-          Start your enquiry
-        </Button>
-      </Section>
+      <section className="relative isolate overflow-hidden border-y">
+        <Image
+          src={business.ctaImage}
+          alt=""
+          fill
+          sizes="100vw"
+          className="-z-20 object-cover object-[50%_58%] opacity-55"
+        />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-background/80 via-background/60 to-background/45" />
+        <div className="relative mx-auto w-full max-w-6xl px-4 py-20 sm:px-6 lg:px-8">
+          <div className="max-w-2xl">
+            <h2 className="text-3xl font-semibold tracking-tight">
+              Ready to lock in your date?
+            </h2>
+            <p className="mt-3 text-muted-foreground">
+              Tell us your event details and we will confirm package availability.
+            </p>
+            <Button className="mt-6" size="lg" nativeButton={false} render={<Link href="/contact" />}>
+              Start your enquiry
+            </Button>
+          </div>
+        </div>
+      </section>
     </>
   );
 }

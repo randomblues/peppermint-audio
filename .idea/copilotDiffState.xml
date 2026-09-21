@@ -39,15 +39,6 @@
             </PendingDiffInfo>
           </value>
         </entry>
-        <entry key="$PROJECT_DIR$/next.config.ts">
-          <value>
-            <PendingDiffInfo>
-              <option name="filePath" value="$PROJECT_DIR$/next.config.ts" />
-              <option name="originalContent" value="import type { NextConfig } from &quot;next&quot;;&#10;&#10;const nextConfig: NextConfig = {&#10;  /* config options here */&#10;};&#10;&#10;export default nextConfig;&#10;" />
-              <option name="updatedContent" value="import type { NextConfig } from &quot;next&quot;;&#10;&#10;const nextConfig: NextConfig = {&#10;  images: {&#10;    remotePatterns: [new URL(&quot;https://images.unsplash.com/**&quot;)],&#10;  },&#10;};&#10;&#10;export default nextConfig;&#10;" />
-            </PendingDiffInfo>
-          </value>
-        </entry>
       </map>
     </option>
   </component>

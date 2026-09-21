@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { PackageTier } from "@/lib/site-content";
+import { addOnCatalog, type PackageTier } from "@/lib/site-content";
 
 type PackageCardProps = {
   pkg: PackageTier;
@@ -42,11 +42,28 @@ export function PackageCard({ pkg, compact = false }: PackageCardProps) {
         {compact ? (
           <p className="mt-2 text-sm text-muted-foreground">{pkg.summary}</p>
         ) : (
-          <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
-            {pkg.inclusions.map((item) => (
-              <li key={item}>- {item}</li>
-            ))}
-          </ul>
+          <>
+            <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
+              {pkg.inclusions.map((item) => (
+                <li key={item}>- {item}</li>
+              ))}
+            </ul>
+            <div className="mt-6 border-t pt-4">
+              <p className="text-sm font-medium text-foreground">Optional add-ons</p>
+              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                {pkg.addOnSlugs.map((slug) => {
+                  const addOn = addOnCatalog[slug];
+
+                  return (
+                    <li key={slug} className="flex items-center justify-between gap-4">
+                      <span>{addOn.name}</span>
+                      <span className="shrink-0 font-medium text-foreground">+${addOn.price}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </>
         )}
       </CardContent>
       <CardFooter>

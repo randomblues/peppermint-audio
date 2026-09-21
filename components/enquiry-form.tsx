@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DatePicker } from "@/components/date-picker";
 import {
   Select,
   SelectContent,
@@ -106,7 +107,19 @@ export function EnquiryForm({ packageName }: EnquiryFormProps) {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="eventDate">Event Date</Label>
-              <Input id="eventDate" className="h-10" type="date" {...register("eventDate")} />
+              <Controller
+                control={control}
+                name="eventDate"
+                render={({ field }) => (
+                  <DatePicker
+                    id="eventDate"
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    invalid={Boolean(errors.eventDate)}
+                  />
+                )}
+              />
               {errors.eventDate ? <p className="text-xs text-destructive">{errors.eventDate.message}</p> : null}
             </div>
           </div>

@@ -6,8 +6,45 @@ export type PackageTier = {
   summary: string;
   bestFor: string;
   inclusions: string[];
+  addOnSlugs: string[];
   notes?: string;
   image: string;
+};
+
+export type AddOn = {
+  name: string;
+  price: number;
+};
+
+export const addOnCatalog: Record<string, AddOn> = {
+  "party-lights-bar": {
+    name: "All-in-One Party Lights Bar",
+    price: 30,
+  },
+  "wireless-microphones": {
+    name: "Wireless Microphone Upgrade",
+    price: 20,
+  },
+  "di-box": {
+    name: "DI Box",
+    price: 10,
+  },
+  "four-channel-di-box": {
+    name: "4-Channel DI Box",
+    price: 20,
+  },
+  "spirit-e12-mixer": {
+    name: "Spirit E12 / 12-Channel Soundcraft Mixer Upgrade",
+    price: 30,
+  },
+  "behringer-x32": {
+    name: "Behringer X32 Digital Mixer Upgrade",
+    price: 110,
+  },
+  "party-light-par-can": {
+    name: "Party Light PAR Can",
+    price: 10,
+  },
 };
 
 export const business = {
@@ -15,13 +52,14 @@ export const business = {
   serviceArea: "Melbourne",
   pickupSuburb: "Abbotsford",
   pickupPostcode: "3067",
-  phone: "0400 000 000",
-  email: "hello@peppermintaudio.com.au",
+  phone: "0452 316 823",
+  email: "peppermintaudioau@gmail.com",
   heroHeading: "Audio Rental for Melbourne Events",
   heroSubheading:
     "Reliable audio system packages with speakers, microphones, mixers, and cables for parties, weddings, small corporate events, live gigs, and private functions.",
-  heroImage:
-    "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&h=600&fit=crop",
+  heroImage: "/hero-mixer.jpg",
+  ctaImage:
+    "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=1600&h=700&fit=crop",
 };
 
 export const packageTiers: PackageTier[] = [
@@ -30,19 +68,28 @@ export const packageTiers: PackageTier[] = [
     name: "Speech & Presentation Package",
     price: 120,
     capacity: "20-60 people",
-    summary: "A straightforward, plug-and-play setup for clear speeches and presentations.",
+    summary: "Two 150W speakers, stands, a wired microphone, and a simple mixer for clear speeches and presentations.",
     bestFor: "Speeches, presentations, small corporate events, and announcements",
     image:
-      "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=600&h=400&fit=crop",
+      "https://images.pexels.com/photos/164829/pexels-photo-164829.jpeg?w=600&h=400&fit=crop",
+    addOnSlugs: [
+      "wireless-microphones",
+      "party-lights-bar",
+      "di-box",
+      "four-channel-di-box",
+      "spirit-e12-mixer",
+      "behringer-x32",
+      "party-light-par-can",
+    ],
     inclusions: [
-      "2 x Bose S1 Pro PA speakers",
-      "2 x speaker stands",
-      "1 x microphone",
-      "Easy-to-use sound mixer",
-      "Power cables for all equipment",
-      "AUX or Bluetooth phone connection",
-      "Long extension leads as needed",
-      "Multiple XLR audio cables as needed",
+      "2 x Bose S1 Pro PA Speakers (150W each).",
+      "2 x Speaker Stands.",
+      "1 x Wired Microphone.",
+      "Easy to use 2-channel Behringer Xenyx mixer.",
+      "Power Cables for All Equipment.",
+      "AUX or Bluetooth Phone Connection.",
+      "Long Extension Leads as Needed.",
+      "Multiple XLR Audio Cables as Needed.",
     ],
   },
   {
@@ -50,19 +97,28 @@ export const packageTiers: PackageTier[] = [
     name: "Standard Party & Events Package",
     price: 160,
     capacity: "60-120 people",
-    summary: "The easy all-rounder for parties, birthdays, corporate events, and small live gigs.",
+    summary: "Two 1100W peak speakers, stands, a wired microphone, and mixer for parties and private events.",
     bestFor: "Parties, private functions, small corporate events, and live gigs",
     image:
-      "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=600&h=400&fit=crop",
+      "https://images.pexels.com/photos/7715611/pexels-photo-7715611.jpeg",
+    addOnSlugs: [
+      "wireless-microphones",
+      "party-lights-bar",
+      "di-box",
+      "four-channel-di-box",
+      "spirit-e12-mixer",
+      "behringer-x32",
+      "party-light-par-can",
+    ],
     inclusions: [
-      "2 x Yamaha DXR15 speakers",
-      "2 x speaker stands",
-      "1 x microphone",
-      "Easy-to-use sound mixer",
-      "Power cables for all equipment",
-      "AUX or Bluetooth phone connection",
-      "Long extension leads as needed",
-      "Multiple XLR audio cables as needed",
+      "2 x Yamaha DXR15 Speakers (1100W peak each).",
+      "2 x Speaker Stands.",
+      "1 x Wired Microphone.",
+      "Easy to use 2-channel Behringer Xenyx mixer.",
+      "Power Cables for All Equipment.",
+      "AUX or Bluetooth Phone Connection.",
+      "Long Extension Leads as Needed.",
+      "Multiple XLR Audio Cables as Needed.",
     ],
     notes: "Most popular",
   },
@@ -71,20 +127,27 @@ export const packageTiers: PackageTier[] = [
     name: "Big Celebration Package",
     price: 240,
     capacity: "100-250 people",
-    summary: "More headroom and bass for weddings, larger celebrations, and bigger live events.",
+    summary: "Two 1100W peak speakers, stands, two wireless microphones, a subwoofer, and mixer for bigger celebrations.",
     bestFor: "Weddings, large parties, celebrations, and live gigs",
     image:
-      "https://images.unsplash.com/photo-1519741497674-611481863552?w=600&h=400&fit=crop",
+      "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=600&h=400&fit=crop",
+    addOnSlugs: [
+      "di-box",
+      "four-channel-di-box",
+      "behringer-x32",
+      "party-lights-bar",
+      "party-light-par-can",
+    ],
     inclusions: [
-      "2 x Yamaha DXR15 speakers",
-      "2 x speaker stands",
-      "2 x microphones",
-      "1 x 15-inch subwoofer",
-      "Easy-to-use sound mixer",
-      "Power cables for all equipment",
-      "AUX or Bluetooth phone connection",
-      "Long extension leads as needed",
-      "Multiple XLR audio cables as needed",
+      "2 x Yamaha DXR15 Speakers (1100W peak each).",
+      "2 x Speaker Stands.",
+      "2 x Wireless Microphones.",
+      "1 x 15-Inch Subwoofer.",
+      "Easy to use 2-channel Behringer Xenyx mixer.",
+      "Power Cables for All Equipment.",
+      "AUX or Bluetooth Phone Connection.",
+      "Long Extension Leads as Needed.",
+      "Multiple XLR Audio Cables as Needed.",
     ],
     notes: "Highly recommended for weddings",
   },
@@ -120,7 +183,7 @@ export const howItWorks = [
 
 export const faqs = [
   {
-    question: "Why hire Peppermint Audio instead of a basic speaker rental?",
+    question: "Why hire Peppermint Audio?",
     answer:
       "Most rental companies hand you a pair of speakers and leave you to work out the rest. We make it simple with complete, ready-to-go systems for your event. But hey, if two speakers is all you need, we've got your back too ;)",
   },
@@ -132,7 +195,7 @@ export const faqs = [
   {
     question: "Which package is right for my event?",
     answer:
-      "Choose based on your expected guest count and event type. Speech & Presentation suits speeches, presentations, and small corporate events. Standard Party & Events is the all-round option for parties, functions, and small live gigs. Big Celebration adds extra microphones and a subwoofer for weddings, larger celebrations, and bigger live events.",
+      "Choose based on your guest count and event type. Speech & Presentation is best for smaller speeches and presentations. Standard Party & Events is the all-rounder for parties and private functions. Big Celebration is for weddings and larger events. Add-ons are available if you need anything extra.",
   },
   {
     question: "What is included in every package?",
@@ -142,7 +205,7 @@ export const faqs = [
   {
     question: "Do I need sound or event experience?",
     answer:
-      "No. The packages are designed to be simple and plug-and-play. We provide a straightforward setup walkthrough at pickup and an easy-to-follow guide so you can run the system confidently.",
+      "No. The packages are designed to be simple and plug-and-play.",
   },
   {
     question: "Can I connect my phone or music device?",
@@ -157,7 +220,7 @@ export const faqs = [
   {
     question: "Do you deliver or set everything up for me?",
     answer:
-      "The standard service is pickup from Abbotsford with a setup walkthrough. If you need delivery or hands-on setup, mention it in your enquiry and we can confirm what is possible for your event.",
+      "The standard service is pickup from Abbotsford. If you need delivery or hands-on setup, mention it in your enquiry and we can confirm what is possible for your event.",
   },
   {
     question: "How do I book a package?",
