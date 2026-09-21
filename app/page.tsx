@@ -113,6 +113,10 @@ export default function Home() {
         </Card>
       </Section>
 
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8" aria-hidden="true">
+        <div className="border-t" />
+      </div>
+
       <Section eyebrow="Process" title="How hire works" description="Five simple steps from quote to return.">
         <ol className="grid gap-4 md:grid-cols-2">
           {howItWorks.map((step, index) => (
