@@ -113,6 +113,39 @@ export default function Home() {
         </Card>
       </Section>
 
+      <Section
+        eyebrow="Melbourne PA hire"
+        title="Simple sound system hire for your event"
+        description="Peppermint Audio provides PA system hire in Melbourne for weddings, parties, presentations, corporate events, live gigs, and private functions. Collect your ready-to-use equipment from Abbotsford 3067 and get support with setup before your event."
+      >
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Card className="border">
+            <CardHeader>
+              <CardTitle>Speaker hire</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              Choose speakers and stands sized for your guest count and venue.
+            </CardContent>
+          </Card>
+          <Card className="border">
+            <CardHeader>
+              <CardTitle>Microphone hire</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              Add wired or wireless microphones for speeches, announcements, and performances.
+            </CardContent>
+          </Card>
+          <Card className="border">
+            <CardHeader>
+              <CardTitle>Complete PA packages</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              Get the mixer, cables, stands, and connections you need in one straightforward package.
+            </CardContent>
+          </Card>
+        </div>
+      </Section>
+
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8" aria-hidden="true">
         <div className="border-t" />
       </div>

@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 
 import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
+import { business } from "@/lib/site-content";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,9 +17,40 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Peppermint Audio | Audio Rental for Melbourne Events",
+  metadataBase: new URL(business.website),
+  title: {
+    default: "Peppermint Audio | Audio Rental for Melbourne Events",
+    template: "%s | Peppermint Audio",
+  },
   description:
     "Complete audio system hire for private events in Melbourne, including speakers, microphones, mixers, and cables. Pickup from Abbotsford 3067.",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_AU",
+    url: business.website,
+    siteName: business.name,
+    title: "Peppermint Audio | Audio Rental for Melbourne Events",
+    description:
+      "Complete audio system hire for private events in Melbourne, including speakers, microphones, mixers, and cables. Pickup from Abbotsford 3067.",
+    images: [
+      {
+        url: "/hero-mixer.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Audio mixer for Peppermint Audio event hire",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Peppermint Audio | Audio Rental for Melbourne Events",
+    description:
+      "Complete audio system hire for private events in Melbourne, including speakers, microphones, mixers, and cables. Pickup from Abbotsford 3067.",
+    images: ["/hero-mixer.jpg"],
+  },
 };
 
 export default function RootLayout({
@@ -26,12 +58,56 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "@id": `${business.website}/#business`,
+    name: business.name,
+    url: business.website,
+    image: `${business.website}${business.heroImage}`,
+    logo: `${business.website}/logo-white.png`,
+    description:
+      "Complete audio system hire for parties, weddings, corporate events, live gigs, and private functions in Melbourne.",
+    telephone: business.phone,
+    email: business.email,
+    priceRange: "$$",
+    address: {
+      "@type": "PostalAddress",
+      addressLocality: business.pickupSuburb,
+      postalCode: business.pickupPostcode,
+      addressRegion: "VIC",
+      addressCountry: "AU",
+    },
+    areaServed: {
+      "@type": "City",
+      name: business.serviceArea,
+    },
+    makesOffer: [
+      {
+        "@type": "Offer",
+        name: "PA system hire",
+        url: `${business.website}/packages`,
+      },
+      {
+        "@type": "Offer",
+        name: "Audio equipment hire for events",
+        url: `${business.website}/packages`,
+      },
+    ],
+  };
+
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
     >
       <body className="min-h-full">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c"),
+          }}
+        />
         <div className="flex min-h-screen flex-col">
           <Navbar />
           <main className="flex-1 bg-background">{children}</main>

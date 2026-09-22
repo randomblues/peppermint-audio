@@ -49,6 +49,7 @@ export const addOnCatalog: Record<string, AddOn> = {
 
 export const business = {
   name: "Peppermint Audio",
+  website: "https://www.peppermintaudio.com.au",
   serviceArea: "Melbourne",
   pickupSuburb: "Abbotsford",
   pickupPostcode: "3067",
