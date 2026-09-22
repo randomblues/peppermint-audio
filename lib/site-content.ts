@@ -53,7 +53,7 @@ export const business = {
   pickupSuburb: "Abbotsford",
   pickupPostcode: "3067",
   phone: "0452 316 823",
-  email: "peppermintaudioau@gmail.com",
+  email: "contactus@peppermintaudio.com.au",
   heroHeading: "Audio Rental for Melbourne Events",
   heroSubheading:
     "Reliable audio system packages with speakers, microphones, mixers, and cables for parties, weddings, small corporate events, live gigs, and private functions.",
