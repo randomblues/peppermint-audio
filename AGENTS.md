@@ -4,6 +4,12 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
+# Project overview
+
+Peppermint Audio is a Next.js website for a Melbourne audio-equipment rental business. It presents ready-to-use sound-system packages for parties, weddings, corporate events, live gigs, and private functions, with equipment pickup from Abbotsford 3067. The site includes package information, FAQs, setup guidance, and an event enquiry form.
+
+The production site is deployed to Vercel from the private GitHub repository's `main` branch. The custom domain is `https://www.peppermintaudio.com.au`. Enquiries are submitted to the Next.js API route and sent through Resend to `contactus@peppermintaudio.com.au`, where they are received and answered through Zoho Mail.
+
 # Agent working rules
 
 These rules are mandatory. Safety, preservation of existing work, bounded execution, and truthful verification take priority over speed.
@@ -64,4 +70,3 @@ Report:
 - validations or commands run and their actual outcomes;
 - anything incomplete and the exact reason; and
 - any manual authentication or approval still required.
-
