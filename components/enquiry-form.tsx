@@ -41,6 +41,7 @@ export function EnquiryForm({ packageName }: EnquiryFormProps) {
   } = useForm<EnquiryFormInputValues, unknown, EnquiryFormValues>({
     resolver: zodResolver(enquirySchema),
     defaultValues: {
+      eventDate: "",
       packageInterest: packageName ?? packageTiers[1]?.name ?? "",
     },
   });

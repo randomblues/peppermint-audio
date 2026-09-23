@@ -17,9 +17,10 @@ import { addOnCatalog, type PackageTier } from "@/lib/site-content";
 type PackageCardProps = {
   pkg: PackageTier;
   compact?: boolean;
+  priority?: boolean;
 };
 
-export function PackageCard({ pkg, compact = false }: PackageCardProps) {
+export function PackageCard({ pkg, compact = false, priority = false }: PackageCardProps) {
   return (
     <Card className="h-full justify-between overflow-hidden border">
       <div className="relative h-40">
@@ -28,6 +29,7 @@ export function PackageCard({ pkg, compact = false }: PackageCardProps) {
           alt={pkg.name}
           fill
           sizes="(max-width: 768px) 100vw, 33vw"
+          loading={priority ? "eager" : "lazy"}
           className="object-cover"
         />
       </div>

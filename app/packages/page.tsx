@@ -29,9 +29,9 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
       title="Choose your complete PA package"
       description="Three straightforward options, starting at $120. Every package is ready to plug in and use."
     >
-      <Tabs defaultValue={selectedPackage}>
+      <Tabs defaultValue={selectedPackage} className="w-full">
         <TabsList
-          className="grid h-auto w-full max-w-4xl grid-cols-1 gap-2 bg-transparent p-0 sm:grid-cols-3"
+          className="!h-auto grid w-full max-w-4xl grid-cols-1 gap-2 bg-transparent p-0 sm:grid-cols-3"
           variant="line"
         >
           {packageTiers.map((pkg) => (
@@ -45,8 +45,8 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
           ))}
         </TabsList>
         {packageTiers.map((pkg) => (
-          <TabsContent key={pkg.slug} value={pkg.slug} className="mt-6 max-w-2xl">
-            <PackageCard pkg={pkg} />
+          <TabsContent key={pkg.slug} value={pkg.slug} className="mt-6 w-full max-w-3xl">
+            <PackageCard pkg={pkg} priority={pkg.slug === selectedPackage} />
           </TabsContent>
         ))}
       </Tabs>

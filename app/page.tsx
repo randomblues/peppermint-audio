@@ -94,8 +94,8 @@ export default function Home() {
         description="Choose a ready-to-use package for your guest count. Every option includes the equipment and cables you need for a hassle-free setup."
       >
         <div className="grid gap-4 md:grid-cols-3">
-          {packageTiers.map((pkg) => (
-            <PackageCard key={pkg.slug} pkg={pkg} compact />
+          {packageTiers.map((pkg, index) => (
+            <PackageCard key={pkg.slug} pkg={pkg} compact priority={index === 0} />
           ))}
         </div>
         <Card className="mt-4 border-dashed">
