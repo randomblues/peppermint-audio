@@ -129,10 +129,10 @@ export default function Home() {
           </Card>
           <Card className="border">
             <CardHeader>
-              <CardTitle>Microphone hire</CardTitle>
+              <CardTitle>Event-ready sound</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              Add wired or wireless microphones for speeches, announcements, and performances.
+              Our microphone hire includes wired or wireless options for speeches, announcements, and performances.
             </CardContent>
           </Card>
           <Card className="border">
