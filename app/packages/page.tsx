@@ -31,7 +31,7 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
     >
       <Tabs defaultValue={selectedPackage} className="w-full">
         <TabsList
-          className="!h-auto grid w-full max-w-4xl grid-cols-1 gap-2 bg-transparent p-0 sm:grid-cols-3"
+          className="!h-auto mx-auto grid w-full max-w-4xl grid-cols-1 gap-2 bg-transparent p-0 sm:grid-cols-3"
           variant="line"
         >
           {packageTiers.map((pkg) => (
@@ -45,7 +45,7 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
           ))}
         </TabsList>
         {packageTiers.map((pkg) => (
-          <TabsContent key={pkg.slug} value={pkg.slug} className="mt-6 w-full max-w-3xl">
+          <TabsContent key={pkg.slug} value={pkg.slug} className="mx-auto mt-6 w-full max-w-3xl">
             <PackageCard pkg={pkg} priority={pkg.slug === selectedPackage} />
           </TabsContent>
         ))}
