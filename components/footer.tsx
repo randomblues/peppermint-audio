@@ -22,7 +22,7 @@ export function Footer() {
               alt={business.name}
               width={266}
               height={51}
-              className="h-auto w-44"
+              className="-ml-2 h-auto w-44"
             />
             <p>Email: {business.email}</p>
             <p>Phone: {business.phone}</p>
