@@ -28,19 +28,27 @@ export async function POST(request: Request) {
     }
 
     const { email, firstName, lastName, mobile, eventType, eventAddress, pickupDate, dropoffDate, packageInterest, guestCount, additionalDetails } = parsed.data;
-    const calendarEventLink = await createBookingCalendarEvent({
-      firstName,
-      lastName,
-      email,
-      mobile,
-      eventType,
-      eventAddress,
-      pickupDate,
-      dropoffDate,
-      packageInterest,
-      guestCount,
-      additionalDetails,
-    });
+    let calendarEventLink: string | null = null;
+    let calendarError: string | null = null;
+
+    try {
+      calendarEventLink = await createBookingCalendarEvent({
+        firstName,
+        lastName,
+        email,
+        mobile,
+        eventType,
+        eventAddress,
+        pickupDate,
+        dropoffDate,
+        packageInterest,
+        guestCount,
+        additionalDetails,
+      });
+    } catch (error) {
+      calendarError = error instanceof Error ? error.message : "Unknown Google Calendar error";
+      console.error("Google Calendar event creation failed:", error);
+    }
 
     const text = [
       "New audio equipment booking",
@@ -59,6 +67,7 @@ export async function POST(request: Request) {
       "",
       "Terms: Customer confirmed they have read and agree to the PA Equipment Hire Terms & Conditions.",
       calendarEventLink ? `Google Calendar event: ${calendarEventLink}` : "",
+      calendarError ? `Google Calendar event was not created: ${calendarError}` : "",
     ].join("\n");
 
     const bookingSummary = [
@@ -105,7 +114,7 @@ export async function POST(request: Request) {
 
     await Promise.all([internalEmail, customerEmail]);
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, calendarEventCreated: Boolean(calendarEventLink) });
   } catch {
     return NextResponse.json({ error: "Something went wrong while sending your booking details." }, { status: 500 });
   }
