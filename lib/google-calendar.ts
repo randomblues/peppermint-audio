@@ -1,0 +1,87 @@
+import { google } from "googleapis";
+
+type BookingCalendarDetails = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  mobile: string;
+  eventType: string;
+  eventAddress: string;
+  pickupDate: string;
+  dropoffDate: string;
+  packageInterest: string;
+  guestCount: number;
+  additionalDetails: string;
+};
+
+function getOAuthClient() {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const redirectUri = process.env.GOOGLE_CALENDAR_REDIRECT_URI;
+
+  if (!clientId || !clientSecret || !redirectUri) {
+    throw new Error(
+      "Google Calendar is not configured. Add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_CALENDAR_REDIRECT_URI.",
+    );
+  }
+
+  return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+}
+
+export function getGoogleCalendarAuthorizationUrl() {
+  const client = getOAuthClient();
+
+  return client.generateAuthUrl({
+    access_type: "offline",
+    prompt: "consent",
+    scope: ["https://www.googleapis.com/auth/calendar.events"],
+  });
+}
+
+export async function exchangeGoogleCalendarCode(code: string) {
+  const client = getOAuthClient();
+  const { tokens } = await client.getToken(code);
+
+  return tokens.refresh_token;
+}
+
+function addOneDay(dateValue: string) {
+  const date = new Date(`${dateValue}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+export async function createBookingCalendarEvent(details: BookingCalendarDetails) {
+  const refreshToken = process.env.GOOGLE_CALENDAR_REFRESH_TOKEN;
+  if (!refreshToken) {
+    return null;
+  }
+
+  const client = getOAuthClient();
+  client.setCredentials({ refresh_token: refreshToken });
+  const calendar = google.calendar({ version: "v3", auth: client });
+  const calendarId = process.env.GOOGLE_CALENDAR_ID ?? "primary";
+
+  const response = await calendar.events.insert({
+    calendarId,
+    requestBody: {
+      summary: `PA Hire - ${details.eventType} - ${details.firstName} ${details.lastName}`,
+      description: [
+        `Customer: ${details.firstName} ${details.lastName}`,
+        `Email: ${details.email}`,
+        `Mobile: ${details.mobile}`,
+        `Package: ${details.packageInterest}`,
+        `Estimated guests: ${details.guestCount}`,
+        "",
+        "Additional details:",
+        details.additionalDetails || "None provided",
+      ].join("\n"),
+      location: details.eventAddress,
+      start: { date: details.pickupDate },
+      end: { date: addOneDay(details.dropoffDate) },
+      reminders: { useDefault: true },
+    },
+  });
+
+  return response.data.htmlLink ?? null;
+}

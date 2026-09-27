@@ -26,9 +26,17 @@ import {
 
 type EnquiryFormProps = {
   packageName?: string;
+  heading?: string;
+  description?: string;
+  submitLabel?: string;
 };
 
-export function EnquiryForm({ packageName }: EnquiryFormProps) {
+export function EnquiryForm({
+  packageName,
+  heading = "Event enquiry form",
+  description,
+  submitLabel = "Send enquiry",
+}: EnquiryFormProps) {
   const [submitted, setSubmitted] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -83,7 +91,8 @@ export function EnquiryForm({ packageName }: EnquiryFormProps) {
   return (
     <Card className="border">
       <CardHeader>
-        <CardTitle>Event enquiry form</CardTitle>
+        <CardTitle>{heading}</CardTitle>
+        {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="space-y-4">
@@ -190,7 +199,7 @@ export function EnquiryForm({ packageName }: EnquiryFormProps) {
           {serverError ? <p className="text-sm text-destructive">{serverError}</p> : null}
 
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Sending..." : "Send enquiry"}
+            {isSubmitting ? "Sending..." : submitLabel}
           </Button>
         </form>
       </CardContent>

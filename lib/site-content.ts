@@ -47,6 +47,45 @@ export const addOnCatalog: Record<string, AddOn> = {
   },
 };
 
+export const hireTerms = [
+  {
+    title: "1. ID Verification",
+    body: "Valid photo ID must be presented at pickup. The booking name must match the ID. We reserve the right to refuse hire if ID cannot be verified.",
+  },
+  {
+    title: "2. Security Deposit",
+    body: "A refundable deposit is required for all hires. The amount depends on the package and will be confirmed before booking. The deposit covers damage, missing items, late returns, or excessive cleaning. Deposits are fully refunded if equipment is returned on time, in original condition, and with all accessories.",
+  },
+  {
+    title: "3. Equipment Responsibility",
+    body: "The hirer is fully responsible for all equipment from pickup until return. Equipment must not be dropped, exposed to water, or misused. Any damage or loss will be charged at repair or replacement cost.",
+  },
+  {
+    title: "4. Late Returns",
+    body: "Equipment must be returned at the agreed time. Late returns may incur additional fees. Delays affecting other bookings may result in extra charges.",
+  },
+  {
+    title: "5. Use of Equipment",
+    body: "Equipment is for normal event use only, such as parties and functions. It must not be used for illegal activities or unsafe environments. The hirer is responsible for explicitly enquiring about any additional equipment or accessories required that are not included in the selected package.",
+  },
+  {
+    title: "6. Pickup & Return",
+    body: "All equipment is collected and returned from 181 Nicholson St, Abbotsford, Melbourne (3067). The hirer must ensure suitable transport to prevent damage.",
+  },
+  {
+    title: "7. Faults & Issues",
+    body: "If issues occur, contact Peppermint Audio immediately. We are not responsible for venue power issues, setup errors, or external limitations.",
+  },
+  {
+    title: "8. Liability",
+    body: "We are not liable for injury, damage, or loss of event time caused by equipment use or external factors. The hirer assumes full responsibility once equipment is collected.",
+  },
+  {
+    title: "9. Agreement",
+    body: "By completing the booking and paying the deposit, you confirm you have read and agree to these terms and authorise charges for damage, loss, or late return.",
+  },
+];
+
 export const business = {
   name: "Peppermint Audio",
   website: "https://www.peppermintaudio.com.au",
