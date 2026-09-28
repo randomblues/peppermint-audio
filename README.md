@@ -27,6 +27,13 @@ Marketing website for a Melbourne PA equipment hire business, built with:
 - `RESEND_API_KEY`: API key from Resend
 - `ENQUIRY_FROM_EMAIL`: verified sender (or Resend onboarding address during setup)
 - `ENQUIRY_TO_EMAIL`: inbox for customer enquiries
+- `NEXT_PUBLIC_SUPABASE_URL`: Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase public anon key
+- `SUPABASE_SERVICE_ROLE_KEY`: server-only Supabase service role key
+
+## Booking management
+
+Run `supabase/001_booking_management.sql` in the Supabase SQL editor, then create administrator users under Supabase Authentication > Users. Bookings are submitted at `/booking` and managed at `/admin`; photo IDs remain in the private `booking-photo-ids` bucket and are only available through short-lived signed links.
 
 ## Run
 
