@@ -83,7 +83,7 @@ describe("BookingForm", () => {
 
     request.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
     fireEvent.click(screen.getByRole("button", { name: "Submit booking details" }));
-    expect(await screen.findByText("Your booking request has been submitted")).toBeInTheDocument();
+    expect(await screen.findByText("Your booking request has been received")).toBeInTheDocument();
     expect(screen.getByText("Please note that your booking has not yet been confirmed.")).toBeInTheDocument();
     expect(screen.getByText(/Once your booking is confirmed/)).toBeInTheDocument();
   });

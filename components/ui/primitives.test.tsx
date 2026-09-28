@@ -29,6 +29,23 @@ import {
   NavigationMenuList,
   NavigationMenuTrigger,
 } from "./navigation-menu";
+import { Button } from "./button";
+
+describe("Button primitive", () => {
+  it("uses pointer affordances for enabled and disabled states", () => {
+    render(
+      <>
+        <Button>Continue</Button>
+        <Button disabled>Disabled</Button>
+      </>,
+    );
+
+    expect(screen.getByRole("button", { name: "Continue" })).toHaveClass("cursor-pointer");
+    expect(screen.getByRole("button", { name: "Disabled" }))
+      .toBeDisabled()
+      .toHaveClass("disabled:cursor-not-allowed");
+  });
+});
 
 describe("Select primitive", () => {
   it("opens, selects an item, and renders grouped content", async () => {

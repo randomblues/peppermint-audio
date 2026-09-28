@@ -154,7 +154,7 @@ export function BookingForm({ initialPackageSlug }: BookingFormProps) {
       <Card className="mx-auto w-full max-w-3xl !overflow-visible border">
         <CardHeader>
           <Badge variant="secondary" className="w-fit">Request submitted</Badge>
-          <CardTitle>Your booking request has been submitted</CardTitle>
+          <CardTitle>Your booking request has been received</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
           <p>Please note that your booking has not yet been confirmed.</p>
