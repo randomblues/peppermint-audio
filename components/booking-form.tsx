@@ -247,8 +247,10 @@ export function BookingForm({ initialPackageSlug }: BookingFormProps) {
                         </div>
                         <span className="shrink-0 whitespace-nowrap text-xl font-semibold">${pkg.price}</span>
                       </div>
-                      <p className="mt-2 text-sm font-medium text-foreground">Ideal for {pkg.capacity}</p>
-                      <p className="mt-2 text-sm text-muted-foreground">{pkg.summary}</p>
+                      <div className="mt-3 border-t pt-3">
+                        <p className="text-sm font-medium text-foreground">Ideal for {pkg.capacity}</p>
+                        <p className="mt-2 text-sm text-muted-foreground">{pkg.summary}</p>
+                      </div>
                       <ul className="mt-4 space-y-1.5 border-t pt-3 text-sm text-muted-foreground">
                         {pkg.inclusions.slice(0, 4).map((item) => (
                           <li key={item}>• {item}</li>

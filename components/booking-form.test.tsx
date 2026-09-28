@@ -51,6 +51,7 @@ describe("BookingForm", () => {
       name: /Standard Party & Events Package/i,
     });
     expect(selectedPackage).toBeChecked();
+    expect(screen.getByText("Ideal for 60-120 people").parentElement).toHaveClass("border-t");
   });
 
   it("shows booking API errors and the success confirmation", async () => {
