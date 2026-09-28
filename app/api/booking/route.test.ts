@@ -136,6 +136,7 @@ describe("POST /api/booking", () => {
     expect(send).toHaveBeenCalledWith(expect.objectContaining({ to: ["to@example.com"], attachments: expect.any(Array) }));
     expect(send).toHaveBeenCalledWith(expect.objectContaining({
       to: ["alex@example.com"],
+      subject: "Your booking request has been received",
       text: expect.stringContaining("Your request is not confirmed yet"),
     }));
   });

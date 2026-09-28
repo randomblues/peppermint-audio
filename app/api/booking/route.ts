@@ -102,9 +102,9 @@ export async function POST(request: Request) {
       attachments: await Promise.all(files.map(async (file) => ({ filename: file.name, content: Buffer.from(await file.arrayBuffer()).toString("base64") }))),
       });
       const customerEmail = resend.emails.send({
-      from: fromEmail, to: [data.email], replyTo: toEmail, subject: "Your Peppermint Audio booking details have been received",
+      from: fromEmail, to: [data.email], replyTo: toEmail, subject: "Your booking request has been received",
       text: [
-        `Hi ${data.firstName},`, "", "Thanks for submitting your booking details to Peppermint Audio.", "",
+        `Hi ${data.firstName},`, "", "Thanks for submitting your booking request to Peppermint Audio.", "",
         `Event: ${data.eventType}`, `Event address: ${data.eventAddress}`, `Pickup date: ${formatEmailDate(data.pickupDate)}`,
         `Drop-off date: ${formatEmailDate(data.dropoffDate)}`, `Package: ${data.packageInterest}`, `Estimated guests: ${data.guestCount}`,
         `Add-ons: ${selectedAddOns.length ? selectedAddOns.join(", ") : "None selected"}`,

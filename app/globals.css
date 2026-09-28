@@ -126,12 +126,18 @@ body {
     @apply border-border outline-ring/50;
   }
 
+  a,
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
   [role="tab"]:not([aria-disabled="true"]),
   [role="option"],
   summary {
-    cursor: pointer;
+    cursor: pointer !important;
+  }
+
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed !important;
   }
 
   body {
