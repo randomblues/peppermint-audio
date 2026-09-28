@@ -85,6 +85,6 @@ describe("BookingForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Submit booking details" }));
     expect(await screen.findByText("Your booking request has been submitted")).toBeInTheDocument();
     expect(screen.getByText("Please note that your booking has not yet been confirmed.")).toBeInTheDocument();
-    expect(screen.getByText(/Once we confirm it from our admin console/)).toBeInTheDocument();
+    expect(screen.getByText(/Once your booking is confirmed/)).toBeInTheDocument();
   });
 });
