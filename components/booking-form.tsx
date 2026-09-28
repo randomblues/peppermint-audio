@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { packageTiers, hireTerms } from "@/lib/site-content";
+import { addOnCatalog, packageTiers, hireTerms } from "@/lib/site-content";
 import { bookingSchema, type BookingFormInputValues } from "@/lib/validation/booking";
 
 const steps = [
@@ -32,6 +32,7 @@ const initialValues: BookingFormInputValues = {
   pickupDate: "",
   dropoffDate: "",
   packageInterest: "",
+  addOns: "",
   guestCount: 1,
   additionalDetails: "",
   termsAccepted: "",
@@ -58,6 +59,12 @@ export function BookingForm() {
   function updateValue(name: keyof BookingFormInputValues, value: string) {
     setValues((current) => ({ ...current, [name]: value }));
     setErrors((current) => ({ ...current, [name]: "" }));
+  }
+
+  function toggleAddOn(slug: string) {
+    const selected = values.addOns ? values.addOns.split(",").filter(Boolean) : [];
+    const next = selected.includes(slug) ? selected.filter((value) => value !== slug) : [...selected, slug];
+    updateValue("addOns", next.join(","));
   }
 
   function validateCurrentStep() {
@@ -196,7 +203,7 @@ export function BookingForm() {
             <p className="text-sm text-muted-foreground">Please read what is included in each current package before choosing.</p>
             {packageTiers.map((pkg) => (
               <label key={pkg.slug} className={`block cursor-pointer rounded-xl border p-4 transition-colors ${values.packageInterest === pkg.name ? "border-primary bg-primary/5 ring-2 ring-primary/20" : "hover:bg-muted/50"}`}>
-                <input className="sr-only" type="radio" name="packageInterest" value={pkg.name} checked={values.packageInterest === pkg.name} onChange={(event) => updateValue("packageInterest", event.target.value)} />
+                <input className="sr-only" type="radio" name="packageInterest" value={pkg.name} checked={values.packageInterest === pkg.name} onChange={(event) => { updateValue("packageInterest", event.target.value); updateValue("addOns", ""); }} />
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-2"><span className="font-medium">{pkg.name}</span>{pkg.notes ? <Badge>{pkg.notes}</Badge> : null}</div>
@@ -208,6 +215,23 @@ export function BookingForm() {
               </label>
             ))}
             {fieldError(errors, "packageInterest")}
+            {values.packageInterest ? (() => {
+              const selectedPackage = packageTiers.find((pkg) => pkg.name === values.packageInterest);
+              const selectedAddOns = (values.addOns ?? "").split(",").filter(Boolean);
+              return selectedPackage && selectedPackage.addOnSlugs.length > 0 ? (
+                <div className="rounded-xl border p-4">
+                  <p className="font-medium">Optional add-ons</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Select any extras you would like us to consider for this package.</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {selectedPackage.addOnSlugs.map((slug) => {
+                      const addOn = addOnCatalog[slug];
+                      if (!addOn) return null;
+                      return <label key={slug} className="flex items-center gap-3 rounded-lg border p-3 text-sm"><input type="checkbox" checked={selectedAddOns.includes(slug)} onChange={() => toggleAddOn(slug)} /> <span>{addOn.name}</span><span className="ml-auto text-muted-foreground">+${addOn.price}</span></label>;
+                    })}
+                  </div>
+                </div>
+              ) : null;
+            })() : null}
           </div>
         ) : null}
 

@@ -10,6 +10,7 @@ export const bookingSchema = z.object({
   pickupDate: z.string().min(1, "Please select a pickup date"),
   dropoffDate: z.string().min(1, "Please select a drop-off date"),
   packageInterest: z.string().min(2, "Please select a package"),
+  addOns: z.string().default(""),
   guestCount: z.coerce
     .number()
     .int()

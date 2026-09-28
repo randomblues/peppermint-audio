@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   const pickupDate = getMelbourneTomorrow();
   const admin = createAdminClient();
   const result = await admin.from("bookings")
-    .select("id,email,first_name,last_name,event_type,pickup_date,package_interest,additional_details")
+    .select("id,email,first_name,last_name,event_type,pickup_date,package_interest,add_ons,additional_details")
     .eq("pickup_date", pickupDate)
     .neq("status", "cancelled")
     .is("reminder_sent_at", null);

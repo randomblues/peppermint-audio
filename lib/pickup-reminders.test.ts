@@ -19,6 +19,7 @@ describe("pickup reminders", () => {
       event_type: "Wedding & party",
       pickup_date: "2026-09-29",
       package_interest: "speech-presentation",
+      add_ons: ["Wireless Microphone Upgrade"],
       additional_details: "Need <extra> cable",
     });
     expect(email.html).toContain("&lt;Sam&gt;");
@@ -28,5 +29,6 @@ describe("pickup reminders", () => {
     expect(email.html).toContain("Need &lt;extra&gt; cable");
     expect(email.text).toContain("Please note:");
     expect(email.text).toContain("2 x Bose S1 Pro PA Speakers (150W each).");
+    expect(email.text).toContain("Wireless Microphone Upgrade");
   });
 });

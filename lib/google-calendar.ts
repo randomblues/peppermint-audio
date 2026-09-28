@@ -10,6 +10,7 @@ type BookingCalendarDetails = {
   pickupDate: string;
   dropoffDate: string;
   packageInterest: string;
+  addOns: string[];
   guestCount: number;
   additionalDetails: string;
 };
@@ -71,6 +72,7 @@ export async function createBookingCalendarEvent(details: BookingCalendarDetails
         `Email: ${details.email}`,
         `Mobile: ${details.mobile}`,
         `Package: ${details.packageInterest}`,
+        `Add-ons: ${details.addOns.length ? details.addOns.join(", ") : "None selected"}`,
         `Estimated guests: ${details.guestCount}`,
         "",
         "Additional details:",

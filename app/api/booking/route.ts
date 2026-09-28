@@ -1,6 +1,7 @@
 import { after, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createBookingCalendarEvent } from "@/lib/google-calendar";
+import { addOnCatalog, packageTiers } from "@/lib/site-content";
 import { createAdminClient, PHOTO_ID_BUCKET } from "@/lib/supabase";
 import { bookingSchema } from "@/lib/validation/booking";
 
@@ -42,6 +43,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Email service is not configured yet." }, { status: 500 });
     }
     const data = parsed.data;
+    const selectedAddOnSlugs = data.addOns.split(",").filter(Boolean);
+    const selectedPackage = packageTiers.find((pkg) => pkg.name === data.packageInterest || pkg.slug === data.packageInterest);
+    if (selectedAddOnSlugs.some((slug) => !selectedPackage?.addOnSlugs.includes(slug) || !addOnCatalog[slug])) {
+      return NextResponse.json({ error: "Please choose add-ons from the selected package." }, { status: 400 });
+    }
+    const selectedAddOns = selectedAddOnSlugs.map((slug) => addOnCatalog[slug].name);
     const admin = createAdminClient();
     const bookingId = crypto.randomUUID();
     const objectPaths: string[] = [];
@@ -56,7 +63,7 @@ export async function POST(request: Request) {
     const insert = await admin.from("bookings").insert({
       id: bookingId, email: data.email, first_name: data.firstName, last_name: data.lastName, mobile: data.mobile,
       event_type: data.eventType, event_address: data.eventAddress, pickup_date: data.pickupDate, dropoff_date: data.dropoffDate,
-      package_interest: data.packageInterest, guest_count: data.guestCount, additional_details: data.additionalDetails,
+      package_interest: data.packageInterest, add_ons: selectedAddOns, guest_count: data.guestCount, additional_details: data.additionalDetails,
       terms_accepted: data.termsAccepted === "accepted", photo_id_paths: objectPaths, status: "submitted",
       internal_email_sent: false, customer_email_sent: false,
     });
@@ -70,7 +77,7 @@ export async function POST(request: Request) {
       let calendarEventLink: string | null = null;
       let calendarError: string | null = null;
       try {
-        calendarEventLink = await createBookingCalendarEvent(data);
+        calendarEventLink = await createBookingCalendarEvent({ ...data, addOns: selectedAddOns });
       } catch (error) {
         calendarError = error instanceof Error ? error.message : "Unknown Google Calendar error";
         console.error("Google Calendar event creation failed:", error);
@@ -80,6 +87,7 @@ export async function POST(request: Request) {
       "New audio equipment booking", `Name: ${data.firstName} ${data.lastName}`, `Email: ${data.email}`, `Mobile: ${data.mobile}`,
       `Event type: ${data.eventType}`, `Event address: ${data.eventAddress}`, `Estimated guests: ${data.guestCount}`,
       `Pickup date: ${data.pickupDate}`, `Drop-off date: ${data.dropoffDate}`, `Package: ${data.packageInterest}`, "",
+      `Add-ons: ${selectedAddOns.length ? selectedAddOns.join(", ") : "None selected"}`, "",
       "Additional details:", data.additionalDetails || "None provided", "",
       "Terms: Customer confirmed they have read and agree to the PA Equipment Hire Terms & Conditions.",
       calendarEventLink ? `Google Calendar event: ${calendarEventLink}` : "",
@@ -96,6 +104,7 @@ export async function POST(request: Request) {
         `Hi ${data.firstName},`, "", "Thanks for submitting your booking details to Peppermint Audio.", "",
         `Event: ${data.eventType}`, `Event address: ${data.eventAddress}`, `Pickup date: ${formatEmailDate(data.pickupDate)}`,
         `Drop-off date: ${formatEmailDate(data.dropoffDate)}`, `Package: ${data.packageInterest}`, `Estimated guests: ${data.guestCount}`,
+        `Add-ons: ${selectedAddOns.length ? selectedAddOns.join(", ") : "None selected"}`,
         "", "We have received your details and photo ID. Our team will review everything and be in touch shortly.", "",
         "Kind regards,", "Peppermint Audio",
       ].join("\n"),
@@ -118,6 +127,7 @@ export async function POST(request: Request) {
                   <tr><td style="padding:7px 12px 7px 0;color:#777b75">Drop-off</td><td style="padding:7px 0;color:#20211f">${formatEmailDate(data.dropoffDate)}</td></tr>
                   <tr><td style="padding:7px 12px 7px 0;color:#777b75">Package</td><td style="padding:7px 0;color:#20211f">${escapeHtml(data.packageInterest)}</td></tr>
                   <tr><td style="padding:7px 12px 7px 0;color:#777b75">Guests</td><td style="padding:7px 0;color:#20211f">${data.guestCount}</td></tr>
+                  <tr><td style="padding:7px 12px 7px 0;color:#777b75">Add-ons</td><td style="padding:7px 0;color:#20211f">${escapeHtml(selectedAddOns.length ? selectedAddOns.join(", ") : "None selected")}</td></tr>
                 </table>
               </div>
               <p style="margin:24px 0 0;font-size:14px;line-height:1.6;color:#565955">If any of these details need correcting, simply reply to this email and our team will help.</p>
