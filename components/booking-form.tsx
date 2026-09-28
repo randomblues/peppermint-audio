@@ -210,7 +210,7 @@ export function BookingForm({ initialPackageSlug }: BookingFormProps) {
             <fieldset className="space-y-4">
               <legend className="text-base font-semibold">Choose your package</legend>
               <p className="text-sm text-muted-foreground">
-                Start with the complete setup that best fits your event. You can add optional extras after you choose.
+                Start with the complete setup that best fits your event. You can add optional add-ons after you choose.
               </p>
               <div className="grid gap-4 lg:grid-cols-3">
                 {packageTiers.map((pkg) => {
@@ -271,9 +271,9 @@ export function BookingForm({ initialPackageSlug }: BookingFormProps) {
               return selectedPackage && selectedPackage.addOnSlugs.length > 0 ? (
                 <div className="rounded-xl border border-dashed bg-muted/30 p-5">
                   <div className="max-w-2xl">
-                    <p className="font-semibold">Customise your package <span className="font-normal text-muted-foreground">(optional)</span></p>
+                    <p className="font-semibold">Add-ons <span className="font-normal text-muted-foreground">(optional)</span></p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Your <span className="font-medium text-foreground">{selectedPackage.name}</span> already includes everything you need to get started. Add an extra only if it suits your event.
+                      Your <span className="font-medium text-foreground">{selectedPackage.name}</span> already includes everything you need to get started. Select any add-ons that suit your event.
                     </p>
                   </div>
                   <div className="mt-4 grid gap-2 sm:grid-cols-2">

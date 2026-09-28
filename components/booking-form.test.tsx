@@ -38,6 +38,7 @@ describe("BookingForm", () => {
 
     const addOn = screen.queryByRole("checkbox", { name: /extra|subwoofer|microphone/i });
     if (addOn) {
+      expect(screen.getByText("Add-ons")).toBeInTheDocument();
       fireEvent.click(addOn);
       expect(addOn).toBeChecked();
     }
