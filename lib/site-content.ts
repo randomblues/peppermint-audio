@@ -189,7 +189,7 @@ export const packageTiers: PackageTier[] = [
       "Long Extension Leads as Needed.",
       "Multiple XLR Audio Cables as Needed.",
     ],
-    notes: "Wedding pick",
+    notes: "Highly recommended for weddings",
   },
 ];
 

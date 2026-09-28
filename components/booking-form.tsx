@@ -239,7 +239,11 @@ export function BookingForm({ initialPackageSlug }: BookingFormProps) {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex flex-1 flex-wrap items-center gap-2">
                           <span className="font-semibold">{pkg.name}</span>
-                          {pkg.notes ? <Badge>{pkg.notes}</Badge> : null}
+                          {pkg.notes ? (
+                            <span className="max-w-full text-xs font-medium leading-tight text-primary">
+                              {pkg.notes}
+                            </span>
+                          ) : null}
                         </div>
                         <span className="shrink-0 whitespace-nowrap text-xl font-semibold">${pkg.price}</span>
                       </div>
