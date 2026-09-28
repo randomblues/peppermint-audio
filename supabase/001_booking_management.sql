@@ -11,8 +11,10 @@ create table if not exists public.bookings (
   customer_email_sent boolean not null default false, internal_notes text not null default '',
   created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
+alter table public.bookings add column if not exists reminder_sent_at timestamptz;
 alter table public.bookings enable row level security;
 revoke all on public.bookings from anon, authenticated;
+drop policy if exists "service role manages bookings" on public.bookings;
 create policy "service role manages bookings" on public.bookings for all to service_role using (true) with check (true);
 create or replace function public.set_bookings_updated_at()
 returns trigger language plpgsql as $$ begin new.updated_at = now(); return new; end; $$;
@@ -21,6 +23,7 @@ create trigger bookings_updated_at before update on public.bookings
 for each row execute function public.set_bookings_updated_at();
 
 insert into storage.buckets (id, name, public) values ('booking-photo-ids', 'booking-photo-ids', false) on conflict (id) do nothing;
+drop policy if exists "service role manages booking photos" on storage.objects;
 create policy "service role manages booking photos" on storage.objects for all to service_role using (bucket_id = 'booking-photo-ids') with check (bucket_id = 'booking-photo-ids');
 
 -- Create an Auth user in Supabase Dashboard (Authentication > Users) for each administrator.
