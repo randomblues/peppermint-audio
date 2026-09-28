@@ -17,7 +17,7 @@ export default function BookingPage() {
     <Section
       eyebrow="Peppermint Audio"
       title="Making a booking"
-      description="Complete the form below with your event details so we can prepare your audio equipment hire."
+      description="Submitting the form creates a booking request. The booking is only confirmed after Peppermint Audio reviews availability and confirms it."
     >
       <BookingForm />
     </Section>

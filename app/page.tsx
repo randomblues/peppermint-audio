@@ -31,8 +31,8 @@ export default function Home() {
             </h1>
             <p className="mt-4 text-lg text-muted-foreground">{business.heroSubheading}</p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Button size="lg" nativeButton={false} render={<Link href="/contact" />}>
-                Get a Quote
+              <Button size="lg" nativeButton={false} render={<Link href="/booking" />}>
+                Book now
               </Button>
               <Button
                 variant="outline"
@@ -185,8 +185,8 @@ export default function Home() {
             <p className="mt-3 text-muted-foreground">
               Tell us your event details and we will confirm package availability.
             </p>
-            <Button className="mt-6" size="lg" nativeButton={false} render={<Link href="/contact" />}>
-              Start your enquiry
+            <Button className="mt-6" size="lg" nativeButton={false} render={<Link href="/booking" />}>
+              Start a booking request
             </Button>
           </div>
         </div>

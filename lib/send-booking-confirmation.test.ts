@@ -1,0 +1,45 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { send } = vi.hoisted(() => ({ send: vi.fn() }));
+
+vi.mock("resend", () => ({ Resend: vi.fn(() => ({ emails: { send } })) }));
+
+import { sendBookingConfirmationEmail } from "./send-booking-confirmation";
+
+const booking = {
+  email: "customer@example.com",
+  first_name: "Alex",
+  event_type: "Wedding",
+  pickup_date: "2026-10-09",
+  dropoff_date: "2026-10-11",
+  package_interest: "Standard Party & Events Package",
+  add_ons: ["Wireless Microphone Upgrade"],
+};
+
+describe("sendBookingConfirmationEmail", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubEnv("RESEND_API_KEY", "key");
+    vi.stubEnv("ENQUIRY_FROM_EMAIL", "Peppermint Audio <from@example.com>");
+  });
+
+  it("sends the confirmation template to the booking email", async () => {
+    send.mockResolvedValue({ data: { id: "email-1" }, error: null });
+
+    await expect(sendBookingConfirmationEmail(booking)).resolves.toBe("email-1");
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({
+      from: "Peppermint Audio <from@example.com>",
+      to: ["customer@example.com"],
+      subject: expect.stringContaining("booking is confirmed"),
+    }));
+  });
+
+  it("surfaces missing configuration and provider failures", async () => {
+    vi.stubEnv("RESEND_API_KEY", "");
+    await expect(sendBookingConfirmationEmail(booking)).rejects.toThrow("Email service is not configured.");
+
+    vi.stubEnv("RESEND_API_KEY", "key");
+    send.mockResolvedValue({ data: null, error: { message: "provider down" } });
+    await expect(sendBookingConfirmationEmail(booking)).rejects.toThrow("Booking confirmation email could not be sent.");
+  });
+});

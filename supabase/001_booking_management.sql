@@ -8,11 +8,13 @@ create table if not exists public.bookings (
   terms_accepted boolean not null default false, photo_id_paths text[] not null default '{}',
   status text not null default 'submitted' check (status in ('submitted','confirmed','completed','cancelled')),
   calendar_event_link text, calendar_error text, internal_email_sent boolean not null default false,
-  customer_email_sent boolean not null default false, internal_notes text not null default '',
+  customer_email_sent boolean not null default false, confirmation_email_sent boolean not null default false,
+  internal_notes text not null default '',
   created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
 alter table public.bookings add column if not exists reminder_sent_at timestamptz;
 alter table public.bookings add column if not exists add_ons text[] not null default '{}';
+alter table public.bookings add column if not exists confirmation_email_sent boolean not null default false;
 alter table public.bookings enable row level security;
 revoke all on public.bookings from anon, authenticated;
 drop policy if exists "service role manages bookings" on public.bookings;

@@ -146,12 +146,12 @@ export function BookingForm() {
     return (
       <Card className="mx-auto w-full max-w-3xl !overflow-visible border">
         <CardHeader>
-          <Badge variant="secondary" className="w-fit">Booking details received</Badge>
-          <CardTitle>Thanks, your booking details have been sent</CardTitle>
+          <Badge variant="secondary" className="w-fit">Request submitted</Badge>
+          <CardTitle>Your booking request has been submitted</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
-          <p>We have received your details, package selection, and photo ID. We will use them to prepare your hire.</p>
-          <p>If anything further is needed, Peppermint Audio will contact you directly.</p>
+          <p>Please note that your booking has not yet been confirmed.</p>
+          <p>Someone from our team will reach out, if not already, to discuss your booking. Once we confirm it from our admin console, you will automatically receive a confirmation email.</p>
         </CardContent>
       </Card>
     );

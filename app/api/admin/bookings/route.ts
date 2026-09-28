@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { PHOTO_ID_BUCKET } from "@/lib/supabase";
+import { sendBookingConfirmationEmail } from "@/lib/send-booking-confirmation";
 
 export async function GET(request: Request) {
   const session = await requireAdmin();
@@ -26,7 +27,38 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
   if (!body.id || (body.status && !["submitted", "confirmed", "completed", "cancelled"].includes(body.status))) return NextResponse.json({ error: "Invalid update." }, { status: 400 });
+  let confirmation: {
+    email: string;
+    first_name: string;
+    event_type: string;
+    pickup_date: string;
+    dropoff_date: string;
+    package_interest: string;
+    add_ons: string[] | null;
+    confirmation_email_sent: boolean;
+  } | null = null;
+  if (body.status === "confirmed") {
+    const result = await session.admin.from("bookings")
+      .select("email,first_name,event_type,pickup_date,dropoff_date,package_interest,add_ons,confirmation_email_sent")
+      .eq("id", body.id)
+      .single();
+    if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 });
+    if (!result.data) return NextResponse.json({ error: "Booking could not be found." }, { status: 404 });
+    confirmation = result.data;
+    if (!confirmation.confirmation_email_sent) {
+      try {
+        await sendBookingConfirmationEmail(confirmation);
+      } catch (error) {
+        console.error("Booking confirmation email failed:", error);
+        const message = error instanceof Error ? error.message : "Booking confirmation email could not be sent.";
+        return NextResponse.json({ error: message }, { status: message === "Email service is not configured." ? 500 : 502 });
+      }
+    }
+  }
   const update = { ...(body.status ? { status: body.status } : {}), ...(body.internal_notes !== undefined ? { internal_notes: body.internal_notes } : {}), updated_at: new Date().toISOString() };
+  if (body.status === "confirmed" && confirmation && !confirmation.confirmation_email_sent) {
+    Object.assign(update, { confirmation_email_sent: true });
+  }
   const { error } = await session.admin.from("bookings").update(update).eq("id", body.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

@@ -105,7 +105,7 @@ export async function POST(request: Request) {
         `Event: ${data.eventType}`, `Event address: ${data.eventAddress}`, `Pickup date: ${formatEmailDate(data.pickupDate)}`,
         `Drop-off date: ${formatEmailDate(data.dropoffDate)}`, `Package: ${data.packageInterest}`, `Estimated guests: ${data.guestCount}`,
         `Add-ons: ${selectedAddOns.length ? selectedAddOns.join(", ") : "None selected"}`,
-        "", "We have received your details and photo ID. Our team will review everything and be in touch shortly.", "",
+        "", "We have received your booking request and photo ID. Your request is not confirmed yet; our team will review availability and be in touch shortly.", "",
         "Kind regards,", "Peppermint Audio",
       ].join("\n"),
       html: `
@@ -117,7 +117,7 @@ export async function POST(request: Request) {
             <div style="padding:34px 32px">
               <p style="margin:0 0 8px;color:#5c806f;font-size:13px;font-weight:bold;letter-spacing:1px;text-transform:uppercase">Booking received</p>
               <h1 style="margin:0 0 16px;font-size:26px;line-height:1.2;color:#20211f">Thanks, ${escapeHtml(data.firstName)}.</h1>
-              <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:#565955">We have received your booking details and photo ID. Our team will review everything and be in touch shortly.</p>
+              <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:#565955">We have received your booking request and photo ID. Your request is not confirmed yet; our team will review availability and be in touch shortly.</p>
               <div style="border:1px solid #e4ddd5;border-radius:12px;background:#faf9f7;padding:20px">
                 <p style="margin:0 0 16px;font-size:14px;font-weight:bold;color:#20211f">Booking summary</p>
                 <table role="presentation" style="width:100%;border-collapse:collapse;font-size:14px;line-height:1.5">

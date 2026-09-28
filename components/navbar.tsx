@@ -20,6 +20,7 @@ import {
 import { business } from "@/lib/site-content";
 
 const navLinks = [
+  { href: "/booking", label: "Book now" },
   { href: "/packages", label: "Packages" },
   { href: "/how-it-works", label: "How It Works" },
   { href: "/faq", label: "FAQ" },
@@ -55,8 +56,8 @@ export function Navbar() {
           </NavigationMenuList>
         </NavigationMenu>
         <div className="flex items-center gap-2">
-          <Button className="hidden md:inline-flex" nativeButton={false} render={<Link href="/contact" />}>
-            Get a Quote
+          <Button className="hidden md:inline-flex" nativeButton={false} render={<Link href="/booking" />}>
+            Book now
           </Button>
 
           <Sheet>
@@ -89,8 +90,8 @@ export function Navbar() {
                     {link.label}
                   </Button>
                 ))}
-                <Button className="mt-2" nativeButton={false} render={<Link href="/contact" />}>
-                  Get a Quote
+                <Button className="mt-2" nativeButton={false} render={<Link href="/booking" />}>
+                  Book now
                 </Button>
               </div>
             </SheetContent>

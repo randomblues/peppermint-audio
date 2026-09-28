@@ -30,6 +30,12 @@ These rules are mandatory. Safety, preservation of existing work, bounded execut
 - After editing, re-read the changed section and run the most relevant syntax check, formatter, linter, type-check, or test.
 - Do not modify generated files, lockfiles, or release metadata unless the task requires it.
 
+## Mandatory unit testing
+
+- Every code change or new feature MUST include or update unit tests covering the changed behavior.
+- Unit tests are mandatory; do not consider a code change complete without them unless the change is documentation-only or a test is technically impossible. In that case, document the reason explicitly in the completion report.
+- Run the relevant focused tests and the broader test suite when practical, and report the actual results.
+
 ## Terminal commands
 
 - Use commands appropriate for the detected operating system and shell.

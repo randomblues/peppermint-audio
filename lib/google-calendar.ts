@@ -1,4 +1,4 @@
-mport { google } from "googleapis";
+import { google } from "googleapis";
 
 type BookingCalendarDetails = {
   firstName: string;
