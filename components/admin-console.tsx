@@ -1,13 +1,129 @@
 "use client";
-import { useEffect, useState } from "react";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ComponentType, ReactNode } from "react";
+import {
+  Archive, CalendarDays, CheckCircle2, ChevronRight, Clock3, Download,
+  ExternalLink, FileText, LayoutDashboard, LogOut, Mail, Menu, RefreshCw,
+  Search, ShieldCheck, UserRound, X, XCircle,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-type Booking = Record<string, unknown> & { id: string; first_name: string; last_name: string; event_type: string; pickup_date: string; status: string; internal_notes?: string; photo_id_paths?: string[] };
+import { Card, CardContent } from "@/components/ui/card";
+
+type Booking = Record<string, unknown> & {
+  id: string; first_name: string; last_name: string; event_type: string;
+  pickup_date: string; dropoff_date?: string; status: string;
+  internal_notes?: string; photo_id_paths?: string[];
+};
+const statuses = ["submitted", "confirmed", "completed", "cancelled"] as const;
+const statusLabel = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+const display = (value: unknown) => value === null || value === undefined || value === "" ? "—" : String(value);
+const formatDate = (value: unknown) => {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat("en-AU", { day: "numeric", month: "short", year: "numeric" }).format(new Date(`${String(value)}T00:00:00`));
+};
+const statusClass = (value: string) => ({
+  submitted: "border-amber-200 bg-amber-50 text-amber-700",
+  confirmed: "border-blue-200 bg-blue-50 text-blue-700",
+  completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  cancelled: "border-red-200 bg-red-50 text-red-700",
+}[value] ?? "border-border bg-muted text-muted-foreground");
+type SummaryCard = { key: string; label: string; icon: ComponentType<{ className?: string }>; color: string; count: number };
+
 export function AdminConsole() {
-  const [bookings, setBookings] = useState<Booking[]>([]); const [search, setSearch] = useState(""); const [status, setStatus] = useState(""); const [range, setRange] = useState({ from: "", to: "" }); const [message, setMessage] = useState("");
-  useEffect(() => { void (async () => { const query = new URLSearchParams({ ...(search ? { search } : {}), ...(status ? { status } : {}) }); const response = await fetch(`/api/admin/bookings?${query}`); if (response.status === 401) window.location.href = "/admin/login"; else setBookings((await response.json()).bookings ?? []); })(); }, [search, status]);
-  async function update(id: string, values: { status?: string; internal_notes?: string }) { await fetch("/api/admin/bookings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...values }) }); setBookings((current) => current.map((booking) => booking.id === id ? { ...booking, ...values } : booking)); }
-  async function exportArchive() { if (!range.from || !range.to || !window.confirm("Export bookings and private attachments for this date range?")) return; const response = await fetch("/api/admin/export", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...range, confirm: true }) }); if (!response.ok) { setMessage((await response.json()).error); return; } const blob = await response.blob(); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `booking-archive-${range.from}-to-${range.to}.zip`; link.click(); URL.revokeObjectURL(link.href); }
-  async function signedLink(path: string) { const response = await fetch(`/api/admin/photo-link?path=${encodeURIComponent(path)}`); const { url, error } = await response.json(); if (url) window.open(url, "_blank", "noopener,noreferrer"); else setMessage(error); }
-  async function deleteBooking(id: string) { if (!window.confirm("Permanently delete this booking and its private photo IDs?")) return; const response = await fetch("/api/admin/bookings", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, confirm: true }) }); if (!response.ok) { setMessage((await response.json()).error); return; } setBookings((current) => current.filter((booking) => booking.id !== id)); }
-  return <main className="mx-auto max-w-6xl space-y-6 px-6 py-10"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm text-muted-foreground">Peppermint Audio</p><h1 className="text-3xl font-semibold">Booking management</h1></div><Button variant="outline" onClick={async () => { await fetch("/api/admin/logout", { method: "POST" }); window.location.href = "/admin/login"; }}>Sign out</Button></div><section className="flex flex-wrap gap-2"><input placeholder="Search name, email or event" value={search} onChange={(e) => setSearch(e.target.value)} className="rounded border bg-background p-2" /><select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded border bg-background p-2"><option value="">All statuses</option>{["submitted", "confirmed", "completed", "cancelled"].map((value) => <option key={value}>{value}</option>)}</select><Button onClick={() => setSearch(search)}>Search</Button></section><section className="rounded border p-4"><h2 className="mb-3 font-semibold">Date-range archive export</h2><div className="flex flex-wrap gap-2"><input type="date" value={range.from} onChange={(e) => setRange({ ...range, from: e.target.value })} className="rounded border bg-background p-2" /><input type="date" value={range.to} onChange={(e) => setRange({ ...range, to: e.target.value })} className="rounded border bg-background p-2" /><Button onClick={() => void exportArchive()}>Export ZIP</Button></div></section>{message && <p className="text-sm text-destructive">{message}</p>}<div className="space-y-4">{bookings.map((booking) => <article key={booking.id} className="rounded border p-4"><div className="flex flex-wrap justify-between gap-3"><div><h2 className="font-semibold">{booking.first_name} {booking.last_name} — {booking.event_type}</h2><p className="text-sm text-muted-foreground">{String(booking.email)} · {booking.pickup_date} to {String(booking.dropoff_date)}</p><p className="text-sm">{String(booking.event_address)}</p></div><select value={booking.status} onChange={(e) => void update(booking.id, { status: e.target.value })} className="h-9 rounded border bg-background px-2">{["submitted", "confirmed", "completed", "cancelled"].map((value) => <option key={value}>{value}</option>)}</select></div><textarea defaultValue={booking.internal_notes ?? ""} onBlur={(e) => void update(booking.id, { internal_notes: e.target.value })} placeholder="Internal notes" className="mt-3 min-h-20 w-full rounded border bg-background p-2 text-sm" />{booking.photo_id_paths?.length ? <div className="mt-2 flex gap-2">{booking.photo_id_paths.map((path) =>   <Button key={path} variant="outline" size="sm" onClick={() => void signedLink(path)}>View photo ID</Button>)}</div> : null}<Button variant="destructive" size="sm" className="mt-3" onClick={() => void deleteBooking(booking.id)}>Delete booking</Button></article>)}</div></main>;
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [selected, setSelected] = useState<Booking | null>(null);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [range, setRange] = useState({ from: "", to: "" });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [mobileNav, setMobileNav] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError("");
+    try {
+      const query = new URLSearchParams({ ...(search ? { search } : {}), ...(status ? { status } : {}) });
+      const response = await fetch(`/api/admin/bookings?${query}`, { cache: "no-store" });
+      if (response.status === 401) { window.location.href = "/admin/login"; return; }
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Could not load bookings.");
+      setBookings(data.bookings ?? []); setLastUpdated(new Date());
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not load bookings."); }
+    finally { setLoading(false); }
+  }, [search, status]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
+
+  const visibleBookings = useMemo(() => bookings.filter((booking) =>
+    (!dateFrom || booking.pickup_date >= dateFrom) && (!dateTo || booking.pickup_date <= dateTo)), [bookings, dateFrom, dateTo]);
+  const counts = useMemo(() => statuses.reduce((result, key) => ({ ...result, [key]: bookings.filter((b) => b.status === key).length }), {} as Record<string, number>), [bookings]);
+  const upcomingCount = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return bookings.filter((booking) => booking.pickup_date >= today && booking.status !== "cancelled" && booking.status !== "completed").length;
+  }, [bookings]);
+
+  async function update(id: string, values: { status?: string; internal_notes?: string }) {
+    const response = await fetch("/api/admin/bookings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...values }) });
+    if (!response.ok) { setMessage((await response.json()).error ?? "Update failed."); return; }
+    setBookings((current) => current.map((booking) => booking.id === id ? { ...booking, ...values } : booking));
+    setSelected((current) => current?.id === id ? { ...current, ...values } : current);
+    setMessage("Booking updated.");
+  }
+  async function signedLink(path: string) {
+    const response = await fetch(`/api/admin/photo-link?path=${encodeURIComponent(path)}`);
+    const data = await response.json(); if (data.url) window.open(data.url, "_blank", "noopener,noreferrer"); else setMessage(data.error ?? "Photo ID unavailable.");
+  }
+  async function exportArchive() {
+    if (!range.from || !range.to || !window.confirm("This archive includes booking data and private photo IDs. Continue?")) return;
+    const response = await fetch("/api/admin/export", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...range, confirm: true }) });
+    if (!response.ok) { setMessage((await response.json()).error ?? "Export failed."); return; }
+    const blob = await response.blob(); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `booking-archive-${range.from}-to-${range.to}.zip`; link.click(); URL.revokeObjectURL(link.href); setMessage("Archive downloaded.");
+  }
+  async function deleteBooking(id: string) {
+    if (!window.confirm("Permanently delete this booking and its private photo IDs?")) return;
+    const response = await fetch("/api/admin/bookings", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, confirm: true }) });
+    if (!response.ok) { setMessage((await response.json()).error ?? "Delete failed."); return; }
+    setBookings((current) => current.filter((booking) => booking.id !== id)); setSelected(null); setMessage("Booking deleted.");
+  }
+  async function signOut() { await fetch("/api/admin/logout", { method: "POST" }); window.location.href = "/admin/login"; }
+
+  return (
+    <div className="min-h-screen bg-muted/30">
+      <aside className={`fixed inset-y-0 left-0 z-30 w-64 border-r bg-card p-5 transition-transform md:translate-x-0 ${mobileNav ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="flex items-center gap-3 border-b pb-6"><div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground"><ShieldCheck className="size-5" /></div><div><p className="font-semibold">Peppermint Audio</p><p className="text-xs text-muted-foreground">Operations console</p></div></div>
+        <nav className="mt-6 space-y-1"><a className="flex items-center gap-3 rounded-lg bg-primary/10 px-3 py-2.5 text-sm font-medium text-primary" href="#bookings"><LayoutDashboard className="size-4" />Bookings</a><a className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted" href="#archive"><Archive className="size-4" />Archive export</a></nav>
+        <div className="absolute bottom-5 left-5 right-5 border-t pt-4"><Button variant="ghost" className="w-full justify-start gap-3" onClick={() => void signOut()}><LogOut className="size-4" />Sign out</Button></div>
+      </aside>
+      {mobileNav && <button aria-label="Close navigation" className="fixed inset-0 z-20 bg-black/20 md:hidden" onClick={() => setMobileNav(false)} />}
+      <div className="md:pl-64">
+        <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background/95 px-4 backdrop-blur sm:px-8"><Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileNav(true)}><Menu /></Button><div className="hidden md:block"><p className="text-sm font-medium">Booking management</p><p className="text-xs text-muted-foreground">Keep every event moving smoothly</p></div><div className="flex items-center gap-3"><span className="hidden text-xs text-muted-foreground sm:inline">{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" })}` : "Not updated yet"}</span><Button variant="outline" size="sm" className="gap-2" onClick={() => void load()} disabled={loading}><RefreshCw className={loading ? "size-3.5 animate-spin" : "size-3.5"} />Refresh</Button><Button variant="ghost" size="icon" className="md:hidden" onClick={() => void signOut()}><LogOut /></Button></div></header>
+        <main className="mx-auto max-w-7xl space-y-7 p-4 sm:p-8">
+          <section className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-medium text-primary">Good to see you</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Bookings overview</h1><p className="mt-1 text-sm text-muted-foreground">Review enquiries, confirm details, and prepare every event.</p></div><div className="flex items-center gap-2 text-xs text-muted-foreground"><Clock3 className="size-3.5" />{lastUpdated ? `Last updated ${lastUpdated.toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short" })}` : "Loading latest data"}</div></section>
+          <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">{([{ key: "upcoming", label: "Upcoming", icon: CalendarDays, color: "text-primary", count: upcomingCount }, { key: "submitted", label: "Submitted", icon: FileText, color: "text-amber-600", count: counts.submitted }, { key: "confirmed", label: "Confirmed", icon: CheckCircle2, color: "text-blue-600", count: counts.confirmed }, { key: "completed", label: "Completed", icon: CalendarDays, color: "text-emerald-600", count: counts.completed }, { key: "cancelled", label: "Cancelled", icon: XCircle, color: "text-red-600", count: counts.cancelled }] satisfies SummaryCard[]).map(({ key, label, icon: Icon, color, count }) => <Card key={key}><CardContent className="flex items-center justify-between p-4"><div><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-semibold">{count}</p></div><div className={`rounded-lg bg-muted p-2.5 ${color}`}><Icon className="size-5" /></div></CardContent></Card>)}</section>
+          <section id="bookings" className="space-y-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">All bookings</h2><p className="text-sm text-muted-foreground">{visibleBookings.length} {visibleBookings.length === 1 ? "booking" : "bookings"} in view</p></div></div>
+            <Card><CardContent className="flex flex-wrap gap-2 p-3"><div className="relative min-w-[220px] flex-1"><Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" /><input aria-label="Search bookings" placeholder="Search name, email or event" value={search} onChange={(e) => setSearch(e.target.value)} className="h-9 w-full rounded-lg border bg-background pl-9 pr-3 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring" /></div><select aria-label="Filter by status" value={status} onChange={(e) => setStatus(e.target.value)} className="h-9 rounded-lg border bg-background px-3 text-sm"><option value="">All statuses</option>{statuses.map((value) => <option key={value}>{statusLabel(value)}</option>)}</select><input aria-label="Bookings from date" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 rounded-lg border bg-background px-3 text-sm" /><input aria-label="Bookings to date" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 rounded-lg border bg-background px-3 text-sm" /></CardContent></Card>
+            {message && <p className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm text-primary">{message}</p>}
+            {error ? <Card><CardContent className="flex flex-col items-center gap-3 p-10 text-center"><XCircle className="size-8 text-destructive" /><p className="font-medium">We couldn&apos;t load bookings</p><p className="text-sm text-muted-foreground">{error}</p><Button variant="outline" onClick={() => void load()}>Try again</Button></CardContent></Card> : loading ? <Card><CardContent className="p-10 text-center text-sm text-muted-foreground"><RefreshCw className="mx-auto mb-3 size-6 animate-spin" />Loading bookings…</CardContent></Card> : visibleBookings.length === 0 ? <Card><CardContent className="p-12 text-center"><CalendarDays className="mx-auto mb-3 size-8 text-muted-foreground" /><p className="font-medium">No bookings match these filters</p><p className="mt-1 text-sm text-muted-foreground">Try clearing a filter or check back after a new enquiry.</p></CardContent></Card> : <Card><div className="divide-y">{visibleBookings.map((booking) => <button key={booking.id} onClick={() => setSelected(booking)} className="flex w-full flex-wrap items-center gap-4 p-4 text-left transition-colors hover:bg-muted/50 sm:flex-nowrap"><div className="flex min-w-0 flex-1 items-center gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">{booking.first_name[0]}{booking.last_name[0]}</div><div className="min-w-0"><p className="truncate font-medium">{booking.first_name} {booking.last_name}</p><p className="truncate text-sm text-muted-foreground">{display(booking.email)}</p></div></div><div className="w-36"><p className="text-sm font-medium">{display(booking.event_type)}</p><p className="text-xs text-muted-foreground">{formatDate(booking.pickup_date)}</p></div><Badge className={statusClass(booking.status)}>{statusLabel(booking.status)}</Badge><ChevronRight className="ml-auto size-4 text-muted-foreground" /></button>)}</div></Card>}
+          </section>
+          <section id="archive" className="rounded-xl border border-dashed border-amber-300 bg-amber-50/60 p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div className="flex gap-3"><div className="rounded-lg bg-amber-100 p-2 text-amber-700"><Archive className="size-5" /></div><div><h2 className="font-semibold text-amber-950">Archive export</h2><p className="mt-1 max-w-xl text-sm text-amber-900/70">Download a ZIP of booking records and private photo IDs for a specific pickup date range. Handle this file securely.</p></div></div><div className="flex flex-wrap gap-2"><input aria-label="Archive from date" type="date" value={range.from} onChange={(e) => setRange({ ...range, from: e.target.value })} className="h-9 rounded-lg border border-amber-200 bg-background px-3 text-sm" /><input aria-label="Archive to date" type="date" value={range.to} onChange={(e) => setRange({ ...range, to: e.target.value })} className="h-9 rounded-lg border border-amber-200 bg-background px-3 text-sm" /><Button variant="outline" className="gap-2 border-amber-300 bg-background" onClick={() => void exportArchive()}><Download className="size-4" />Export ZIP</Button></div></div></section>
+        </main>
+      </div>
+      {selected && <BookingDetail booking={selected} onClose={() => setSelected(null)} onUpdate={update} onPhoto={signedLink} onDelete={deleteBooking} />}
+    </div>
+  );
 }
+
+function BookingDetail({ booking, onClose, onUpdate, onPhoto, onDelete }: { booking: Booking; onClose: () => void; onUpdate: (id: string, values: { status?: string; internal_notes?: string }) => Promise<void>; onPhoto: (path: string) => Promise<void>; onDelete: (id: string) => Promise<void> }) {
+  const [notes, setNotes] = useState(booking.internal_notes ?? "");
+  return <div className="fixed inset-0 z-40 flex justify-end bg-black/30" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><aside className="h-full w-full max-w-xl overflow-y-auto bg-background shadow-2xl"><div className="sticky top-0 z-10 flex items-start justify-between border-b bg-background p-5"><div><p className="text-sm text-primary">Booking details</p><h2 className="mt-1 text-2xl font-semibold">{booking.first_name} {booking.last_name}</h2><p className="text-sm text-muted-foreground">{display(booking.event_type)} · {formatDate(booking.pickup_date)}</p></div><Button variant="ghost" size="icon" onClick={onClose} aria-label="Close details"><X /></Button></div><div className="space-y-6 p-5"><div className="flex items-center justify-between"><Badge className={statusClass(booking.status)}>{statusLabel(booking.status)}</Badge><select aria-label="Update booking status" value={booking.status} onChange={(e) => void onUpdate(booking.id, { status: e.target.value })} className="h-9 rounded-lg border bg-background px-3 text-sm">{statuses.map((value) => <option key={value}>{value}</option>)}</select></div><div className="grid grid-cols-2 gap-4 rounded-xl border p-4 text-sm"><Detail label="Customer" value={`${booking.first_name} ${booking.last_name}`} icon={<UserRound />} /><Detail label="Email" value={display(booking.email)} icon={<Mail />} /><Detail label="Mobile" value={display(booking.mobile)} /><Detail label="Event address" value={display(booking.event_address)} /><Detail label="Pickup" value={formatDate(booking.pickup_date)} /><Detail label="Drop-off" value={formatDate(booking.dropoff_date)} /><Detail label="Package" value={display(booking.package_interest)} /><Detail label="Guests" value={display(booking.guest_count)} /></div><div><h3 className="mb-2 text-sm font-semibold">Additional details</h3><p className="rounded-lg bg-muted p-3 text-sm leading-relaxed">{display(booking.additional_details)}</p></div><div><h3 className="mb-2 text-sm font-semibold">Internal notes</h3><textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-24 w-full rounded-lg border bg-background p-3 text-sm" placeholder="Add a private note for the team…" /><Button size="sm" className="mt-2" onClick={() => void onUpdate(booking.id, { internal_notes: notes })}>Save notes</Button></div><div><h3 className="mb-2 text-sm font-semibold">Actions & outcomes</h3><div className="space-y-2 rounded-lg border p-3 text-sm"><Outcome label="Internal email" ok={booking.internal_email_sent === true} /><Outcome label="Customer email" ok={booking.customer_email_sent === true} /><Outcome label="Google Calendar" ok={Boolean(booking.calendar_event_link)} error={display(booking.calendar_error)} />{booking.calendar_event_link ? <a className="mt-2 inline-flex items-center gap-1 text-primary hover:underline" href={String(booking.calendar_event_link)} target="_blank" rel="noreferrer">Open Calendar event <ExternalLink className="size-3.5" /></a> : null}</div></div>{booking.photo_id_paths?.length ? <div><h3 className="mb-2 text-sm font-semibold">Photo ID</h3><div className="flex flex-wrap gap-2">{booking.photo_id_paths.map((path) => <Button key={path} variant="outline" size="sm" onClick={() => void onPhoto(path)}>View private ID <ExternalLink /></Button>)}</div></div> : null}<Button variant="destructive" className="w-full" onClick={() => void onDelete(booking.id)}>Permanently delete booking</Button></div></aside></div>;
+}
+function Detail({ label, value, icon }: { label: string; value: string; icon?: ReactNode }) { return <div className="min-w-0"><p className="flex items-center gap-1 text-xs text-muted-foreground">{icon ? <span className="size-3">{icon}</span> : null}{label}</p><p className="mt-1 break-words font-medium">{value}</p></div>; }
+function Outcome({ label, ok, error }: { label: string; ok: boolean; error?: string }) { return <div className="flex items-center justify-between"><span>{label}</span><span className={ok ? "text-emerald-600" : "text-amber-600"}>{ok ? "Sent / created" : error && error !== "—" ? "Failed" : "Not available"}</span></div>; }
