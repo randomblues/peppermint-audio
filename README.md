@@ -27,8 +27,8 @@ Marketing website for a Melbourne PA equipment hire business, built with:
 - `RESEND_API_KEY`: API key from Resend
 - `ENQUIRY_FROM_EMAIL`: verified sender (or Resend onboarding address during setup)
 - `ENQUIRY_TO_EMAIL`: inbox for customer enquiries
-- `NEXT_PUBLIC_SUPABASE_URL`: Supabase project URL
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase public anon key
+- `SUPABASE_URL`: Supabase project URL
+- `SUPABASE_ANON_KEY`: Supabase publishable/anon key
 - `SUPABASE_SERVICE_ROLE_KEY`: server-only Supabase service role key
 
 ## Booking management

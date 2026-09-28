@@ -24,5 +24,5 @@ insert into storage.buckets (id, name, public) values ('booking-photo-ids', 'boo
 create policy "service role manages booking photos" on storage.objects for all to service_role using (bucket_id = 'booking-photo-ids') with check (bucket_id = 'booking-photo-ids');
 
 -- Create an Auth user in Supabase Dashboard (Authentication > Users) for each administrator.
--- Set NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY
+-- Set SUPABASE_URL, SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY
 -- in the deployment environment. Never expose the service role key to a browser.
