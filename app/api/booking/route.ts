@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createBookingCalendarEvent } from "@/lib/google-calendar";
 import { createAdminClient, PHOTO_ID_BUCKET } from "@/lib/supabase";
@@ -45,12 +45,13 @@ export async function POST(request: Request) {
     const admin = createAdminClient();
     const bookingId = crypto.randomUUID();
     const objectPaths: string[] = [];
-    for (const [index, file] of files.entries()) {
+    const uploadedFiles = await Promise.all(files.map(async (file, index) => {
       const path = `${bookingId}/${index === 0 ? "front" : "back"}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
       const upload = await admin.storage.from(PHOTO_ID_BUCKET).upload(path, Buffer.from(await file.arrayBuffer()), { contentType: file.type || "application/octet-stream", upsert: false });
       if (upload.error) throw new Error(`Photo ID upload failed: ${upload.error.message}`);
-      objectPaths.push(path);
-    }
+      return path;
+    }));
+    objectPaths.push(...uploadedFiles);
 
     const insert = await admin.from("bookings").insert({
       id: bookingId, email: data.email, first_name: data.firstName, last_name: data.lastName, mobile: data.mobile,
@@ -65,16 +66,17 @@ export async function POST(request: Request) {
       if (result.error) throw new Error(`Booking outcome persistence failed: ${result.error.message}`);
     };
 
-    let calendarEventLink: string | null = null;
-    let calendarError: string | null = null;
-    try {
-      calendarEventLink = await createBookingCalendarEvent(data);
-    } catch (error) {
-      calendarError = error instanceof Error ? error.message : "Unknown Google Calendar error";
-      console.error("Google Calendar event creation failed:", error);
-    }
-    await updateBooking({ calendar_event_link: calendarEventLink, calendar_error: calendarError });
-    const text = [
+    after(async () => {
+      let calendarEventLink: string | null = null;
+      let calendarError: string | null = null;
+      try {
+        calendarEventLink = await createBookingCalendarEvent(data);
+      } catch (error) {
+        calendarError = error instanceof Error ? error.message : "Unknown Google Calendar error";
+        console.error("Google Calendar event creation failed:", error);
+      }
+      await updateBooking({ calendar_event_link: calendarEventLink, calendar_error: calendarError });
+      const text = [
       "New audio equipment booking", `Name: ${data.firstName} ${data.lastName}`, `Email: ${data.email}`, `Mobile: ${data.mobile}`,
       `Event type: ${data.eventType}`, `Event address: ${data.eventAddress}`, `Estimated guests: ${data.guestCount}`,
       `Pickup date: ${data.pickupDate}`, `Drop-off date: ${data.dropoffDate}`, `Package: ${data.packageInterest}`, "",
@@ -82,13 +84,13 @@ export async function POST(request: Request) {
       "Terms: Customer confirmed they have read and agree to the PA Equipment Hire Terms & Conditions.",
       calendarEventLink ? `Google Calendar event: ${calendarEventLink}` : "",
       calendarError ? `Google Calendar event was not created: ${calendarError}` : "",
-    ].join("\n");
-    const resend = new Resend(resendApiKey);
-    const internalEmail = resend.emails.send({
+      ].join("\n");
+      const resend = new Resend(resendApiKey);
+      const internalEmail = resend.emails.send({
       from: fromEmail, to: [toEmail], replyTo: data.email, subject: `Booking request: ${data.eventType} from ${data.pickupDate} to ${data.dropoffDate}`, text,
       attachments: await Promise.all(files.map(async (file) => ({ filename: file.name, content: Buffer.from(await file.arrayBuffer()).toString("base64") }))),
-    });
-    const customerEmail = resend.emails.send({
+      });
+      const customerEmail = resend.emails.send({
       from: fromEmail, to: [data.email], replyTo: toEmail, subject: "Your Peppermint Audio booking details have been received",
       text: [
         `Hi ${data.firstName},`, "", "Thanks for submitting your booking details to Peppermint Audio.", "",
@@ -128,27 +130,28 @@ export async function POST(request: Request) {
           </div>
         </div>
       `,
-    });
-    let emails: Awaited<ReturnType<typeof resend.emails.send>>[];
-    try {
-      emails = await Promise.all([internalEmail, customerEmail]);
-    } catch (error) {
+      });
+      let emails: Awaited<ReturnType<typeof resend.emails.send>>[];
+      try {
+        emails = await Promise.all([internalEmail, customerEmail]);
+      } catch (error) {
+        await updateBooking({
+          calendar_event_link: calendarEventLink, calendar_error: calendarError,
+          internal_email_sent: false, customer_email_sent: false,
+        });
+        throw new Error(`Booking email failed: ${error instanceof Error ? error.message : "Unknown email error"}`);
+      }
+      const internalEmailError = emails[0].error;
+      const customerEmailError = emails[1].error;
       await updateBooking({
         calendar_event_link: calendarEventLink, calendar_error: calendarError,
-        internal_email_sent: false, customer_email_sent: false,
+        internal_email_sent: !internalEmailError, customer_email_sent: !customerEmailError,
       });
-      throw new Error(`Booking email failed: ${error instanceof Error ? error.message : "Unknown email error"}`);
-    }
-    const internalEmailError = emails[0].error;
-    const customerEmailError = emails[1].error;
-    await updateBooking({
-      calendar_event_link: calendarEventLink, calendar_error: calendarError,
-      internal_email_sent: !internalEmailError, customer_email_sent: !customerEmailError,
+      if (internalEmailError || customerEmailError) {
+        throw new Error(`Booking email failed: ${internalEmailError?.message ?? customerEmailError?.message}`);
+      }
     });
-    if (internalEmailError || customerEmailError) {
-      throw new Error(`Booking email failed: ${internalEmailError?.message ?? customerEmailError?.message}`);
-    }
-    return NextResponse.json({ ok: true, calendarEventCreated: Boolean(calendarEventLink), bookingId });
+    return NextResponse.json({ ok: true, bookingId });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown booking error";
     console.error("Booking submission failed:", error);
