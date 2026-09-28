@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 
+import { emailFooterText } from "@/lib/email-footer";
 import { requireAdmin } from "@/lib/admin-auth";
 
 export async function POST(request: Request) {
@@ -28,7 +29,12 @@ export async function POST(request: Request) {
   const from = process.env.ENQUIRY_FROM_EMAIL;
   if (!apiKey || !from) return NextResponse.json({ error: "Email service is not configured." }, { status: 500 });
 
-  const response = await new Resend(apiKey).emails.send({ from, to: [booking.data.email], subject, text: message });
+  const response = await new Resend(apiKey).emails.send({
+    from,
+    to: [booking.data.email],
+    subject,
+    text: `${message}\n\n${emailFooterText}`,
+  });
   if (response.error) return NextResponse.json({ error: "Custom email could not be sent." }, { status: 502 });
   return NextResponse.json({ ok: true, id: response.data?.id });
 }

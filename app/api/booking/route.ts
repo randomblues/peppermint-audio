@@ -1,5 +1,6 @@
 import { after, NextResponse } from "next/server";
 import { Resend } from "resend";
+import { emailFooterHtml, emailFooterText } from "@/lib/email-footer";
 import { createBookingCalendarEvent } from "@/lib/google-calendar";
 import { addOnCatalog, packageTiers } from "@/lib/site-content";
 import { createAdminClient, PHOTO_ID_BUCKET } from "@/lib/supabase";
@@ -92,6 +93,8 @@ export async function POST(request: Request) {
       "Terms: Customer confirmed they have read and agree to the PA Equipment Hire Terms & Conditions.",
       calendarEventLink ? `Google Calendar event: ${calendarEventLink}` : "",
       calendarError ? `Google Calendar event was not created: ${calendarError}` : "",
+      "",
+      emailFooterText,
       ].join("\n");
       const resend = new Resend(resendApiKey);
       const internalEmail = resend.emails.send({
@@ -106,7 +109,7 @@ export async function POST(request: Request) {
         `Drop-off date: ${formatEmailDate(data.dropoffDate)}`, `Package: ${data.packageInterest}`, `Estimated guests: ${data.guestCount}`,
         `Add-ons: ${selectedAddOns.length ? selectedAddOns.join(", ") : "None selected"}`,
         "", "We have received your booking request and photo ID. Your request is not confirmed yet; our team will review availability and be in touch shortly.", "",
-        "Kind regards,", "Peppermint Audio",
+        emailFooterText,
       ].join("\n"),
       html: `
         <div style="margin:0;background:#f4f1ed;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;color:#20211f">
@@ -132,11 +135,7 @@ export async function POST(request: Request) {
               </div>
               <p style="margin:24px 0 0;font-size:14px;line-height:1.6;color:#565955">If any of these details need correcting, simply reply to this email and our team will help.</p>
             </div>
-            <div style="border-top:1px solid #e4ddd5;padding:20px 32px;text-align:center;color:#777b75;font-size:12px;line-height:1.6">
-              <strong style="color:#20211f">Peppermint Audio</strong><br />
-              Melbourne audio equipment hire · Abbotsford 3067<br />
-              contactus@peppermintaudio.com.au · 0452 316 823
-            </div>
+            ${emailFooterHtml}
           </div>
         </div>
       `,

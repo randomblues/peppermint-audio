@@ -1,3 +1,5 @@
+import { emailFooterHtml, emailFooterText } from "@/lib/email-footer";
+
 type BookingConfirmationDetails = {
   firstName: string;
   eventType: string;
@@ -33,8 +35,7 @@ export function buildBookingConfirmationEmail(details: BookingConfirmationDetail
     "",
     "Our team will be in touch if there are any final details to discuss.",
     "",
-    "Kind regards,",
-    "Peppermint Audio",
+    emailFooterText,
   ].join("\n");
   const html = `
     <div style="margin:0;background:#f4f1ed;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;color:#20211f">
@@ -56,11 +57,7 @@ export function buildBookingConfirmationEmail(details: BookingConfirmationDetail
           </div>
           <p style="margin:24px 0 0;font-size:14px;line-height:1.6;color:#565955">Our team will be in touch if there are any final details to discuss.</p>
         </div>
-        <div style="border-top:1px solid #e4ddd5;padding:20px 32px;text-align:center;color:#777b75;font-size:12px;line-height:1.6">
-          <strong style="color:#20211f">Peppermint Audio</strong><br />
-          Melbourne audio equipment hire · Abbotsford 3067<br />
-          contactus@peppermintaudio.com.au · 0452 316 823
-        </div>
+        ${emailFooterHtml}
       </div>
     </div>
   `;

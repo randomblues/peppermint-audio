@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 
+import { emailFooterText } from "@/lib/email-footer";
 import { enquirySchema } from "@/lib/validation/enquiry";
 
 const resendApiKey = process.env.RESEND_API_KEY;
@@ -46,6 +47,8 @@ export async function POST(request: Request) {
       "",
       "Event details:",
       message,
+      "",
+      emailFooterText,
     ].join("\n");
 
     await resend.emails.send({

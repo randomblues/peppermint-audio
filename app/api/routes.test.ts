@@ -189,7 +189,7 @@ describe("admin booking routes", () => {
     expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({
       to: ["customer@example.com"],
       subject: "A quick update",
-      text: "Please call us when you can.",
+      text: expect.stringContaining("Please call us when you can.\n\nKind regards,\nPeppermint Audio"),
     }));
   });
 
