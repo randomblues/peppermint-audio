@@ -52,9 +52,15 @@ export function AdminConsole() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<"success" | "error">("success");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [mobileNav, setMobileNav] = useState(false);
   const [section, setSection] = useState<AdminSection>("bookings");
+
+  const showMessage = useCallback((nextMessage: string, type: "success" | "error") => {
+    setMessage(nextMessage);
+    setMessageType(type);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -73,11 +79,19 @@ export function AdminConsole() {
     return () => window.clearTimeout(timer);
   }, [load]);
   useEffect(() => {
-    const syncSection = () => setSection(window.location.hash === "#archive" ? "archive" : "bookings");
+    const syncSection = () => {
+      setSection(window.location.hash === "#archive" ? "archive" : "bookings");
+      setMessage("");
+    };
     syncSection();
     window.addEventListener("hashchange", syncSection);
     return () => window.removeEventListener("hashchange", syncSection);
   }, []);
+  useEffect(() => {
+    if (!message || messageType !== "success") return;
+    const timer = window.setTimeout(() => setMessage(""), 4000);
+    return () => window.clearTimeout(timer);
+  }, [message, messageType]);
 
   const visibleBookings = useMemo(() => filterBookings(bookings, { status, from: dateFrom, to: dateTo }), [bookings, status, dateFrom, dateTo]);
   const counts = useMemo(() => statusCounts(bookings), [bookings]);
@@ -86,37 +100,38 @@ export function AdminConsole() {
   async function update(id: string, values: { status?: string; internal_notes?: string }) {
     try {
       const response = await fetch("/api/admin/bookings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...values }) });
-      if (!response.ok) { setMessage(await responseError(response, "Update failed.")); return; }
+      if (!response.ok) { showMessage(await responseError(response, "Update failed."), "error"); return; }
       setBookings((current) => current.map((booking) => booking.id === id ? { ...booking, ...values } : booking));
       setSelected((current) => current?.id === id ? { ...current, ...values } : current);
-      setMessage("Booking updated.");
-    } catch { setMessage("Update failed. Check your connection and try again."); }
+      showMessage("Booking updated.", "success");
+    } catch { showMessage("Update failed. Check your connection and try again.", "error"); }
   }
   async function signedLink(path: string) {
     try {
       const response = await fetch(`/api/admin/photo-link?path=${encodeURIComponent(path)}`);
       const data = await response.json();
       if (response.ok && data.url) window.open(data.url, "_blank", "noopener,noreferrer");
-      else setMessage(data.error ?? "Photo ID unavailable.");
-    } catch { setMessage("Photo ID unavailable. Check your connection and try again."); }
+      else showMessage(data.error ?? "Photo ID unavailable.", "error");
+    } catch { showMessage("Photo ID unavailable. Check your connection and try again.", "error"); }
   }
   async function exportArchive() {
     if (!range.from || !range.to || !window.confirm("This archive includes booking data and private photo IDs. Continue?")) return;
     const response = await fetch("/api/admin/export", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...range, confirm: true }) });
-    if (!response.ok) { setMessage(await responseError(response, "Export failed.")); return; }
-    const blob = await response.blob(); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `booking-archive-${range.from}-to-${range.to}.zip`; link.click(); URL.revokeObjectURL(link.href); setMessage("Archive downloaded.");
+    if (!response.ok) { showMessage(await responseError(response, "Export failed."), "error"); return; }
+    const blob = await response.blob(); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `booking-archive-${range.from}-to-${range.to}.zip`; link.click(); URL.revokeObjectURL(link.href); showMessage("Archive downloaded.", "success");
   }
   async function deleteBooking(id: string) {
     if (!window.confirm("Permanently delete this booking and its private photo IDs?")) return;
     const response = await fetch("/api/admin/bookings", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, confirm: true }) });
-    if (!response.ok) { setMessage(await responseError(response, "Delete failed.")); return; }
-    setBookings((current) => current.filter((booking) => booking.id !== id)); setSelected(null); setMessage("Booking deleted.");
+    if (!response.ok) { showMessage(await responseError(response, "Delete failed."), "error"); return; }
+    setBookings((current) => current.filter((booking) => booking.id !== id)); setSelected(null); showMessage("Booking deleted.", "success");
   }
   async function signOut() { await fetch("/api/admin/logout", { method: "POST" }); window.location.href = "/admin/login"; }
   function navigateSection(nextSection: AdminSection, event: React.MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
     setSection(nextSection);
     setMobileNav(false);
+    setMessage("");
     window.history.replaceState(null, "", `#${nextSection}`);
   }
 
@@ -129,13 +144,13 @@ export function AdminConsole() {
       </aside>
       {mobileNav && <button aria-label="Close navigation" className="fixed inset-0 z-20 bg-black/20 md:hidden" onClick={() => setMobileNav(false)} />}
       <div className="md:pl-64">
-        <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background/95 px-4 backdrop-blur sm:px-8"><Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileNav(true)}><Menu /></Button><div className="hidden md:block"><p className="text-sm font-medium">{section === "archive" ? "Archive export" : "Booking management"}</p><p className="text-xs text-muted-foreground">{section === "archive" ? "Securely download booking records" : "Keep every event moving smoothly"}</p></div><div className="flex items-center gap-3"><span className="hidden text-xs text-muted-foreground sm:inline">{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" })}` : "Not updated yet"}</span><Button variant="outline" size="sm" className="gap-2" onClick={() => void load()} disabled={loading}><RefreshCw className={loading ? "size-3.5 animate-spin" : "size-3.5"} />Refresh</Button><Button variant="ghost" size="icon" className="md:hidden" onClick={() => void signOut()}><LogOut /></Button></div></header>
-        <main className="mx-auto max-w-7xl space-y-7 p-4 sm:p-8">
-          {message && <p className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm text-primary">{message}</p>}
+        <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur"><div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-8"><Button variant="ghost" size="icon" className="shrink-0 md:hidden" onClick={() => setMobileNav(true)}><Menu /></Button><div className="hidden min-w-0 md:block"><p className="text-sm font-medium">{section === "archive" ? "Archive export" : "Booking management"}</p><p className="text-xs text-muted-foreground">{section === "archive" ? "Securely download booking records" : "Keep every event moving smoothly"}</p></div><div className="flex shrink-0 items-center gap-3"><span className="hidden text-xs text-muted-foreground sm:inline">{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" })}` : "Not updated yet"}</span><Button variant="outline" size="sm" className="gap-2" onClick={() => void load()} disabled={loading}><RefreshCw className={loading ? "size-3.5 animate-spin" : "size-3.5"} />Refresh</Button><Button variant="ghost" size="icon" className="md:hidden" onClick={() => void signOut()}><LogOut /></Button></div></div></header>
+        <main className="mx-auto w-full max-w-6xl space-y-7 p-4 sm:p-8">
+          {message && <p role="status" className={`rounded-lg border px-4 py-2.5 text-sm ${messageType === "error" ? "border-destructive/20 bg-destructive/5 text-destructive" : "border-primary/20 bg-primary/5 text-primary"}`}>{message}</p>}
           {section === "bookings" ? <><section className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-medium text-primary">Good to see you</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Bookings overview</h1><p className="mt-1 text-sm text-muted-foreground">Review enquiries, confirm details, and prepare every event.</p></div><div className="flex items-center gap-2 text-xs text-muted-foreground"><Clock3 className="size-3.5" />{lastUpdated ? `Last updated ${lastUpdated.toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short" })}` : "Loading latest data"}</div></section>
-          <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">{([{ key: "upcoming", label: "Upcoming", icon: CalendarDays, color: "text-primary", count: upcomingCount }, { key: "submitted", label: "Submitted", icon: FileText, color: "text-amber-600", count: counts.submitted }, { key: "confirmed", label: "Confirmed", icon: CheckCircle2, color: "text-blue-600", count: counts.confirmed }, { key: "completed", label: "Completed", icon: CalendarDays, color: "text-emerald-600", count: counts.completed }, { key: "cancelled", label: "Cancelled", icon: XCircle, color: "text-red-600", count: counts.cancelled }] satisfies SummaryCard[]).map(({ key, label, icon: Icon, color, count }) => <Card key={key}><CardContent className="flex items-center justify-between p-4"><div><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-semibold">{count}</p></div><div className={`rounded-lg bg-muted p-2.5 ${color}`}><Icon className="size-5" /></div></CardContent></Card>)}</section>
+          <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">{([{ key: "upcoming", label: "Upcoming", icon: CalendarDays, color: "text-primary", count: upcomingCount }, { key: "submitted", label: "Submitted", icon: FileText, color: "text-amber-600", count: counts.submitted }, { key: "confirmed", label: "Confirmed", icon: CheckCircle2, color: "text-blue-600", count: counts.confirmed }, { key: "completed", label: "Completed", icon: CalendarDays, color: "text-emerald-600", count: counts.completed }, { key: "cancelled", label: "Cancelled", icon: XCircle, color: "text-red-600", count: counts.cancelled }] satisfies SummaryCard[]).map(({ key, label, icon: Icon, color, count }) => <Card key={key}><CardContent className="flex items-center justify-between p-4"><div><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-semibold">{count}</p></div><div className={`rounded-lg bg-muted p-2.5 ${color}`}><Icon className="size-5" /></div></CardContent></Card>)}</section>
           <section id="bookings" className="space-y-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">All bookings</h2><p className="text-sm text-muted-foreground">{visibleBookings.length} {visibleBookings.length === 1 ? "booking" : "bookings"} in view</p></div></div>
-            <Card><CardContent className="grid gap-3 p-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto]"><label className="relative min-w-0"><span className="sr-only">Search bookings</span><Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" /><input aria-label="Search bookings" placeholder="Search name, email or event" value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 w-full min-w-0 rounded-lg border bg-background pl-9 pr-3 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring" /></label><label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground"><span>Status</span><select aria-label="Filter by status" value={status} onChange={(e) => setStatus(e.target.value)} className="h-10 w-full rounded-lg border bg-background px-3 text-sm font-normal text-foreground"><option value="">All statuses</option>{statuses.map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}</select></label><label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground"><span>Pickup from</span><input aria-label="Bookings from date" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm font-normal text-foreground" /></label><label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground"><span>Pickup to</span><input aria-label="Bookings to date" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm font-normal text-foreground" /></label></CardContent></Card>
+            <Card><CardContent className="grid gap-4 p-3 sm:grid-cols-[repeat(2,minmax(10rem,1fr))] lg:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(10rem,1fr))]"><label className="relative min-w-0 sm:col-span-2 lg:col-span-1"><span className="sr-only">Search bookings</span><Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" /><input aria-label="Search bookings" placeholder="Search name, email or event" value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 w-full min-w-0 rounded-lg border bg-background pl-9 pr-3 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring" /></label><label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground"><span>Status</span><select aria-label="Filter by status" value={status} onChange={(e) => setStatus(e.target.value)} className="h-10 w-full rounded-lg border bg-background px-3 text-sm font-normal text-foreground"><option value="">All statuses</option>{statuses.map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}</select></label><label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground"><span>Pickup from</span><input aria-label="Bookings from date" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm font-normal text-foreground" /></label><label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground"><span>Pickup to</span><input aria-label="Bookings to date" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm font-normal text-foreground" /></label></CardContent></Card>
             {error ? <Card><CardContent className="flex flex-col items-center gap-3 p-10 text-center"><XCircle className="size-8 text-destructive" /><p className="font-medium">We couldn&apos;t load bookings</p><p className="text-sm text-muted-foreground">{error}</p><Button variant="outline" onClick={() => void load()}>Try again</Button></CardContent></Card> : loading ? <Card><CardContent className="p-10 text-center text-sm text-muted-foreground"><RefreshCw className="mx-auto mb-3 size-6 animate-spin" />Loading bookings…</CardContent></Card> : visibleBookings.length === 0 ? <Card><CardContent className="p-12 text-center"><CalendarDays className="mx-auto mb-3 size-8 text-muted-foreground" /><p className="font-medium">No bookings match these filters</p><p className="mt-1 text-sm text-muted-foreground">Try clearing a filter or check back after a new enquiry.</p></CardContent></Card> : <Card><div className="divide-y">{visibleBookings.map((booking) => <button key={booking.id} onClick={() => setSelected(booking)} className="flex w-full flex-wrap items-center gap-4 p-4 text-left transition-colors hover:bg-muted/50 sm:flex-nowrap"><div className="flex min-w-0 flex-1 items-center gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">{booking.first_name[0]}{booking.last_name[0]}</div><div className="min-w-0"><p className="truncate font-medium">{booking.first_name} {booking.last_name}</p><p className="truncate text-sm text-muted-foreground">{display(booking.email)}</p></div></div><div className="w-36"><p className="text-sm font-medium">{display(booking.event_type)}</p><p className="text-xs text-muted-foreground">{formatDate(booking.pickup_date)}</p></div><Badge className={statusClass(booking.status)}>{statusLabel(booking.status)}</Badge><ChevronRight className="ml-auto size-4 text-muted-foreground" /></button>)}</div></Card>}
           </section>
           </> : <section id="archive" aria-labelledby="archive-title" className="space-y-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-medium text-primary">Data management</p><h1 id="archive-title" className="mt-1 text-3xl font-semibold tracking-tight">Archive export</h1><p className="mt-1 text-sm text-muted-foreground">Create a secure backup of booking records and private photo IDs.</p></div><a href="#bookings" onClick={(event) => navigateSection("bookings", event)} className="inline-flex items-center rounded-lg border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted">Back to bookings</a></div><div className="rounded-xl border border-dashed border-amber-300 bg-amber-50/60 p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div className="flex gap-3"><div className="rounded-lg bg-amber-100 p-2 text-amber-700"><Archive className="size-5" /></div><div><h2 className="font-semibold text-amber-950">Export booking archive</h2><p className="mt-1 max-w-xl text-sm text-amber-900/70">Download a ZIP of booking records and private photo IDs for a specific pickup date range. Handle this file securely.</p></div></div><div className="flex flex-wrap gap-2"><input aria-label="Archive from date" type="date" value={range.from} onChange={(e) => setRange({ ...range, from: e.target.value })} className="h-9 rounded-lg border border-amber-200 bg-background px-3 text-sm" /><input aria-label="Archive to date" type="date" value={range.to} onChange={(e) => setRange({ ...range, to: e.target.value })} className="h-9 rounded-lg border border-amber-200 bg-background px-3 text-sm" /><Button variant="outline" className="gap-2 border-amber-300 bg-background" onClick={() => void exportArchive()}><Download className="size-4" />Export ZIP</Button></div></div></div></section>}
