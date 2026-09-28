@@ -25,6 +25,6 @@ describe("POST /api/admin/test-reminder", () => {
     vi.stubEnv("ENQUIRY_FROM_EMAIL", "Peppermint Audio <test@example.com>");
     const response = await POST(new Request("http://localhost/api/admin/test-reminder", { method: "POST", body: JSON.stringify({ email: "recipient@example.com" }) }));
     expect(response.status).toBe(200);
-    expect(send).toHaveBeenCalledWith(expect.objectContaining({ to: ["recipient@example.com"], subject: "[TEST] Pickup reminder" }));
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ to: ["recipient@example.com"], subject: "Pickup reminder" }));
   });
 });

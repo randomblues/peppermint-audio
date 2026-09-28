@@ -199,34 +199,93 @@ export function BookingForm() {
         ) : null}
 
         {step === 3 ? (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">Please read what is included in each current package before choosing.</p>
-            {packageTiers.map((pkg) => (
-              <label key={pkg.slug} className={`block cursor-pointer rounded-xl border p-4 transition-colors ${values.packageInterest === pkg.name ? "border-primary bg-primary/5 ring-2 ring-primary/20" : "hover:bg-muted/50"}`}>
-                <input className="sr-only" type="radio" name="packageInterest" value={pkg.name} checked={values.packageInterest === pkg.name} onChange={(event) => { updateValue("packageInterest", event.target.value); updateValue("addOns", ""); }} />
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2"><span className="font-medium">{pkg.name}</span>{pkg.notes ? <Badge>{pkg.notes}</Badge> : null}</div>
-                    <p className="mt-1 text-sm text-muted-foreground">Ideal for {pkg.capacity}</p>
-                    <ul className="mt-3 space-y-1 text-sm text-muted-foreground">{pkg.inclusions.map((item) => <li key={item}>• {item}</li>)}</ul>
-                  </div>
-                  <span className="shrink-0 text-xl font-semibold">${pkg.price}</span>
-                </div>
-              </label>
-            ))}
+          <div className="space-y-8">
+            <fieldset className="space-y-4">
+              <legend className="text-base font-semibold">Choose your package</legend>
+              <p className="text-sm text-muted-foreground">
+                Start with the complete setup that best fits your event. You can add optional extras after you choose.
+              </p>
+              <div className="grid gap-4 lg:grid-cols-3">
+                {packageTiers.map((pkg) => {
+                  const isSelected = values.packageInterest === pkg.name;
+
+                  return (
+                    <label
+                      key={pkg.slug}
+                      className={`relative flex cursor-pointer flex-col rounded-xl border p-4 transition-colors ${
+                        isSelected
+                          ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                          : "hover:border-primary/50 hover:bg-muted/50"
+                      }`}
+                    >
+                      <input
+                        className="sr-only"
+                        type="radio"
+                        name="packageInterest"
+                        value={pkg.name}
+                        checked={isSelected}
+                        onChange={(event) => {
+                          updateValue("packageInterest", event.target.value);
+                          updateValue("addOns", "");
+                        }}
+                      />
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold">{pkg.name}</span>
+                          {pkg.notes ? <Badge>{pkg.notes}</Badge> : null}
+                        </div>
+                        <span className="shrink-0 text-xl font-semibold">${pkg.price}</span>
+                      </div>
+                      <p className="mt-2 text-sm font-medium text-foreground">Ideal for {pkg.capacity}</p>
+                      <p className="mt-2 text-sm text-muted-foreground">{pkg.summary}</p>
+                      <ul className="mt-4 space-y-1.5 border-t pt-3 text-sm text-muted-foreground">
+                        {pkg.inclusions.slice(0, 4).map((item) => (
+                          <li key={item}>• {item}</li>
+                        ))}
+                      </ul>
+                      <span className="mt-auto pt-4 text-sm font-medium text-primary">
+                        {isSelected ? "Selected package" : "Select this package"}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
             {fieldError(errors, "packageInterest")}
             {values.packageInterest ? (() => {
               const selectedPackage = packageTiers.find((pkg) => pkg.name === values.packageInterest);
               const selectedAddOns = (values.addOns ?? "").split(",").filter(Boolean);
               return selectedPackage && selectedPackage.addOnSlugs.length > 0 ? (
-                <div className="rounded-xl border p-4">
-                  <p className="font-medium">Optional add-ons</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Select any extras you would like us to consider for this package.</p>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <div className="rounded-xl border border-dashed bg-muted/30 p-5">
+                  <div className="max-w-2xl">
+                    <p className="font-semibold">Customise your package <span className="font-normal text-muted-foreground">(optional)</span></p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Your <span className="font-medium text-foreground">{selectedPackage.name}</span> already includes everything you need to get started. Add an extra only if it suits your event.
+                    </p>
+                  </div>
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
                     {selectedPackage.addOnSlugs.map((slug) => {
                       const addOn = addOnCatalog[slug];
                       if (!addOn) return null;
-                      return <label key={slug} className="flex items-center gap-3 rounded-lg border p-3 text-sm"><input type="checkbox" checked={selectedAddOns.includes(slug)} onChange={() => toggleAddOn(slug)} /> <span>{addOn.name}</span><span className="ml-auto text-muted-foreground">+${addOn.price}</span></label>;
+                      const inputId = `add-on-${slug}`;
+
+                      return (
+                        <label
+                          key={slug}
+                          htmlFor={inputId}
+                          className="flex cursor-pointer items-center gap-3 rounded-lg border bg-background p-3 text-sm transition-colors hover:border-primary/50"
+                        >
+                          <input
+                            id={inputId}
+                            type="checkbox"
+                            checked={selectedAddOns.includes(slug)}
+                            onChange={() => toggleAddOn(slug)}
+                            className="size-4 accent-primary"
+                          />
+                          <span>{addOn.name}</span>
+                          <span className="ml-auto shrink-0 text-muted-foreground">+${addOn.price}</span>
+                        </label>
+                      );
                     })}
                   </div>
                 </div>

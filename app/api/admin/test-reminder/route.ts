@@ -31,7 +31,11 @@ export async function POST(request: Request) {
       .select("email,first_name,last_name,event_type,pickup_date,package_interest,add_ons,additional_details")
       .eq("id", body.bookingId)
       .single();
-    if (result.error || !result.data) return NextResponse.json({ error: "Booking could not be found." }, { status: 404 });
+    if (result.error) {
+      console.error("Reminder booking lookup failed:", result.error);
+      return NextResponse.json({ error: "Booking lookup failed. Please confirm the latest Supabase migration has been applied." }, { status: 500 });
+    }
+    if (!result.data) return NextResponse.json({ error: "Booking could not be found." }, { status: 404 });
     booking = result.data;
   }
   const email = (booking?.email ?? body.email)?.trim();
@@ -56,7 +60,7 @@ export async function POST(request: Request) {
   const response = await new Resend(apiKey).emails.send({
     from,
     to: [email],
-    subject: `[TEST] ${reminder.subject}`,
+    subject: reminder.subject,
     text: reminder.text,
     html: reminder.html,
   });
