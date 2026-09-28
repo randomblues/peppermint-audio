@@ -36,6 +36,8 @@ Marketing website for a Melbourne PA equipment hire business, built with:
 
 Run `supabase/001_booking_management.sql` in the Supabase SQL editor, then create administrator users under Supabase Authentication > Users. Bookings are submitted at `/booking` and managed at `/admin`; photo IDs remain in the private `booking-photo-ids` bucket and are only available through short-lived signed links.
 
+The admin bookings view includes a **Send email reminder** tool. Enter a recipient address and choose **Send email reminder** to send the current pickup-reminder design without creating a booking or changing booking data.
+
 ## Pickup reminders
 
 `/api/cron/pickup-reminders` runs once daily through Vercel Cron and emails customers with a pickup scheduled for the next day in Melbourne. Set `CRON_SECRET` to a long random value in Vercel project environment variables; Vercel sends it as a Bearer token. The route uses the server-only Supabase service role and Resend credentials. Apply the booking migration before enabling the cron.

@@ -56,6 +56,8 @@ export function AdminConsole() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [mobileNav, setMobileNav] = useState(false);
   const [section, setSection] = useState<AdminSection>("bookings");
+  const [testEmail, setTestEmail] = useState("");
+  const [sendingTestEmail, setSendingTestEmail] = useState(false);
 
   const showMessage = useCallback((nextMessage: string, type: "success" | "error") => {
     setMessage(nextMessage);
@@ -126,6 +128,16 @@ export function AdminConsole() {
     if (!response.ok) { showMessage(await responseError(response, "Delete failed."), "error"); return; }
     setBookings((current) => current.filter((booking) => booking.id !== id)); setSelected(null); showMessage("Booking deleted.", "success");
   }
+  async function sendTestEmail() {
+    if (!testEmail.trim()) { showMessage("Enter an email address for the test.", "error"); return; }
+    setSendingTestEmail(true);
+    try {
+      const response = await fetch("/api/admin/test-reminder", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: testEmail }) });
+      if (!response.ok) { showMessage(await responseError(response, "Test email failed."), "error"); return; }
+      showMessage(`Test reminder sent to ${testEmail.trim()}.`, "success");
+    } catch { showMessage("Test email failed. Check your connection and try again.", "error"); }
+    finally { setSendingTestEmail(false); }
+  }
   async function signOut() { await fetch("/api/admin/logout", { method: "POST" }); window.location.href = "/admin/login"; }
   function navigateSection(nextSection: AdminSection, event: React.MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
@@ -148,6 +160,7 @@ export function AdminConsole() {
         <main className="mx-auto w-full max-w-6xl space-y-7 p-4 sm:p-8">
           {message && <p role="status" className={`rounded-lg border px-4 py-2.5 text-sm ${messageType === "error" ? "border-destructive/20 bg-destructive/5 text-destructive" : "border-primary/20 bg-primary/5 text-primary"}`}>{message}</p>}
           {section === "bookings" ? <><section className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-medium text-primary">Good to see you</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Bookings overview</h1><p className="mt-1 text-sm text-muted-foreground">Review enquiries, confirm details, and prepare every event.</p></div><div className="flex items-center gap-2 text-xs text-muted-foreground"><Clock3 className="size-3.5" />{lastUpdated ? `Last updated ${lastUpdated.toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short" })}` : "Loading latest data"}</div></section>
+          <Card><CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="font-semibold">Send email reminder</h2><p className="mt-1 text-sm text-muted-foreground">Send the current pickup reminder design without creating a booking.</p></div><div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-80 sm:flex-row"><input aria-label="Test email recipient" type="email" value={testEmail} onChange={(event) => setTestEmail(event.target.value)} placeholder="you@example.com" className="h-9 min-w-0 flex-1 rounded-lg border bg-background px-3 text-sm" /><Button onClick={() => void sendTestEmail()} disabled={sendingTestEmail}>{sendingTestEmail ? "Sending…" : "Send email reminder"}</Button></div></CardContent></Card>
           <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">{([{ key: "upcoming", label: "Upcoming", icon: CalendarDays, color: "text-primary", count: upcomingCount }, { key: "submitted", label: "Submitted", icon: FileText, color: "text-amber-600", count: counts.submitted }, { key: "confirmed", label: "Confirmed", icon: CheckCircle2, color: "text-blue-600", count: counts.confirmed }, { key: "completed", label: "Completed", icon: CalendarDays, color: "text-emerald-600", count: counts.completed }, { key: "cancelled", label: "Cancelled", icon: XCircle, color: "text-red-600", count: counts.cancelled }] satisfies SummaryCard[]).map(({ key, label, icon: Icon, color, count }) => <Card key={key}><CardContent className="flex items-center justify-between p-4"><div><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-semibold">{count}</p></div><div className={`rounded-lg bg-muted p-2.5 ${color}`}><Icon className="size-5" /></div></CardContent></Card>)}</section>
           <section id="bookings" className="space-y-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">All bookings</h2><p className="text-sm text-muted-foreground">{visibleBookings.length} {visibleBookings.length === 1 ? "booking" : "bookings"} in view</p></div></div>
             <Card><CardContent className="grid gap-4 p-3 sm:grid-cols-[repeat(2,minmax(10rem,1fr))] lg:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(10rem,1fr))]"><label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground sm:col-span-2 lg:col-span-1"><span>Search</span><span className="relative"><Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" /><input aria-label="Search bookings" placeholder="Search name, email or event" value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 w-full min-w-0 rounded-lg border bg-background pl-9 pr-3 text-sm font-normal text-foreground outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring" /></span></label><label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground"><span>Status</span><select aria-label="Filter by status" value={status} onChange={(e) => setStatus(e.target.value)} className="h-10 w-full rounded-lg border bg-background px-3 text-sm font-normal text-foreground"><option value="">All statuses</option>{statuses.map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}</select></label><label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground"><span>Pickup from</span><input aria-label="Bookings from date" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm font-normal text-foreground" /></label><label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground"><span>Pickup to</span><input aria-label="Bookings to date" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm font-normal text-foreground" /></label></CardContent></Card>
