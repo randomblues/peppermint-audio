@@ -48,9 +48,16 @@ function fieldError(errors: Record<string, string>, name: string) {
   return errors[name] ? <p className="text-xs text-destructive">{errors[name]}</p> : null;
 }
 
-export function BookingForm() {
+type BookingFormProps = {
+  initialPackageSlug?: string;
+};
+
+export function BookingForm({ initialPackageSlug }: BookingFormProps) {
   const [step, setStep] = useState(0);
-  const [values, setValues] = useState<BookingFormState>(initialState);
+  const [values, setValues] = useState<BookingFormState>(() => ({
+    ...initialState,
+    packageInterest: packageTiers.find((pkg) => pkg.slug === initialPackageSlug)?.name ?? "",
+  }));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);

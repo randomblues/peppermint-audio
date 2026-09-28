@@ -33,7 +33,7 @@ type EnquiryFormProps = {
 
 export function EnquiryForm({
   packageName,
-  heading = "Event enquiry form",
+  heading = "Send us a message",
   description,
   submitLabel = "Send enquiry",
 }: EnquiryFormProps) {

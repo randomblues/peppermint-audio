@@ -25,7 +25,9 @@ describe("Navbar", () => {
     expect(screen.getByRole("link", { name: "Packages" })).toHaveAttribute("href", "/packages");
     expect(screen.getByRole("link", { name: "How It Works" })).toHaveAttribute("href", "/how-it-works");
     expect(screen.getByRole("link", { name: "FAQ" })).toHaveAttribute("href", "/faq");
-    expect(screen.getAllByText("Book now")[0].closest("a")).toHaveAttribute("href", "/booking");
+    const bookingLinks = screen.getAllByText("Book now").map((element) => element.closest("a"));
+    expect(bookingLinks).toHaveLength(1);
+    expect(bookingLinks.every((link) => link?.getAttribute("href") === "/booking")).toBe(true);
     expect(screen.getByRole("button", { name: "Open menu" })).toBeInTheDocument();
   });
 });
@@ -43,7 +45,7 @@ describe("Footer", () => {
 });
 
 describe("PackageCard", () => {
-  it("renders package data, inclusions, add-ons, and the full enquiry link", () => {
+  it("renders package data, inclusions, add-ons, and booking links", () => {
     const pkg = packageTiers[1];
     render(<PackageCard pkg={pkg} />);
 
@@ -56,6 +58,10 @@ describe("PackageCard", () => {
     expect(screen.getByText("Enquire about this package").closest("a")).toHaveAttribute(
       "href",
       `/contact?package=${pkg.slug}`,
+    );
+    expect(screen.getByText("Book this package").closest("a")).toHaveAttribute(
+      "href",
+      `/booking?package=${pkg.slug}`,
     );
     expect(screen.getByRole("img", { name: pkg.name })).toHaveAttribute("src", expect.stringContaining("pexels"));
   });

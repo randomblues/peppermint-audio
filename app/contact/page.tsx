@@ -9,7 +9,7 @@ import { business, packageTiers } from "@/lib/site-content";
 
 export const metadata: Metadata = {
   title: "Contact | Peppermint Audio",
-  description: "Send an enquiry for audio system hire in Melbourne.",
+  description: "Ask a question or send an enquiry to Peppermint Audio in Melbourne.",
 };
 
 type ContactPageProps = {
@@ -26,8 +26,8 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
   return (
     <Section
       eyebrow="Contact"
-      title="Get a Quote"
-      description="Tell us about your event and we will recommend the best package and confirm availability."
+      title="Get in touch"
+      description="Have a question, want to enquire about a package, or need help planning your event? Send us a message and we will get back to you."
     >
       <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
         <EnquiryForm packageName={packageName} />

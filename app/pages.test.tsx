@@ -17,7 +17,9 @@ vi.mock("@/components/enquiry-form", () => ({
 }));
 
 vi.mock("@/components/booking-form", () => ({
-  BookingForm: () => <div aria-label="Booking form">Booking form</div>,
+  BookingForm: ({ initialPackageSlug }: { initialPackageSlug?: string }) => (
+    <div aria-label="Booking form">Booking form{initialPackageSlug ? `: ${initialPackageSlug}` : ""}</div>
+  ),
 }));
 
 describe("static site pages", () => {
@@ -49,11 +51,11 @@ describe("static site pages", () => {
     );
   });
 
-  it("booking page explains that requests require confirmation", () => {
-    render(<BookingPage />);
+  it("booking page explains that requests require confirmation", async () => {
+    render(await BookingPage({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByRole("heading", { name: "Making a booking" })).toBeInTheDocument();
-    expect(screen.getByText(/The booking is only confirmed after Peppermint Audio reviews availability/)).toBeInTheDocument();
+    expect(screen.getByText("The booking is only confirmed after Peppermint Audio reviews availability and confirms it.")).toBeInTheDocument();
     expect(screen.getByLabelText("Booking form")).toBeInTheDocument();
   });
 
@@ -63,10 +65,16 @@ describe("static site pages", () => {
     expect(screen.getByRole("tab", { name: "Speech & Presentation Package" })).toHaveAttribute("aria-selected", "true");
   });
 
+  it("passes a valid package selection through to the booking form", async () => {
+    render(await BookingPage({ searchParams: Promise.resolve({ package: "big-celebration" }) }));
+
+    expect(screen.getByLabelText("Booking form")).toHaveTextContent("big-celebration");
+  });
+
   it("contact page passes a selected package to the enquiry form", async () => {
     render(await ContactPage({ searchParams: Promise.resolve({ package: "standard-party-events" }) }));
 
-    expect(screen.getByRole("heading", { name: "Get a Quote" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Get in touch" })).toBeInTheDocument();
     expect(screen.getByLabelText("Enquiry form")).toHaveTextContent("Selected: Standard Party & Events Package");
     expect(screen.getByText("Pickup from Abbotsford 3067. We confirm the exact window after booking.")).toBeInTheDocument();
   });
@@ -102,8 +110,8 @@ describe("static site pages", () => {
     expect(screen.getByText(/contact Peppermint Audio before powering up/i)).toBeInTheDocument();
   });
 
-  it("booking page introduces the booking form", () => {
-    render(<BookingPage />);
+  it("booking page introduces the booking form", async () => {
+    render(await BookingPage({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByRole("heading", { name: "Making a booking" })).toBeInTheDocument();
     expect(screen.getByLabelText("Booking form")).toBeInTheDocument();

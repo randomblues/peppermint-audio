@@ -68,7 +68,7 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
           </>
         )}
       </CardContent>
-      <CardFooter>
+      <CardFooter className={compact ? undefined : "flex-col gap-2"}>
         <Button
           className="w-full"
           nativeButton={false}
@@ -80,6 +80,11 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
         >
           {compact ? "View package details" : "Enquire about this package"}
         </Button>
+        {!compact ? (
+          <Button className="w-full" nativeButton={false} render={<Link href={`/booking?package=${pkg.slug}`} />}>
+            Book this package
+          </Button>
+        ) : null}
       </CardFooter>
     </Card>
   );

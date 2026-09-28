@@ -20,7 +20,6 @@ import {
 import { business } from "@/lib/site-content";
 
 const navLinks = [
-  { href: "/booking", label: "Book now" },
   { href: "/packages", label: "Packages" },
   { href: "/how-it-works", label: "How It Works" },
   { href: "/faq", label: "FAQ" },

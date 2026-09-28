@@ -43,6 +43,16 @@ describe("BookingForm", () => {
     }
   });
 
+  it("preselects a package when opened from a package page", () => {
+    render(<BookingForm initialPackageSlug="standard-party-events" />);
+    advanceToPackage();
+
+    const selectedPackage = screen.getByRole("radio", {
+      name: /Standard Party & Events Package/i,
+    });
+    expect(selectedPackage).toBeChecked();
+  });
+
   it("shows booking API errors and the success confirmation", async () => {
     const request = vi.fn().mockResolvedValueOnce({
       ok: false,

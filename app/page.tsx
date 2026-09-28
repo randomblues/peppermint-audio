@@ -150,7 +150,7 @@ export default function Home() {
         <div className="border-t" />
       </div>
 
-      <Section eyebrow="Process" title="How hire works" description="Five simple steps from quote to return.">
+      <Section eyebrow="Process" title="How hire works" description="Five simple steps from request to return.">
         <ol className="grid gap-4 md:grid-cols-2">
           {howItWorks.map((step, index) => (
             <li key={step.title}>
