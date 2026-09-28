@@ -10,13 +10,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { bookingStatuses, filterBookings, isUpcoming, statusCounts } from "@/lib/admin-dashboard";
 
 type Booking = Record<string, unknown> & {
   id: string; first_name: string; last_name: string; event_type: string;
   pickup_date: string; dropoff_date?: string; status: string;
   internal_notes?: string; photo_id_paths?: string[];
 };
-const statuses = ["submitted", "confirmed", "completed", "cancelled"] as const;
+const statuses = bookingStatuses;
 const statusLabel = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 const display = (value: unknown) => value === null || value === undefined || value === "" ? "—" : String(value);
 const formatDate = (value: unknown) => {
@@ -29,6 +30,14 @@ const statusClass = (value: string) => ({
   completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
   cancelled: "border-red-200 bg-red-50 text-red-700",
 }[value] ?? "border-border bg-muted text-muted-foreground");
+async function responseError(response: Response, fallback: string) {
+  try {
+    const data = await response.json() as { error?: string };
+    return data.error ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
 type SummaryCard = { key: string; label: string; icon: ComponentType<{ className?: string }>; color: string; count: number };
 
 export function AdminConsole() {
@@ -62,35 +71,37 @@ export function AdminConsole() {
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  const visibleBookings = useMemo(() => bookings.filter((booking) =>
-    (!dateFrom || booking.pickup_date >= dateFrom) && (!dateTo || booking.pickup_date <= dateTo)), [bookings, dateFrom, dateTo]);
-  const counts = useMemo(() => statuses.reduce((result, key) => ({ ...result, [key]: bookings.filter((b) => b.status === key).length }), {} as Record<string, number>), [bookings]);
-  const upcomingCount = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return bookings.filter((booking) => booking.pickup_date >= today && booking.status !== "cancelled" && booking.status !== "completed").length;
-  }, [bookings]);
+  const visibleBookings = useMemo(() => filterBookings(bookings, { status, from: dateFrom, to: dateTo }), [bookings, status, dateFrom, dateTo]);
+  const counts = useMemo(() => statusCounts(bookings), [bookings]);
+  const upcomingCount = useMemo(() => bookings.filter((booking) => isUpcoming(booking)).length, [bookings]);
 
   async function update(id: string, values: { status?: string; internal_notes?: string }) {
-    const response = await fetch("/api/admin/bookings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...values }) });
-    if (!response.ok) { setMessage((await response.json()).error ?? "Update failed."); return; }
-    setBookings((current) => current.map((booking) => booking.id === id ? { ...booking, ...values } : booking));
-    setSelected((current) => current?.id === id ? { ...current, ...values } : current);
-    setMessage("Booking updated.");
+    try {
+      const response = await fetch("/api/admin/bookings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...values }) });
+      if (!response.ok) { setMessage(await responseError(response, "Update failed.")); return; }
+      setBookings((current) => current.map((booking) => booking.id === id ? { ...booking, ...values } : booking));
+      setSelected((current) => current?.id === id ? { ...current, ...values } : current);
+      setMessage("Booking updated.");
+    } catch { setMessage("Update failed. Check your connection and try again."); }
   }
   async function signedLink(path: string) {
-    const response = await fetch(`/api/admin/photo-link?path=${encodeURIComponent(path)}`);
-    const data = await response.json(); if (data.url) window.open(data.url, "_blank", "noopener,noreferrer"); else setMessage(data.error ?? "Photo ID unavailable.");
+    try {
+      const response = await fetch(`/api/admin/photo-link?path=${encodeURIComponent(path)}`);
+      const data = await response.json();
+      if (response.ok && data.url) window.open(data.url, "_blank", "noopener,noreferrer");
+      else setMessage(data.error ?? "Photo ID unavailable.");
+    } catch { setMessage("Photo ID unavailable. Check your connection and try again."); }
   }
   async function exportArchive() {
     if (!range.from || !range.to || !window.confirm("This archive includes booking data and private photo IDs. Continue?")) return;
     const response = await fetch("/api/admin/export", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...range, confirm: true }) });
-    if (!response.ok) { setMessage((await response.json()).error ?? "Export failed."); return; }
+    if (!response.ok) { setMessage(await responseError(response, "Export failed.")); return; }
     const blob = await response.blob(); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `booking-archive-${range.from}-to-${range.to}.zip`; link.click(); URL.revokeObjectURL(link.href); setMessage("Archive downloaded.");
   }
   async function deleteBooking(id: string) {
     if (!window.confirm("Permanently delete this booking and its private photo IDs?")) return;
     const response = await fetch("/api/admin/bookings", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, confirm: true }) });
-    if (!response.ok) { setMessage((await response.json()).error ?? "Delete failed."); return; }
+    if (!response.ok) { setMessage(await responseError(response, "Delete failed.")); return; }
     setBookings((current) => current.filter((booking) => booking.id !== id)); setSelected(null); setMessage("Booking deleted.");
   }
   async function signOut() { await fetch("/api/admin/logout", { method: "POST" }); window.location.href = "/admin/login"; }
@@ -109,7 +120,7 @@ export function AdminConsole() {
           <section className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-medium text-primary">Good to see you</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Bookings overview</h1><p className="mt-1 text-sm text-muted-foreground">Review enquiries, confirm details, and prepare every event.</p></div><div className="flex items-center gap-2 text-xs text-muted-foreground"><Clock3 className="size-3.5" />{lastUpdated ? `Last updated ${lastUpdated.toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short" })}` : "Loading latest data"}</div></section>
           <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">{([{ key: "upcoming", label: "Upcoming", icon: CalendarDays, color: "text-primary", count: upcomingCount }, { key: "submitted", label: "Submitted", icon: FileText, color: "text-amber-600", count: counts.submitted }, { key: "confirmed", label: "Confirmed", icon: CheckCircle2, color: "text-blue-600", count: counts.confirmed }, { key: "completed", label: "Completed", icon: CalendarDays, color: "text-emerald-600", count: counts.completed }, { key: "cancelled", label: "Cancelled", icon: XCircle, color: "text-red-600", count: counts.cancelled }] satisfies SummaryCard[]).map(({ key, label, icon: Icon, color, count }) => <Card key={key}><CardContent className="flex items-center justify-between p-4"><div><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-semibold">{count}</p></div><div className={`rounded-lg bg-muted p-2.5 ${color}`}><Icon className="size-5" /></div></CardContent></Card>)}</section>
           <section id="bookings" className="space-y-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">All bookings</h2><p className="text-sm text-muted-foreground">{visibleBookings.length} {visibleBookings.length === 1 ? "booking" : "bookings"} in view</p></div></div>
-            <Card><CardContent className="flex flex-wrap gap-2 p-3"><div className="relative min-w-[220px] flex-1"><Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" /><input aria-label="Search bookings" placeholder="Search name, email or event" value={search} onChange={(e) => setSearch(e.target.value)} className="h-9 w-full rounded-lg border bg-background pl-9 pr-3 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring" /></div><select aria-label="Filter by status" value={status} onChange={(e) => setStatus(e.target.value)} className="h-9 rounded-lg border bg-background px-3 text-sm"><option value="">All statuses</option>{statuses.map((value) => <option key={value}>{statusLabel(value)}</option>)}</select><input aria-label="Bookings from date" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 rounded-lg border bg-background px-3 text-sm" /><input aria-label="Bookings to date" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 rounded-lg border bg-background px-3 text-sm" /></CardContent></Card>
+            <Card><CardContent className="grid gap-3 p-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto]"><label className="relative min-w-0"><span className="sr-only">Search bookings</span><Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" /><input aria-label="Search bookings" placeholder="Search name, email or event" value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 w-full min-w-0 rounded-lg border bg-background pl-9 pr-3 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring" /></label><label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground"><span>Status</span><select aria-label="Filter by status" value={status} onChange={(e) => setStatus(e.target.value)} className="h-10 w-full rounded-lg border bg-background px-3 text-sm font-normal text-foreground"><option value="">All statuses</option>{statuses.map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}</select></label><label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground"><span>Pickup from</span><input aria-label="Bookings from date" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm font-normal text-foreground" /></label><label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground"><span>Pickup to</span><input aria-label="Bookings to date" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm font-normal text-foreground" /></label></CardContent></Card>
             {message && <p className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm text-primary">{message}</p>}
             {error ? <Card><CardContent className="flex flex-col items-center gap-3 p-10 text-center"><XCircle className="size-8 text-destructive" /><p className="font-medium">We couldn&apos;t load bookings</p><p className="text-sm text-muted-foreground">{error}</p><Button variant="outline" onClick={() => void load()}>Try again</Button></CardContent></Card> : loading ? <Card><CardContent className="p-10 text-center text-sm text-muted-foreground"><RefreshCw className="mx-auto mb-3 size-6 animate-spin" />Loading bookings…</CardContent></Card> : visibleBookings.length === 0 ? <Card><CardContent className="p-12 text-center"><CalendarDays className="mx-auto mb-3 size-8 text-muted-foreground" /><p className="font-medium">No bookings match these filters</p><p className="mt-1 text-sm text-muted-foreground">Try clearing a filter or check back after a new enquiry.</p></CardContent></Card> : <Card><div className="divide-y">{visibleBookings.map((booking) => <button key={booking.id} onClick={() => setSelected(booking)} className="flex w-full flex-wrap items-center gap-4 p-4 text-left transition-colors hover:bg-muted/50 sm:flex-nowrap"><div className="flex min-w-0 flex-1 items-center gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">{booking.first_name[0]}{booking.last_name[0]}</div><div className="min-w-0"><p className="truncate font-medium">{booking.first_name} {booking.last_name}</p><p className="truncate text-sm text-muted-foreground">{display(booking.email)}</p></div></div><div className="w-36"><p className="text-sm font-medium">{display(booking.event_type)}</p><p className="text-xs text-muted-foreground">{formatDate(booking.pickup_date)}</p></div><Badge className={statusClass(booking.status)}>{statusLabel(booking.status)}</Badge><ChevronRight className="ml-auto size-4 text-muted-foreground" /></button>)}</div></Card>}
           </section>
@@ -123,7 +134,17 @@ export function AdminConsole() {
 
 function BookingDetail({ booking, onClose, onUpdate, onPhoto, onDelete }: { booking: Booking; onClose: () => void; onUpdate: (id: string, values: { status?: string; internal_notes?: string }) => Promise<void>; onPhoto: (path: string) => Promise<void>; onDelete: (id: string) => Promise<void> }) {
   const [notes, setNotes] = useState(booking.internal_notes ?? "");
-  return <div className="fixed inset-0 z-40 flex justify-end bg-black/30" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><aside className="h-full w-full max-w-xl overflow-y-auto bg-background shadow-2xl"><div className="sticky top-0 z-10 flex items-start justify-between border-b bg-background p-5"><div><p className="text-sm text-primary">Booking details</p><h2 className="mt-1 text-2xl font-semibold">{booking.first_name} {booking.last_name}</h2><p className="text-sm text-muted-foreground">{display(booking.event_type)} · {formatDate(booking.pickup_date)}</p></div><Button variant="ghost" size="icon" onClick={onClose} aria-label="Close details"><X /></Button></div><div className="space-y-6 p-5"><div className="flex items-center justify-between"><Badge className={statusClass(booking.status)}>{statusLabel(booking.status)}</Badge><select aria-label="Update booking status" value={booking.status} onChange={(e) => void onUpdate(booking.id, { status: e.target.value })} className="h-9 rounded-lg border bg-background px-3 text-sm">{statuses.map((value) => <option key={value}>{value}</option>)}</select></div><div className="grid grid-cols-2 gap-4 rounded-xl border p-4 text-sm"><Detail label="Customer" value={`${booking.first_name} ${booking.last_name}`} icon={<UserRound />} /><Detail label="Email" value={display(booking.email)} icon={<Mail />} /><Detail label="Mobile" value={display(booking.mobile)} /><Detail label="Event address" value={display(booking.event_address)} /><Detail label="Pickup" value={formatDate(booking.pickup_date)} /><Detail label="Drop-off" value={formatDate(booking.dropoff_date)} /><Detail label="Package" value={display(booking.package_interest)} /><Detail label="Guests" value={display(booking.guest_count)} /></div><div><h3 className="mb-2 text-sm font-semibold">Additional details</h3><p className="rounded-lg bg-muted p-3 text-sm leading-relaxed">{display(booking.additional_details)}</p></div><div><h3 className="mb-2 text-sm font-semibold">Internal notes</h3><textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-24 w-full rounded-lg border bg-background p-3 text-sm" placeholder="Add a private note for the team…" /><Button size="sm" className="mt-2" onClick={() => void onUpdate(booking.id, { internal_notes: notes })}>Save notes</Button></div><div><h3 className="mb-2 text-sm font-semibold">Actions & outcomes</h3><div className="space-y-2 rounded-lg border p-3 text-sm"><Outcome label="Internal email" ok={booking.internal_email_sent === true} /><Outcome label="Customer email" ok={booking.customer_email_sent === true} /><Outcome label="Google Calendar" ok={Boolean(booking.calendar_event_link)} error={display(booking.calendar_error)} />{booking.calendar_event_link ? <a className="mt-2 inline-flex items-center gap-1 text-primary hover:underline" href={String(booking.calendar_event_link)} target="_blank" rel="noreferrer">Open Calendar event <ExternalLink className="size-3.5" /></a> : null}</div></div>{booking.photo_id_paths?.length ? <div><h3 className="mb-2 text-sm font-semibold">Photo ID</h3><div className="flex flex-wrap gap-2">{booking.photo_id_paths.map((path) => <Button key={path} variant="outline" size="sm" onClick={() => void onPhoto(path)}>View private ID <ExternalLink /></Button>)}</div></div> : null}<Button variant="destructive" className="w-full" onClick={() => void onDelete(booking.id)}>Permanently delete booking</Button></div></aside></div>;
+  useEffect(() => {
+    const handleKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+  return <div className="fixed inset-0 z-40 flex justify-end bg-black/30" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <aside role="dialog" aria-modal="true" aria-labelledby="booking-detail-title" className="flex h-full w-full max-w-xl flex-col overflow-hidden bg-background shadow-2xl">
+      <div className="flex shrink-0 items-start justify-between border-b bg-background p-4 sm:p-5"><div className="min-w-0 pr-3"><p className="text-sm text-primary">Booking details</p><h2 id="booking-detail-title" className="mt-1 break-words text-xl font-semibold sm:text-2xl">{booking.first_name} {booking.last_name}</h2><p className="truncate text-sm text-muted-foreground">{display(booking.event_type)} · {formatDate(booking.pickup_date)}</p></div><Button variant="ghost" size="icon" onClick={onClose} aria-label="Close details"><X /></Button></div>
+      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4 sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><Badge className={statusClass(booking.status)}>{statusLabel(booking.status)}</Badge><label className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><span>Status</span><select aria-label="Update booking status" value={booking.status} onChange={(e) => void onUpdate(booking.id, { status: e.target.value })} className="h-9 rounded-lg border bg-background px-3 text-sm font-normal text-foreground">{statuses.map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}</select></label></div><div className="grid grid-cols-1 gap-4 rounded-xl border p-4 text-sm sm:grid-cols-2"><Detail label="Customer" value={`${booking.first_name} ${booking.last_name}`} icon={<UserRound />} /><Detail label="Email" value={display(booking.email)} icon={<Mail />} /><Detail label="Mobile" value={display(booking.mobile)} /><Detail label="Event address" value={display(booking.event_address)} /><Detail label="Pickup" value={formatDate(booking.pickup_date)} /><Detail label="Drop-off" value={formatDate(booking.dropoff_date)} /><Detail label="Package" value={display(booking.package_interest)} /><Detail label="Guests" value={display(booking.guest_count)} /></div><div><h3 className="mb-2 text-sm font-semibold">Additional details</h3><p className="break-words rounded-lg bg-muted p-3 text-sm leading-relaxed">{display(booking.additional_details)}</p></div><div><h3 className="mb-2 text-sm font-semibold">Internal notes</h3><textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-24 w-full resize-y rounded-lg border bg-background p-3 text-sm" placeholder="Add a private note for the team…" /><Button size="sm" className="mt-2" onClick={() => void onUpdate(booking.id, { internal_notes: notes })}>Save notes</Button></div><div><h3 className="mb-2 text-sm font-semibold">Actions & outcomes</h3><div className="space-y-2 rounded-lg border p-3 text-sm"><Outcome label="Internal email" ok={booking.internal_email_sent === true} /><Outcome label="Customer email" ok={booking.customer_email_sent === true} /><Outcome label="Google Calendar" ok={Boolean(booking.calendar_event_link)} error={display(booking.calendar_error)} />{booking.calendar_event_link ? <a className="mt-2 inline-flex max-w-full items-center gap-1 break-words text-primary hover:underline" href={String(booking.calendar_event_link)} target="_blank" rel="noreferrer">Open Calendar event <ExternalLink className="size-3.5 shrink-0" /></a> : null}</div></div>{booking.photo_id_paths?.length ? <div><h3 className="mb-2 text-sm font-semibold">Photo ID</h3><div className="flex flex-wrap gap-2">{booking.photo_id_paths.map((path) => <Button key={path} variant="outline" size="sm" onClick={() => void onPhoto(path)}>View private ID <ExternalLink /></Button>)}</div></div> : null}<Button variant="destructive" className="w-full" onClick={() => void onDelete(booking.id)}>Permanently delete booking</Button></div>
+    </aside>
+  </div>;
 }
 function Detail({ label, value, icon }: { label: string; value: string; icon?: ReactNode }) { return <div className="min-w-0"><p className="flex items-center gap-1 text-xs text-muted-foreground">{icon ? <span className="size-3">{icon}</span> : null}{label}</p><p className="mt-1 break-words font-medium">{value}</p></div>; }
 function Outcome({ label, ok, error }: { label: string; ok: boolean; error?: string }) { return <div className="flex items-center justify-between"><span>{label}</span><span className={ok ? "text-emerald-600" : "text-amber-600"}>{ok ? "Sent / created" : error && error !== "—" ? "Failed" : "Not available"}</span></div>; }

@@ -19,7 +19,12 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   const session = await requireAdmin();
   if (!session) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
-  const body = await request.json() as { id?: string; status?: string; internal_notes?: string };
+  let body: { id?: string; status?: string; internal_notes?: string };
+  try {
+    body = await request.json() as { id?: string; status?: string; internal_notes?: string };
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
   if (!body.id || (body.status && !["submitted", "confirmed", "completed", "cancelled"].includes(body.status))) return NextResponse.json({ error: "Invalid update." }, { status: 400 });
   const update = { ...(body.status ? { status: body.status } : {}), ...(body.internal_notes !== undefined ? { internal_notes: body.internal_notes } : {}), updated_at: new Date().toISOString() };
   const { error } = await session.admin.from("bookings").update(update).eq("id", body.id);
@@ -30,7 +35,12 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   const session = await requireAdmin();
   if (!session) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
-  const body = await request.json() as { id?: string; confirm?: boolean };
+  let body: { id?: string; confirm?: boolean };
+  try {
+    body = await request.json() as { id?: string; confirm?: boolean };
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
   if (!body.id || body.confirm !== true) return NextResponse.json({ error: "Explicit deletion confirmation is required." }, { status: 400 });
   const { data: booking, error: readError } = await session.admin.from("bookings").select("photo_id_paths").eq("id", body.id).single();
   if (readError) return NextResponse.json({ error: readError.message }, { status: 500 });
