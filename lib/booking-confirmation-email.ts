@@ -21,11 +21,11 @@ function escapeHtml(value: string) {
 
 export function buildBookingConfirmationEmail(details: BookingConfirmationDetails) {
   const addOns = details.addOns.length ? details.addOns.join(", ") : "None selected";
-  const subject = `Your Peppermint Audio booking is confirmed — ${details.pickupDate}`;
+  const subject = "Your booking with Peppermint Audio has been confirmed.";
   const text = [
     `Hi ${details.firstName},`,
     "",
-    "Your Peppermint Audio booking has been confirmed.",
+    "Your booking with Peppermint Audio has been confirmed.",
     "",
     `Event: ${details.eventType}`,
     `Pickup date: ${details.pickupDate}`,

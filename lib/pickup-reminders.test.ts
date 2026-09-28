@@ -31,6 +31,8 @@ describe("pickup reminders", () => {
     });
     expect(email.html).toContain("&lt;Sam&gt;");
     expect(email.html).toContain("181 Nicholson St, Abbotsford VIC 3067");
+    expect(email.html).not.toContain(">Event</td>");
+    expect(email.text).not.toContain("Event:");
     expect(email.html).toContain("0452 316 823");
     expect(email.html).toContain("Additional requirements");
     expect(email.html).toContain("Need &lt;extra&gt; cable");

@@ -201,5 +201,5 @@ function BookingDetail({ booking, onClose, onUpdate, onPhoto, onDelete, onSendRe
     </aside>
   </div>;
 }
-function Detail({ label, value, icon }: { label: string; value: string; icon?: ReactNode }) { return <div className="min-w-0"><p className="flex items-center gap-1 text-xs text-muted-foreground">{icon ? <span className="size-3">{icon}</span> : null}{label}</p><p className="mt-1 break-words font-medium">{value}</p></div>; }
+function Detail({ label, value, icon }: { label: string; value: string; icon?: ReactNode }) { return <div className="min-w-0"><p className="flex items-center gap-1 text-xs text-muted-foreground">{icon ? <span className="inline-flex size-3 shrink-0 items-center justify-center [&>svg]:size-3">{icon}</span> : null}{label}</p><p className="mt-1 break-words font-medium">{value}</p></div>; }
 function Outcome({ label, ok, error }: { label: string; ok: boolean; error?: string }) { return <div className="flex items-center justify-between"><span>{label}</span><span className={ok ? "text-emerald-600" : "text-amber-600"}>{ok ? "Sent / created" : error && error !== "—" ? "Failed" : "Not available"}</span></div>; }

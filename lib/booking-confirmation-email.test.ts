@@ -13,8 +13,8 @@ describe("buildBookingConfirmationEmail", () => {
       addOns: ["Wireless Microphone Upgrade"],
     });
 
-    expect(email.subject).toContain("booking is confirmed");
-    expect(email.text).toContain("Your Peppermint Audio booking has been confirmed.");
+    expect(email.subject).toBe("Your booking with Peppermint Audio has been confirmed.");
+    expect(email.text).toContain("Your booking with Peppermint Audio has been confirmed.");
     expect(email.text).toContain("Wireless Microphone Upgrade");
     expect(email.html).toContain("&lt;Alex&gt;");
     expect(email.html).toContain("Wedding &amp; reception");

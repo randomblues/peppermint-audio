@@ -190,6 +190,7 @@ describe("admin booking routes", () => {
       to: ["customer@example.com"],
       subject: "A quick update",
       text: expect.stringContaining("Please call us when you can.\n\nKind regards,\nPeppermint Audio"),
+      html: expect.stringContaining("Please call us when you can."),
     }));
   });
 
