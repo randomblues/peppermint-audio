@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 
 import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
+import { WhatsAppButton } from "@/components/whatsapp-button";
 import { business } from "@/lib/site-content";
 import "./globals.css";
 
@@ -112,6 +113,7 @@ export default function RootLayout({
           <Navbar />
           <main className="flex-1 bg-background">{children}</main>
           <Footer />
+          <WhatsAppButton />
         </div>
       </body>
     </html>
