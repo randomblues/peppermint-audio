@@ -16,6 +16,49 @@ export type AddOn = {
   price: number;
 };
 
+export const customerReviews = [
+  {
+    reviewer: "Stan Nicholson",
+    text: "Hired some gear for a house party off just a few days notice, the sound system was a great price. Shane was responsive and accommodating. Would highly recommend.",
+  },
+  {
+    reviewer: "Nathan Johnson",
+    text: "Good service provided heavily recommend",
+  },
+  {
+    reviewer: "AL",
+    text: "Was able to get last minute speaker hire for an absolute bargain with top notch service and quality. Definitely recommend Shane for your sound system needs.",
+  },
+  {
+    reviewer: "Stanley Nguyen",
+    text: "Good service provided and very easy to set up.",
+  },
+  {
+    reviewer: "Harry S",
+    text: "Top tier service provided. Very much recommend hiring from peppermint mint audio for affordable rates.",
+  },
+  {
+    reviewer: "kavin Maran",
+    text: "Thanks to Peppermint Audio for providing excellent speakers and being extremely punctual really appreciated the professional service!",
+  },
+  {
+    reviewer: "Amir H",
+    text: "Shane is a legend. Honest, punctual, and made the process super easy. Highly recommended. I would definitely return for future events.",
+  },
+  {
+    reviewer: "Joe Franklin Genesis Lumintang",
+    text: "Great service, reliable, trustworthy",
+  },
+  {
+    reviewer: "Dennis Katsoulakos",
+    text: "Hired the audio equipment from Shane, great service, great equipment. Thanks Shane.",
+  },
+  {
+    reviewer: "Christina Cravens",
+    text: "Honestly the best in business. Very affordable rates and reliable service provided for my event.",
+  },
+] as const;
+
 export const addOnCatalog: Record<string, AddOn> = {
   "party-lights-bar": {
     name: "All-in-One Party Lights Bar",
@@ -94,6 +137,7 @@ export const business = {
   pickupPostcode: "3067",
   phone: "0452 316 823",
   email: "contactus@peppermintaudio.com.au",
+  googleReviewsUrl: "https://share.google/cZGs5Tv7JAHs5oQOi",
   heroHeading: "Audio Rental for Melbourne Events",
   heroSubheading:
     "Reliable audio system packages with speakers, microphones, mixers, and cables for parties, weddings, small corporate events, live gigs, and private functions.",

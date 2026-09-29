@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Footer } from "./footer";
 import { Navbar } from "./navbar";
 import { PackageCard } from "./package-card";
+import { CustomerReviews } from "./customer-reviews";
 import { Section } from "./section";
 import { WhatsAppButton } from "./whatsapp-button";
 import * as googleAds from "@/lib/google-ads";
@@ -78,6 +79,17 @@ describe("PackageCard", () => {
       "href",
       `/packages?package=${pkg.slug}`,
     );
+  });
+});
+
+describe("CustomerReviews", () => {
+  it("shows the supplied customer reviews with five-star ratings", () => {
+    render(<CustomerReviews />);
+
+    expect(screen.getByRole("region", { name: "Customer reviews" })).toBeInTheDocument();
+    expect(screen.getByText("Stan Nicholson")).toBeInTheDocument();
+    expect(screen.getByText(/sound system was a great price/)).toBeInTheDocument();
+    expect(screen.getAllByLabelText("5 out of 5 stars")).toHaveLength(10);
   });
 });
 

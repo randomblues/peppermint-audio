@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 import { PackageCard } from "@/components/package-card";
+import { CustomerReviews } from "@/components/customer-reviews";
 import { Section } from "@/components/section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -111,6 +112,22 @@ export default function Home() {
             </Button>
           </CardContent>
         </Card>
+      </Section>
+
+      <Section
+        eyebrow="Customer reviews"
+        title="What customers say"
+        description="Read what customers have said about hiring equipment from Peppermint Audio."
+      >
+        <CustomerReviews />
+        <a
+          href={business.googleReviewsUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-2 inline-flex font-medium text-primary underline-offset-4 hover:underline"
+        >
+          Read more reviews on Google
+        </a>
       </Section>
 
       <Section
