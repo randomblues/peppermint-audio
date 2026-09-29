@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { Phone } from "lucide-react";
 
 import { PackageCard } from "@/components/package-card";
 import { CustomerReviews } from "@/components/customer-reviews";
@@ -43,6 +44,16 @@ export default function Home() {
                 render={<Link href="/packages" />}
               >
                 View Packages
+              </Button>
+              <Button
+                variant="secondary"
+                size="lg"
+                className="font-semibold shadow-lg ring-1 ring-white/30"
+                nativeButton={false}
+                render={<a href={`tel:${business.phone.replace(/\s/g, "")}`} />}
+              >
+                <Phone className="size-4" aria-hidden="true" />
+                Call {business.phone}
               </Button>
             </div>
             <div className="mt-8 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">

@@ -29,6 +29,7 @@ describe("static site pages", () => {
     expect(screen.getByRole("heading", { name: "Audio Rental for Melbourne Events" })).toBeInTheDocument();
     expect(screen.getByText("Book now").closest("a")).toHaveAttribute("href", "/booking");
     expect(screen.getByText("View Packages").closest("a")).toHaveAttribute("href", "/packages");
+    expect(screen.getByText("Call 0452 316 823").closest("a")).toHaveAttribute("href", "tel:0452316823");
     for (const pkg of packageTiers) {
       expect(screen.getByText(pkg.name)).toBeInTheDocument();
     }
