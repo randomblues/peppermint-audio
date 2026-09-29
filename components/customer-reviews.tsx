@@ -10,27 +10,13 @@ import { customerReviews } from "@/lib/site-content";
 export function CustomerReviews() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const reviewsSectionRef = useRef<HTMLDivElement | null>(null);
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const reviewRefs = useRef<Array<HTMLDivElement | null>>([]);
-  const hasRevealedSection = useRef(false);
 
   useEffect(() => {
     if (isPaused) return;
 
     const timer = window.setInterval(() => {
-      if (!hasRevealedSection.current) {
-        hasRevealedSection.current = true;
-        if (
-          reviewsSectionRef.current &&
-          typeof reviewsSectionRef.current.scrollIntoView === "function"
-        ) {
-          reviewsSectionRef.current.scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-          });
-        }
-      }
       setActiveIndex((current) => (current + 1) % customerReviews.length);
     }, 6000);
 
@@ -54,7 +40,6 @@ export function CustomerReviews() {
 
   return (
     <div
-      ref={reviewsSectionRef}
       role="region"
       aria-label="Customer reviews"
       aria-roledescription="carousel"
