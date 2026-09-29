@@ -10,12 +10,27 @@ import { customerReviews } from "@/lib/site-content";
 export function CustomerReviews() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const reviewsSectionRef = useRef<HTMLDivElement | null>(null);
+  const carouselRef = useRef<HTMLDivElement | null>(null);
   const reviewRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const hasRevealedSection = useRef(false);
 
   useEffect(() => {
     if (isPaused) return;
 
     const timer = window.setInterval(() => {
+      if (!hasRevealedSection.current) {
+        hasRevealedSection.current = true;
+        if (
+          reviewsSectionRef.current &&
+          typeof reviewsSectionRef.current.scrollIntoView === "function"
+        ) {
+          reviewsSectionRef.current.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }
+      }
       setActiveIndex((current) => (current + 1) % customerReviews.length);
     }, 6000);
 
@@ -23,12 +38,12 @@ export function CustomerReviews() {
   }, [isPaused]);
 
   useEffect(() => {
+    const carousel = carouselRef.current;
     const review = reviewRefs.current[activeIndex];
-    if (review && typeof review.scrollIntoView === "function") {
-      review.scrollIntoView({
+    if (carousel && review && typeof carousel.scrollTo === "function") {
+      carousel.scrollTo({
+        left: review.offsetLeft,
         behavior: "smooth",
-        block: "nearest",
-        inline: "start",
       });
     }
   }, [activeIndex]);
@@ -39,6 +54,7 @@ export function CustomerReviews() {
 
   return (
     <div
+      ref={reviewsSectionRef}
       role="region"
       aria-label="Customer reviews"
       aria-roledescription="carousel"
@@ -72,7 +88,10 @@ export function CustomerReviews() {
           <span aria-hidden="true">→</span>
         </Button>
       </div>
-      <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div
+        ref={carouselRef}
+        className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         {customerReviews.map((review, index) => (
           <div
             key={review.reviewer}
