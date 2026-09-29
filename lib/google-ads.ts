@@ -2,6 +2,7 @@ const conversionId = process.env.NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_ID?.trim();
 const conversionLabel = process.env.NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL?.trim();
 const whatsappConversionLabel = process.env.NEXT_PUBLIC_GOOGLE_ADS_WHATSAPP_CONVERSION_LABEL?.trim();
 const bookingConversionLabel = process.env.NEXT_PUBLIC_GOOGLE_ADS_BOOKING_CONVERSION_LABEL?.trim();
+const phoneConversionLabel = process.env.NEXT_PUBLIC_GOOGLE_ADS_PHONE_CONVERSION_LABEL?.trim();
 
 export const googleAdsConversionId = conversionId ?? "";
 
@@ -41,4 +42,8 @@ export function trackGoogleAdsWhatsAppClick() {
 
 export function trackGoogleAdsBookingSubmission() {
   trackGoogleAdsEvent(bookingConversionLabel);
+}
+
+export function trackGoogleAdsPhoneClick() {
+  trackGoogleAdsEvent(phoneConversionLabel);
 }

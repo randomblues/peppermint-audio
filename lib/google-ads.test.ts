@@ -11,6 +11,7 @@ describe("trackGoogleAdsConversion", () => {
     vi.stubEnv("NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL", "abcDEF123");
     vi.stubEnv("NEXT_PUBLIC_GOOGLE_ADS_WHATSAPP_CONVERSION_LABEL", "whatsapp123");
     vi.stubEnv("NEXT_PUBLIC_GOOGLE_ADS_BOOKING_CONVERSION_LABEL", "booking123");
+    vi.stubEnv("NEXT_PUBLIC_GOOGLE_ADS_PHONE_CONVERSION_LABEL", "phone123");
     const { trackGoogleAdsConversion } = await import("./google-ads");
     const gtag = vi.fn();
     window.gtag = gtag;
@@ -58,6 +59,21 @@ describe("trackGoogleAdsConversion", () => {
 
     expect(gtag).toHaveBeenCalledWith("event", "conversion", {
       send_to: "AW-123456789/booking123",
+    });
+    vi.unstubAllEnvs();
+  });
+
+  it("sends the configured phone conversion event", async () => {
+    vi.stubEnv("NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_ID", "AW-123456789");
+    vi.stubEnv("NEXT_PUBLIC_GOOGLE_ADS_PHONE_CONVERSION_LABEL", "phone123");
+    const { trackGoogleAdsPhoneClick } = await import("./google-ads");
+    const gtag = vi.fn();
+    window.gtag = gtag;
+
+    trackGoogleAdsPhoneClick();
+
+    expect(gtag).toHaveBeenCalledWith("event", "conversion", {
+      send_to: "AW-123456789/phone123",
     });
     vi.unstubAllEnvs();
   });

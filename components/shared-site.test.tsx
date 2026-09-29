@@ -5,6 +5,7 @@ import { Footer } from "./footer";
 import { Navbar } from "./navbar";
 import { PackageCard } from "./package-card";
 import { CustomerReviews } from "./customer-reviews";
+import { PhoneCallButton } from "./phone-call-button";
 import { Section } from "./section";
 import { WhatsAppButton } from "./whatsapp-button";
 import * as googleAds from "@/lib/google-ads";
@@ -90,6 +91,19 @@ describe("CustomerReviews", () => {
     expect(screen.getByText("Stan Nicholson")).toBeInTheDocument();
     expect(screen.getByText(/sound system was a great price/)).toBeInTheDocument();
     expect(screen.getAllByLabelText("5 out of 5 stars")).toHaveLength(10);
+  });
+});
+
+describe("PhoneCallButton", () => {
+  it("tracks phone clicks and keeps the tap-to-call link", () => {
+    const trackClick = vi.spyOn(googleAds, "trackGoogleAdsPhoneClick");
+    render(<PhoneCallButton phone="0452 316 823" />);
+
+    const link = screen.getByRole("button", { name: "Call 0452 316 823" });
+    expect(link).toHaveAttribute("href", "tel:0452316823");
+    fireEvent.click(link);
+
+    expect(trackClick).toHaveBeenCalledTimes(1);
   });
 });
 
