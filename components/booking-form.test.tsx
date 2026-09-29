@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import * as googleAds from "@/lib/google-ads";
 import { BookingForm } from "./booking-form";
 
 function chooseDate(label: string) {
@@ -56,6 +57,7 @@ describe("BookingForm", () => {
   });
 
   it("shows booking API errors and the success confirmation", async () => {
+    const trackSubmission = vi.spyOn(googleAds, "trackGoogleAdsBookingSubmission");
     const request = vi.fn().mockResolvedValueOnce({
       ok: false,
       json: async () => ({ error: "Booking service unavailable" }),
@@ -80,11 +82,13 @@ describe("BookingForm", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: /I have read and agree/i }));
     fireEvent.click(screen.getByRole("button", { name: "Submit booking details" }));
     expect(await screen.findByText("Booking service unavailable")).toBeInTheDocument();
+    expect(trackSubmission).not.toHaveBeenCalled();
 
     request.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
     fireEvent.click(screen.getByRole("button", { name: "Submit booking details" }));
     expect(await screen.findByText("Your booking request has been received")).toBeInTheDocument();
     expect(screen.getByText("Please note that your booking has not yet been confirmed.")).toBeInTheDocument();
     expect(screen.getByText(/Once your booking is confirmed/)).toBeInTheDocument();
+    expect(trackSubmission).toHaveBeenCalledTimes(1);
   });
 });

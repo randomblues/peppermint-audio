@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { trackGoogleAdsConversion } from "@/lib/google-ads";
 import { packageTiers } from "@/lib/site-content";
 import {
   enquirySchema,
@@ -73,6 +74,7 @@ export function EnquiryForm({
 
     reset();
     setSubmitted(true);
+    trackGoogleAdsConversion();
   });
 
   if (submitted) {

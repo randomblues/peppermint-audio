@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { trackGoogleAdsBookingSubmission } from "@/lib/google-ads";
 import { addOnCatalog, packageTiers, hireTerms } from "@/lib/site-content";
 import { bookingSchema, type BookingFormInputValues } from "@/lib/validation/booking";
 
@@ -142,6 +143,7 @@ export function BookingForm({ initialPackageSlug }: BookingFormProps) {
       }
 
       setSubmitted(true);
+      trackGoogleAdsBookingSubmission();
     } catch {
       setServerError("Could not send your booking details right now. Please try again.");
     } finally {

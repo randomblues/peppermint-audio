@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Footer } from "./footer";
@@ -6,6 +6,7 @@ import { Navbar } from "./navbar";
 import { PackageCard } from "./package-card";
 import { Section } from "./section";
 import { WhatsAppButton } from "./whatsapp-button";
+import * as googleAds from "@/lib/google-ads";
 import { packageTiers } from "@/lib/site-content";
 
 const { usePathname } = vi.hoisted(() => ({
@@ -92,6 +93,16 @@ describe("WhatsAppButton", () => {
     expect(link).toHaveAttribute("rel", "noreferrer");
     expect(link).toHaveAttribute("href", expect.stringContaining("wa.me/61452316823"));
     expect(link).toHaveTextContent("Chat on WhatsApp");
+  });
+
+  it("tracks WhatsApp clicks", () => {
+    const trackClick = vi.spyOn(googleAds, "trackGoogleAdsWhatsAppClick");
+    usePathname.mockReturnValue("/contact");
+    render(<WhatsAppButton />);
+
+    fireEvent.click(screen.getByRole("link", { name: "Chat with Peppermint Audio on WhatsApp" }));
+
+    expect(trackClick).toHaveBeenCalledTimes(1);
   });
 
   it("is hidden from admin pages", () => {

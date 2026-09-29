@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import * as googleAds from "@/lib/google-ads";
 import { EnquiryForm } from "./enquiry-form";
 
 function fillEnquiry() {
@@ -26,6 +27,7 @@ describe("EnquiryForm", () => {
   });
 
   it("shows an API error and then the success confirmation", async () => {
+    const trackConversion = vi.spyOn(googleAds, "trackGoogleAdsConversion");
     const request = vi.fn()
       .mockResolvedValueOnce({ ok: false, json: async () => ({ error: "Service unavailable" }) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({}) });
@@ -34,9 +36,11 @@ describe("EnquiryForm", () => {
     fillEnquiry();
     fireEvent.click(screen.getByRole("button", { name: "Send enquiry" }));
     expect(await screen.findByText("Service unavailable")).toBeInTheDocument();
+    expect(trackConversion).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Send enquiry" }));
     expect(await screen.findByText("Enquiry sent")).toBeInTheDocument();
     expect(request).toHaveBeenCalledTimes(2);
+    expect(trackConversion).toHaveBeenCalledTimes(1);
   });
 });
