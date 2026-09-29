@@ -58,10 +58,27 @@ export function EnquiryForm({
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null);
 
+    let attribution: EnquiryFormValues["attribution"];
+    if (typeof window !== "undefined") {
+      try {
+        const stored = window.sessionStorage.getItem("peppermint-marketing-attribution");
+        const parsed = stored ? (JSON.parse(stored) as Record<string, string>) : {};
+        attribution = {
+          gclid: parsed.gclid,
+          utmSource: parsed.utm_source,
+          utmMedium: parsed.utm_medium,
+          utmCampaign: parsed.utm_campaign,
+          utmTerm: parsed.utm_term,
+        };
+      } catch {
+        attribution = undefined;
+      }
+    }
+
     const response = await fetch("/api/enquiry", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(values),
+      body: JSON.stringify({ ...values, attribution }),
     });
 
     if (!response.ok) {
@@ -98,6 +115,10 @@ export function EnquiryForm({
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="space-y-4">
+          <div className="absolute -left-[9999px]" aria-hidden="true">
+            <Label htmlFor="website">Website</Label>
+            <Input id="website" tabIndex={-1} autoComplete="off" {...register("website")} />
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="name">Name</Label>

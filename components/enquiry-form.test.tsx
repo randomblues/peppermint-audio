@@ -42,5 +42,9 @@ describe("EnquiryForm", () => {
     expect(await screen.findByText("Enquiry sent")).toBeInTheDocument();
     expect(request).toHaveBeenCalledTimes(2);
     expect(trackConversion).toHaveBeenCalledTimes(1);
+    expect(request.mock.calls[1][0]).toBe("/api/enquiry");
+    expect(JSON.parse(request.mock.calls[1][1].body)).toMatchObject({
+      attribution: {},
+    });
   });
 });

@@ -10,6 +10,20 @@ const toEmail = process.env.ENQUIRY_TO_EMAIL;
 
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
+function looksLikeSupplierSpam(message: string, eventType: string) {
+  const text = `${message} ${eventType}`.toLowerCase();
+  const indicators = [
+    "manufacturer",
+    "wholesale",
+    "best-selling models",
+    "send you",
+    "supplier",
+    "bluetooth speaker",
+  ];
+
+  return indicators.filter((indicator) => text.includes(indicator)).length >= 2;
+}
+
 export async function POST(request: Request) {
   try {
     const payload = await request.json();
@@ -18,6 +32,13 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Please check the form details and try again." },
+        { status: 400 }
+      );
+    }
+
+    if (parsed.data.website || looksLikeSupplierSpam(parsed.data.message, parsed.data.eventType)) {
+      return NextResponse.json(
+        { error: "Please send an event-related enquiry using the form." },
         { status: 400 }
       );
     }
@@ -32,8 +53,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const { name, email, phone, eventDate, eventType, packageInterest, guestCount, message } =
+    const { name, email, phone, eventDate, eventType, packageInterest, guestCount, message, attribution } =
       parsed.data;
+    const attributionLines = [
+      attribution?.gclid ? `Google click ID: ${attribution.gclid}` : null,
+      attribution?.utmSource ? `UTM source: ${attribution.utmSource}` : null,
+      attribution?.utmMedium ? `UTM medium: ${attribution.utmMedium}` : null,
+      attribution?.utmCampaign ? `UTM campaign: ${attribution.utmCampaign}` : null,
+      attribution?.utmTerm ? `UTM term: ${attribution.utmTerm}` : null,
+    ].filter((line): line is string => Boolean(line));
 
     const text = [
       "New audio system hire enquiry",
@@ -44,6 +72,7 @@ export async function POST(request: Request) {
       `Event type: ${eventType}`,
       `Package interest: ${packageInterest}`,
       `Estimated guests: ${guestCount}`,
+      ...(attributionLines.length > 0 ? ["", "Marketing attribution:", ...attributionLines] : []),
       "",
       "Event details:",
       message,

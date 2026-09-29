@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 
 import { Footer } from "@/components/footer";
+import { MarketingAttribution } from "@/components/marketing-attribution";
 import { Navbar } from "@/components/navbar";
 import { WhatsAppButton } from "@/components/whatsapp-button";
 import { googleAdsConversionId } from "@/lib/google-ads";
@@ -130,6 +131,7 @@ export default function RootLayout({
           }}
         />
         <div className="flex min-h-screen flex-col">
+          <MarketingAttribution />
           <Navbar />
           <main className="flex-1 bg-background">{children}</main>
           <Footer />

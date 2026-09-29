@@ -13,9 +13,18 @@ export const enquirySchema = z.object({
     .positive("Guest count must be greater than 0")
     .max(1000, "Guest count looks too high"),
   message: z.string().min(10, "Please share a few event details"),
+  website: z.string().max(0).optional(),
+  attribution: z
+    .object({
+      gclid: z.string().max(200).optional(),
+      utmSource: z.string().max(100).optional(),
+      utmMedium: z.string().max(100).optional(),
+      utmCampaign: z.string().max(200).optional(),
+      utmTerm: z.string().max(200).optional(),
+    })
+    .optional(),
 });
 
 export type EnquiryFormInputValues = z.input<typeof enquirySchema>;
 export type EnquiryFormValues = z.output<typeof enquirySchema>;
-
 

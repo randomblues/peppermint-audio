@@ -86,4 +86,39 @@ describe("POST /api/enquiry", () => {
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: "Something went wrong while sending your enquiry." });
   });
+
+  it("rejects the honeypot without sending email", async () => {
+    const response = await POST(request({ ...validPayload, website: "https://spam.example" }));
+
+    expect(response.status).toBe(400);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("rejects obvious supplier spam without sending email", async () => {
+    const response = await POST(request({
+      ...validPayload,
+      eventType: "Bluetooth speaker manufacturer",
+      message: "We are a supplier with best-selling models. Would you like us to send you prices?",
+    }));
+
+    expect(response.status).toBe(400);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("includes Google Ads attribution in the notification", async () => {
+    send.mockResolvedValue({ data: { id: "email-id" }, error: null });
+
+    await POST(request({
+      ...validPayload,
+      attribution: {
+        gclid: "test-click-id",
+        utmSource: "google",
+        utmCampaign: "melbourne-pa",
+      },
+    }));
+
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({
+      text: expect.stringContaining("Google click ID: test-click-id"),
+    }));
+  });
 });
