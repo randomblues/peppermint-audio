@@ -47,16 +47,8 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
                   </span>
                   <span>{pkg.name}</span>
                 </span>
-                <span className="flex shrink-0 items-center gap-2">
-                  <span className="text-xs text-muted-foreground group-data-[active]:font-medium group-data-[active]:text-primary">
-                    {pkg.capacity} · ${pkg.price}
-                  </span>
-                  <span
-                    aria-hidden="true"
-                    className="hidden size-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground group-data-[active]:inline-flex"
-                  >
-                    ✓
-                  </span>
+                <span className="shrink-0 text-xs text-muted-foreground group-data-[active]:font-medium group-data-[active]:text-primary">
+                  {pkg.capacity} · ${pkg.price}
                 </span>
               </span>
             </TabsTrigger>
