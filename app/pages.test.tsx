@@ -48,8 +48,6 @@ describe("static site pages", () => {
       "aria-selected",
       "true",
     );
-    expect(screen.getByText("Currently viewing")).toBeInTheDocument();
-    expect(screen.getByText("Selected")).toBeInTheDocument();
     expect(screen.getAllByText("Big Celebration Package").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("Ask about a custom package").closest("a")).toHaveAttribute(
       "href",

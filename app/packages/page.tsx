@@ -31,24 +31,32 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
     >
       <Tabs defaultValue={selectedPackage} className="w-full">
         <TabsList
-          className="!h-auto mx-auto grid w-full max-w-4xl grid-cols-1 gap-2 bg-transparent p-0 sm:grid-cols-3"
-          variant="line"
+          className="!h-auto mx-auto grid w-full max-w-4xl grid-cols-1 gap-3 bg-transparent p-0 sm:grid-cols-3 sm:gap-2"
+          variant="default"
         >
           {packageTiers.map((pkg, index) => (
             <TabsTrigger
               key={pkg.slug}
               value={pkg.slug}
-              className="group h-auto min-h-14 whitespace-normal rounded-lg border border-border/80 px-3 py-2.5 text-left leading-tight data-active:border-primary data-active:bg-primary/10 data-active:text-foreground data-active:ring-2 data-active:ring-primary/20 sm:text-center"
+              className="group h-auto min-h-16 whitespace-normal rounded-lg border border-border/80 bg-card px-3 py-3 text-left leading-tight shadow-sm data-active:!border-primary data-active:!bg-primary data-active:!text-primary-foreground data-active:shadow-md sm:text-center"
             >
               <span className="flex w-full items-center gap-3 sm:flex-col sm:gap-1">
                 <span className="flex min-w-0 flex-1 items-center gap-2 sm:flex-col">
-                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground group-data-[active]:bg-primary group-data-[active]:text-primary-foreground">
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground group-data-[active]:bg-primary-foreground group-data-[active]:text-primary">
                     {index + 1}
                   </span>
                   <span>{pkg.name}</span>
                 </span>
-                <span className="shrink-0 text-xs text-muted-foreground group-data-[active]:font-medium group-data-[active]:text-primary">
-                  {pkg.capacity} · ${pkg.price}
+                <span className="flex shrink-0 items-center gap-2">
+                  <span className="text-xs text-muted-foreground group-data-[active]:font-medium group-data-[active]:text-primary-foreground/80">
+                    {pkg.capacity} · ${pkg.price}
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className="hidden size-5 items-center justify-center rounded-full bg-primary-foreground text-xs font-bold text-primary group-data-[active]:inline-flex"
+                  >
+                    ✓
+                  </span>
                 </span>
               </span>
             </TabsTrigger>
@@ -56,18 +64,6 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
         </TabsList>
         {packageTiers.map((pkg) => (
           <TabsContent key={pkg.slug} value={pkg.slug} className="mx-auto mt-6 w-full max-w-3xl">
-            <div
-              className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 sm:hidden"
-              aria-live="polite"
-            >
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold tracking-wide text-primary uppercase">Currently viewing</p>
-                <p className="truncate text-sm font-semibold">{pkg.name}</p>
-              </div>
-              <span className="shrink-0 rounded-full bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground">
-                Selected
-              </span>
-            </div>
             <PackageCard pkg={pkg} priority={pkg.slug === selectedPackage} />
           </TabsContent>
         ))}
