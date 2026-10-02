@@ -210,7 +210,7 @@ export const packageTiers: PackageTier[] = [
     slug: "big-celebration",
     name: "Big Celebration Package",
     price: 240,
-    capacity: "up to 250 people",
+    capacity: "up to 300 people",
     summary: "Two 1100W peak speakers, stands, two wireless microphones, a subwoofer, and mixer for bigger celebrations.",
     bestFor: "Weddings, large parties, celebrations, and live gigs",
     image:
@@ -274,7 +274,7 @@ export const faqs = [
   {
     question: "What packages are available?",
     answer:
-      "There are three complete, ready-to-use packages: Speech & Presentation for up to 60 people at $120, Standard Party & Events for up to 120 people at $160, and Big Celebration for up to 250 people at $240.",
+      "There are three complete, ready-to-use packages: Speech & Presentation for up to 60 people at $120, Standard Party & Events for up to 120 people at $160, and Big Celebration for up to 300 people at $240.",
   },
   {
     question: "Which package is right for my event?",

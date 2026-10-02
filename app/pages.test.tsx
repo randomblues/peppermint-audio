@@ -44,7 +44,7 @@ describe("static site pages", () => {
     render(await PackagesPage({ searchParams: Promise.resolve({ package: "big-celebration" }) }));
 
     expect(screen.getByRole("heading", { name: "Choose your complete PA package" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /Big Celebration Package.*up to 250 people.*\$240/i })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: /Big Celebration Package.*up to 300 people.*\$240/i })).toHaveAttribute(
       "aria-selected",
       "true",
     );
