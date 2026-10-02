@@ -151,7 +151,7 @@ export const packageTiers: PackageTier[] = [
     slug: "speech-presentation",
     name: "Speech & Presentation Package",
     price: 120,
-    capacity: "20-60 people",
+    capacity: "up to 60 people",
     summary: "Two 150W speakers, stands, a wired microphone, and a simple mixer for clear speeches and presentations.",
     bestFor: "Speeches, presentations, small corporate events, and announcements",
     image:
@@ -180,7 +180,7 @@ export const packageTiers: PackageTier[] = [
     slug: "standard-party-events",
     name: "Standard Party & Events Package",
     price: 160,
-    capacity: "60-120 people",
+    capacity: "up to 120 people",
     summary: "Two 1100W peak speakers, stands, a wired microphone, and mixer for parties and private events.",
     bestFor: "Parties, private functions, small corporate events, and live gigs",
     image:
@@ -210,7 +210,7 @@ export const packageTiers: PackageTier[] = [
     slug: "big-celebration",
     name: "Big Celebration Package",
     price: 240,
-    capacity: "100-250 people",
+    capacity: "up to 250 people",
     summary: "Two 1100W peak speakers, stands, two wireless microphones, a subwoofer, and mixer for bigger celebrations.",
     bestFor: "Weddings, large parties, celebrations, and live gigs",
     image:
@@ -274,7 +274,7 @@ export const faqs = [
   {
     question: "What packages are available?",
     answer:
-      "There are three complete, ready-to-use packages: Speech & Presentation for 20-60 people at $120, Standard Party & Events for 60-120 people at $160, and Big Celebration for 100-250 people at $240.",
+      "There are three complete, ready-to-use packages: Speech & Presentation for up to 60 people at $120, Standard Party & Events for up to 120 people at $160, and Big Celebration for up to 250 people at $240.",
   },
   {
     question: "Which package is right for my event?",
