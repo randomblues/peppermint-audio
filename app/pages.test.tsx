@@ -44,7 +44,12 @@ describe("static site pages", () => {
     render(await PackagesPage({ searchParams: Promise.resolve({ package: "big-celebration" }) }));
 
     expect(screen.getByRole("heading", { name: "Choose your complete PA package" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Big Celebration Package" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /Big Celebration Package.*up to 250 people.*\$240/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByText("Currently viewing")).toBeInTheDocument();
+    expect(screen.getByText("Selected")).toBeInTheDocument();
     expect(screen.getAllByText("Big Celebration Package").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("Ask about a custom package").closest("a")).toHaveAttribute(
       "href",
@@ -63,7 +68,10 @@ describe("static site pages", () => {
   it("falls back to the first package for an unknown request", async () => {
     render(await PackagesPage({ searchParams: Promise.resolve({ package: "does-not-exist" }) }));
 
-    expect(screen.getByRole("tab", { name: "Speech & Presentation Package" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /Speech & Presentation Package.*up to 60 people.*\$120/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
   it("passes a valid package selection through to the booking form", async () => {
