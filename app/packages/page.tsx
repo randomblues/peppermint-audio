@@ -38,22 +38,22 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
             <TabsTrigger
               key={pkg.slug}
               value={pkg.slug}
-              className="group h-auto min-h-16 whitespace-normal rounded-lg border border-border/80 bg-card px-3 py-3 text-left leading-tight shadow-sm data-active:!border-primary data-active:!bg-primary data-active:!text-primary-foreground data-active:shadow-md sm:text-center"
+              className="group h-auto min-h-16 whitespace-normal rounded-lg border border-border/80 bg-card px-3 py-3 text-left leading-tight shadow-sm data-active:!border-2 data-active:!border-primary data-active:!bg-card data-active:!text-foreground data-active:shadow-[0_0_0_2px_color-mix(in_oklab,var(--primary)_15%,transparent)] sm:text-center"
             >
               <span className="flex w-full items-center gap-3 sm:flex-col sm:gap-1">
                 <span className="flex min-w-0 flex-1 items-center gap-2 sm:flex-col">
-                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground group-data-[active]:bg-primary-foreground group-data-[active]:text-primary">
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground group-data-[active]:bg-primary group-data-[active]:text-primary-foreground">
                     {index + 1}
                   </span>
                   <span>{pkg.name}</span>
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
-                  <span className="text-xs text-muted-foreground group-data-[active]:font-medium group-data-[active]:text-primary-foreground/80">
+                  <span className="text-xs text-muted-foreground group-data-[active]:font-medium group-data-[active]:text-primary">
                     {pkg.capacity} · ${pkg.price}
                   </span>
                   <span
                     aria-hidden="true"
-                    className="hidden size-5 items-center justify-center rounded-full bg-primary-foreground text-xs font-bold text-primary group-data-[active]:inline-flex"
+                    className="hidden size-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground group-data-[active]:inline-flex"
                   >
                     ✓
                   </span>
