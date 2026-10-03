@@ -39,7 +39,7 @@ describe("equipmentCatalog", () => {
         expect.objectContaining({
           slug: "speech-presentation-wireless",
           name: "Speech & Presentation Package",
-          price: 95,
+          price: 70,
           image: "/speech-presentation-package.png",
         }),
         expect.objectContaining({
@@ -64,5 +64,23 @@ describe("equipmentCatalog", () => {
         }),
       ]),
     );
+  });
+
+  it("uses customer-facing generic speech package equipment wording", () => {
+    const speechPackage = packageTiers.find(
+      (pkg) => pkg.slug === "speech-presentation-wireless",
+    );
+
+    expect(speechPackage).toMatchObject({
+      summary: expect.stringContaining("portable Bose PA speaker and wireless microphone"),
+      inclusions: [
+        "1 x Portable Bose PA Speaker.",
+        "1 x Wireless Microphone with receiver.",
+        "Power cable for the Bose speaker.",
+        "Bluetooth or AUX phone connection.",
+      ],
+    });
+    expect(speechPackage?.summary).not.toContain("K60");
+    expect(speechPackage?.inclusions.join(" ")).not.toContain("Microphone connection cable");
   });
 });

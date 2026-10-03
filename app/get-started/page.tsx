@@ -45,10 +45,10 @@ const packageGuides = [
   {
     id: "speech",
     title: "Speech & Presentation",
-    equipment: "Bose S1 Pro + K60 Wireless Microphone",
+    equipment: "Bose S1 Pro + Wireless Microphone",
     steps: [
       "Place the Bose S1 Pro facing the audience and keep the microphone behind the speaker to help prevent feedback.",
-      "Connect the K60 wireless microphone receiver to the Bose S1 Pro using the supplied microphone connection cable.",
+      "Connect the wireless microphone receiver to the Bose S1 Pro.",
       "Turn on the receiver and microphone, then connect your phone by Bluetooth or AUX if you are playing background audio.",
     ],
   },

@@ -290,17 +290,16 @@ export const packageTiers: PackageTier[] = [
   {
     slug: "speech-presentation-wireless",
     name: "Speech & Presentation Package",
-    price: 95,
+    price: 70,
     capacity: "up to 40 people",
-    summary: "A Bose S1 Pro speaker and K60 wireless microphone for clear, simple speeches and presentations.",
+    summary: "A portable Bose PA speaker and wireless microphone for clear, simple speeches and presentations.",
     bestFor: "Speeches, presentations, small meetings, and announcements",
     image: "/speech-presentation-package.png",
     addOnSlugs: [],
     inclusions: [
-      "1 x Bose S1 Pro PA Speaker.",
-      "1 x K60 Wireless Microphone with receiver.",
+      "1 x Portable Bose PA Speaker.",
+      "1 x Wireless Microphone with receiver.",
       "Power cable for the Bose speaker.",
-      "Microphone connection cable.",
       "Bluetooth or AUX phone connection.",
     ],
   },
@@ -462,7 +461,7 @@ export const faqs = [
   {
     question: "What packages are available?",
     answer:
-      "Our complete, ready-to-use packages include the Speech & Presentation Package with a Bose S1 Pro and K60 wireless microphone for up to 40 people at $95, the Small Budget Event Package for up to 60 people at $120, Budget With A Boom with a Behringer subwoofer for up to 60 people at $170, the Standard Party & Events Package for up to 120 people at $160, and the Big Celebration Package for up to 300 people at $240.",
+      "Our complete, ready-to-use packages include the Speech & Presentation Package with a portable Bose PA speaker and wireless microphone for up to 40 people at $70, the Small Budget Event Package for up to 60 people at $120, Budget With A Boom with a Behringer subwoofer for up to 60 people at $170, the Standard Party & Events Package for up to 120 people at $160, and the Big Celebration Package for up to 300 people at $240.",
   },
   {
     question: "Which package is right for my event?",

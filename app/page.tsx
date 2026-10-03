@@ -85,7 +85,7 @@ export default function Home() {
                 <div className="p-3">
                   <p className="font-medium text-foreground">Built around your event</p>
                   <p className="mt-1 text-muted-foreground">
-                    Clear package options from $95, plus custom options when you need them.
+                    Clear package options from $70, plus custom options when you need them.
                   </p>
                 </div>
               </div>
