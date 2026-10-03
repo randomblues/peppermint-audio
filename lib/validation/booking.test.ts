@@ -13,23 +13,14 @@ const validBooking = {
   pickupTime: "10:00",
   dropoffTime: "17:00",
   packageInterest: "standard-party-events",
-  guestCount: "1",
   additionalDetails: "",
   termsAccepted: "accepted",
 };
 
 describe("bookingSchema", () => {
-  it("accepts valid values, coerces guest count, and defaults add-ons", () => {
+  it("accepts valid values and defaults add-ons", () => {
     const result = bookingSchema.parse(validBooking);
-    expect(result.guestCount).toBe(1);
     expect(result.addOns).toBe("");
-  });
-
-  it("accepts the guest-count boundaries", () => {
-    expect(bookingSchema.safeParse({ ...validBooking, guestCount: "1000" }).success).toBe(true);
-    expect(bookingSchema.safeParse({ ...validBooking, guestCount: "0" }).success).toBe(false);
-    expect(bookingSchema.safeParse({ ...validBooking, guestCount: "1001" }).success).toBe(false);
-    expect(bookingSchema.safeParse({ ...validBooking, guestCount: "1.5" }).success).toBe(false);
   });
 
   it("enforces minimum text lengths, terms, and the details maximum", () => {

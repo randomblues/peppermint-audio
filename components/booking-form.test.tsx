@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as googleAds from "@/lib/google-ads";
 import { BookingForm } from "./booking-form";
 
@@ -17,16 +17,43 @@ function advanceToPackage() {
   fireEvent.click(screen.getByRole("button", { name: "Next" }));
   fireEvent.change(screen.getByLabelText("Event type"), { target: { value: "Birthday party" } });
   fireEvent.change(screen.getByLabelText("Event address"), { target: { value: "1 Smith Street, Melbourne" } });
-  fireEvent.change(screen.getByLabelText("Estimated guests"), { target: { value: "50" } });
   fireEvent.click(screen.getByRole("button", { name: "Next" }));
   chooseDate("Select a date");
   chooseDate("Select a date");
-  fireEvent.change(screen.getByLabelText("Pickup time"), { target: { value: "10:00" } });
-  fireEvent.change(screen.getByLabelText("Drop-off time"), { target: { value: "17:00" } });
+  fireEvent.click(screen.getByRole("button", { name: /Pickup time/ }));
+  fireEvent.change(screen.getByLabelText("Pickup time hour"), { target: { value: "10" } });
+  fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  fireEvent.click(screen.getByRole("button", { name: /Drop-off time/ }));
+  fireEvent.change(screen.getByLabelText("Drop-off time hour"), { target: { value: "5" } });
+  fireEvent.click(screen.getByRole("button", { name: "PM" }));
+  fireEvent.click(screen.getByRole("button", { name: "Done" }));
   fireEvent.click(screen.getByRole("button", { name: "Next" }));
 }
 
 describe("BookingForm", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("restores saved form details and the current step after a refresh", async () => {
+    window.localStorage.setItem("peppermint-audio-booking-draft", JSON.stringify({
+      step: 1,
+      values: {
+        email: "saved@example.com",
+        firstName: "Saved",
+        lastName: "Customer",
+        mobile: "0412345678",
+        eventType: "Wedding",
+      },
+    }));
+
+    render(<BookingForm />);
+
+    expect(await screen.findByText("Event details")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Wedding")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("saved@example.com")).not.toBeInTheDocument();
+  });
+
   it("gates each step and supports package and add-on selection", () => {
     render(<BookingForm />);
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
@@ -93,5 +120,6 @@ describe("BookingForm", () => {
     expect(screen.getByText("Please note that your booking has not yet been confirmed.")).toBeInTheDocument();
     expect(screen.getByText(/Once your booking is confirmed/)).toBeInTheDocument();
     expect(trackSubmission).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(window.localStorage.getItem("peppermint-audio-booking-draft")).toBeNull());
   });
 });

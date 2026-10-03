@@ -100,7 +100,6 @@ test.describe("contact form", () => {
     await page.getByLabel("Email").fill("taylor@example.com");
     await page.getByLabel("Phone").fill("0400123456");
     await page.getByLabel("Event Type").fill("Birthday party");
-    await page.getByLabel("Estimated Guests").fill("60");
     await page.getByLabel("Event Details").fill("A birthday party requiring speakers and a microphone.");
 
     await page.locator("#eventDate").click();

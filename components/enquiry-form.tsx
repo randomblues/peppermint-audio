@@ -176,17 +176,6 @@ export function EnquiryForm({
               />
               {errors.eventType ? <p className="text-xs text-destructive">{errors.eventType.message}</p> : null}
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="guestCount">Estimated Guests</Label>
-              <Input
-                id="guestCount"
-                className="h-10"
-                type="number"
-                min={1}
-                {...register("guestCount")}
-              />
-              {errors.guestCount ? <p className="text-xs text-destructive">{errors.guestCount.message}</p> : null}
-            </div>
           </div>
 
           <div className="space-y-1.5">

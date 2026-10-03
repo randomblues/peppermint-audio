@@ -55,7 +55,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { name, email, phone, eventDate, eventType, packageInterest, guestCount, message, attribution } =
+    const { name, email, phone, eventDate, eventType, packageInterest, message, attribution } =
       parsed.data;
     const attributionLines = [
       attribution?.gclid ? `Google click ID: ${attribution.gclid}` : null,
@@ -73,7 +73,6 @@ export async function POST(request: Request) {
       `Event date: ${eventDate}`,
       `Event type: ${eventType}`,
       `Package interest: ${packageInterest}`,
-      `Estimated guests: ${guestCount}`,
       ...(attributionLines.length > 0 ? ["", "Marketing attribution:", ...attributionLines] : []),
       "",
       "Event details:",

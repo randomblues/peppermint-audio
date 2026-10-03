@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { DatePicker } from "@/components/date-picker";
+import { TimePicker } from "@/components/time-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +27,7 @@ const steps = [
 
 const maxPhotoIdSize = 1.5 * 1024 * 1024;
 const maxPhotoIdDimension = 1800;
+const bookingDraftStorageKey = "peppermint-audio-booking-draft";
 
 const initialValues: BookingFormInputValues = {
   email: "",
@@ -40,7 +42,6 @@ const initialValues: BookingFormInputValues = {
   dropoffTime: "",
   packageInterest: "",
   addOns: "",
-  guestCount: 1,
   additionalDetails: "",
   termsAccepted: "",
 };
@@ -111,6 +112,38 @@ export function BookingForm({ initialPackageSlug }: BookingFormProps) {
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const draftLoaded = useRef(false);
+
+  useEffect(() => {
+    try {
+      const savedDraft = window.localStorage.getItem(bookingDraftStorageKey);
+      if (savedDraft) {
+        const parsed = JSON.parse(savedDraft) as { step?: number; values?: Partial<BookingFormInputValues> };
+        if (parsed.values && typeof parsed.values === "object") {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setValues((current) => ({ ...current, ...parsed.values, idFiles: [] }));
+        }
+        if (typeof parsed.step === "number" && parsed.step >= 0 && parsed.step < steps.length) {
+          setStep(parsed.step);
+        }
+      }
+    } catch {
+      window.localStorage.removeItem(bookingDraftStorageKey);
+    }
+    draftLoaded.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (!draftLoaded.current || submitted) return;
+
+    const draftValues = Object.fromEntries(
+      Object.entries(values).filter(([name]) => name !== "idFiles"),
+    );
+    window.localStorage.setItem(
+      bookingDraftStorageKey,
+      JSON.stringify({ step, values: draftValues }),
+    );
+  }, [step, submitted, values]);
 
   function updateValue(name: keyof BookingFormInputValues, value: string) {
     setValues((current) => ({ ...current, [name]: value }));
@@ -126,7 +159,7 @@ export function BookingForm({ initialPackageSlug }: BookingFormProps) {
   function validateCurrentStep() {
     const fieldsByStep: Array<Array<keyof BookingFormInputValues>> = [
       ["email", "firstName", "lastName", "mobile"],
-      ["eventType", "eventAddress", "guestCount"],
+      ["eventType", "eventAddress"],
       ["pickupDate", "dropoffDate", "pickupTime", "dropoffTime"],
       ["packageInterest"],
       ["additionalDetails"],
@@ -196,6 +229,7 @@ export function BookingForm({ initialPackageSlug }: BookingFormProps) {
       }
 
       setSubmitted(true);
+      window.localStorage.removeItem(bookingDraftStorageKey);
       trackGoogleAdsBookingSubmission();
     } catch {
       setServerError("Could not send your booking details right now. Please try again.");
@@ -248,7 +282,6 @@ export function BookingForm({ initialPackageSlug }: BookingFormProps) {
           <div className="space-y-5">
             <Field label="Event type" name="eventType" value={values.eventType} onChange={(value) => updateValue("eventType", value)} error={errors.eventType} placeholder="Birthday party, wedding, presentation..." />
             <Field label="Event address" name="eventAddress" value={values.eventAddress} onChange={(value) => updateValue("eventAddress", value)} error={errors.eventAddress} />
-            <Field label="Estimated guests" name="guestCount" value={String(values.guestCount)} onChange={(value) => updateValue("guestCount", value)} error={errors.guestCount} type="number" min={1} />
           </div>
         ) : null}
 
@@ -258,8 +291,8 @@ export function BookingForm({ initialPackageSlug }: BookingFormProps) {
             <DateField label="Pickup date" value={values.pickupDate} onChange={(value) => updateValue("pickupDate", value)} error={errors.pickupDate} minDate={getMelbourneToday()} />
             <DateField label="Drop-off date" value={values.dropoffDate} onChange={(value) => updateValue("dropoffDate", value)} error={errors.dropoffDate} minDate={values.pickupDate || getMelbourneToday()} />
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Pickup time" name="pickupTime" value={values.pickupTime} onChange={(value) => updateValue("pickupTime", value)} error={errors.pickupTime} type="time" />
-              <Field label="Drop-off time" name="dropoffTime" value={values.dropoffTime} onChange={(value) => updateValue("dropoffTime", value)} error={errors.dropoffTime} type="time" />
+              <TimePicker id="pickupTime" label="Pickup time" value={values.pickupTime} onChange={(value) => updateValue("pickupTime", value)} error={errors.pickupTime} />
+              <TimePicker id="dropoffTime" label="Drop-off time" value={values.dropoffTime} onChange={(value) => updateValue("dropoffTime", value)} error={errors.dropoffTime} />
             </div>
           </div>
         ) : null}

@@ -32,7 +32,6 @@ const details = {
   dropoffTime: "17:00",
   packageInterest: "Big Events",
   addOns: ["Wireless Microphone", "Subwoofer"],
-  guestCount: 100,
   additionalDetails: "Please include setup guidance.",
 };
 

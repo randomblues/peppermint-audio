@@ -5,7 +5,7 @@ create table if not exists public.bookings (
   email text not null, first_name text not null, last_name text not null, mobile text not null,
   event_type text not null, event_address text not null, pickup_date date not null, dropoff_date date not null,
   pickup_time time, dropoff_time time,
-  package_interest text not null, add_ons text[] not null default '{}', guest_count integer not null, additional_details text not null default '',
+  package_interest text not null, add_ons text[] not null default '{}', guest_count integer, additional_details text not null default '',
   terms_accepted boolean not null default false, photo_id_paths text[] not null default '{}',
   status text not null default 'submitted' check (status in ('submitted','confirmed','completed','cancelled')),
   calendar_event_link text, calendar_error text, internal_email_sent boolean not null default false,
@@ -28,6 +28,7 @@ alter table public.bookings add column if not exists add_ons text[] not null def
 alter table public.bookings add column if not exists confirmation_email_sent boolean not null default false;
 alter table public.bookings add column if not exists pickup_time time;
 alter table public.bookings add column if not exists dropoff_time time;
+alter table public.bookings alter column guest_count drop not null;
 alter table public.bookings enable row level security;
 revoke all on public.bookings from anon, authenticated;
 drop policy if exists "service role manages bookings" on public.bookings;

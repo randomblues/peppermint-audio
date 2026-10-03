@@ -12,11 +12,6 @@ export const enquirySchema = z.object({
     .refine((value) => value >= getMelbourneToday(), "Event date must be today or later"),
   eventType: z.string().min(2, "Please enter event type"),
   packageInterest: z.string().min(2, "Please choose a package"),
-  guestCount: z.coerce
-    .number()
-    .int()
-    .positive("Guest count must be greater than 0")
-    .max(1000, "Guest count looks too high"),
   message: z.string().min(10, "Please share a few event details"),
   website: z.string().max(0).optional(),
   attribution: z

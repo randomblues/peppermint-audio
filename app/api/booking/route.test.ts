@@ -41,7 +41,6 @@ const validFields = {
   dropoffTime: "17:00",
   packageInterest: "Standard Party & Events Package",
   addOns: "wireless-microphones",
-  guestCount: "80",
   additionalDetails: "Please include setup guidance.",
   termsAccepted: "accepted",
 };
