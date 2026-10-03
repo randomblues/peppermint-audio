@@ -30,7 +30,7 @@ describe("sendBookingConfirmationEmail", () => {
     expect(send).toHaveBeenCalledWith(expect.objectContaining({
       from: "Peppermint Audio <from@example.com>",
       to: ["customer@example.com"],
-      subject: expect.stringContaining("booking is confirmed"),
+      subject: "Your booking with Peppermint Audio has been confirmed.",
       text: expect.not.stringContaining("Same-day pickup details:"),
     }));
   });
