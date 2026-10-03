@@ -9,7 +9,7 @@ import { createPageMetadata } from "@/lib/seo";
 
 export const metadata = createPageMetadata({
   title: "How It Works",
-  description: "How audio system hire pickup works from Abbotsford Melbourne 3067.",
+  description: "How Peppermint Audio package and equipment hire works, from cart request to pickup in Abbotsford Melbourne.",
   path: "/how-it-works",
 });
 
@@ -18,7 +18,7 @@ export default function HowItWorksPage() {
     <Section
       eyebrow="Booking Flow"
       title="How It Works"
-      description="From first enquiry to gear return, here is exactly what to expect."
+      description="Choose your equipment, send a booking request, and let us confirm availability before you collect from Abbotsford."
     >
       <div className="grid gap-4">
         {howItWorks.map((step, index) => (
@@ -36,9 +36,14 @@ export default function HowItWorksPage() {
         Pickup location: {business.pickupSuburb} {business.pickupPostcode}. Please bring photo ID and arrive during your confirmed collection window.
       </div>
 
-      <Button className="mt-6" nativeButton={false} render={<Link href="/contact" />}>
-        Check availability
-      </Button>
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+        <Button nativeButton={false} render={<Link href="/packages" />}>
+          Browse packages
+        </Button>
+        <Button variant="outline" nativeButton={false} render={<Link href="/equipment" />}>
+          Hire individual equipment
+        </Button>
+      </div>
     </Section>
   );
 }

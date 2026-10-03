@@ -103,14 +103,16 @@ describe("static site pages", () => {
     });
   });
 
-  it("how-it-works page labels every step and links to availability", () => {
+  it("how-it-works page explains the request lifecycle and links to catalogues", () => {
     render(<HowItWorksPage />);
 
     for (const [index, step] of howItWorks.entries()) {
       expect(screen.getByText(`Step ${index + 1}`)).toBeInTheDocument();
       expect(screen.getByText(step.title)).toBeInTheDocument();
     }
-    expect(screen.getByText("Check availability").closest("a")).toHaveAttribute("href", "/contact");
+    expect(screen.getByText(/does not confirm the booking/i)).toBeInTheDocument();
+    expect(screen.getByText("Browse packages").closest("a")).toHaveAttribute("href", "/packages");
+    expect(screen.getByText("Hire individual equipment").closest("a")).toHaveAttribute("href", "/equipment");
   });
 
   it("get-started page contains package setup guidance and equipment help links", () => {

@@ -422,19 +422,24 @@ export const packageTiers: PackageTier[] = [
 
 export const howItWorks = [
   {
-    title: "Choose your package",
+    title: "Choose your setup",
     detail:
-      "Tell us your date, venue type, and expected guests. We recommend the right setup.",
+      "Browse complete packages or individual equipment. Add a package, specific items, or both to your cart.",
   },
   {
-    title: "Confirm booking",
+    title: "Submit a booking request",
     detail:
-      "We lock in your hire with package price, pickup window, and return time.",
+      "Open your cart, enter your event details, upload both required photo IDs, and accept the hire terms. Sending the request does not confirm the booking.",
   },
   {
-    title: "Pick up in Abbotsford",
+    title: "We review availability",
     detail:
-      "Collect from Abbotsford 3067. We run through setup so you are ready to go.",
+      "We check your date and selected equipment, then contact you to confirm availability, pricing, and the pickup and return window.",
+  },
+  {
+    title: "Collect from Abbotsford",
+    detail:
+      "After your request is confirmed, collect from Abbotsford 3067. Bring photo ID and we will run through the setup with you.",
   },
   {
     title: "Run your event",
