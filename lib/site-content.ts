@@ -14,6 +14,24 @@ export type PackageTier = {
 export type AddOn = {
   name: string;
   price: number;
+  image?: string;
+  imageSize?: "compact";
+};
+
+export type EquipmentOption = {
+  label: string;
+  price: number;
+};
+
+export type EquipmentItem = {
+  slug: string;
+  name: string;
+  category: string;
+  description: string;
+  image?: string;
+  imageSize?: "compact";
+  options: EquipmentOption[];
+  details: string[];
 };
 
 export const customerReviews = [
@@ -61,34 +79,143 @@ export const customerReviews = [
 
 export const addOnCatalog: Record<string, AddOn> = {
   "party-lights-bar": {
-    name: "All-in-One Party Lights Bar",
+    name: "CR Lite MagikBar Hub Party Bar",
     price: 30,
+    image: "/cr-lite-magikbar.avif",
   },
   "wireless-microphones": {
     name: "Wireless Microphone Upgrade",
     price: 20,
   },
   "di-box": {
-    name: "DI Box",
+    name: "Pro DI Box",
+    price: 15,
+    image: "/pro-di-box.webp",
+  },
+  "generic-di-box": {
+    name: "Generic DI Box",
     price: 10,
+    image: "/generic-di-box.jpg",
   },
   "four-channel-di-box": {
     name: "4-Channel DI Box",
     price: 20,
+    image: "/dbx-di4.jpg",
+    imageSize: "compact",
   },
   "spirit-e12-mixer": {
     name: "Spirit E12 / 12-Channel Soundcraft Mixer Upgrade",
     price: 30,
+    image: "/soundcraft-spirit-e12.jpg",
   },
   "behringer-x32": {
     name: "Behringer X32 Digital Mixer Upgrade",
     price: 110,
+    image: "/behringer-x32.jpg",
   },
   "party-light-par-can": {
     name: "Party Light PAR Can",
     price: 10,
+    image: "/par-can-generic.jpg",
+  },
+  "extension-reel-10m": {
+    name: "10m Extension Reel",
+    price: 10,
+    image: "/10m-extension-reel.jpeg",
   },
 };
+
+export const equipmentCatalog: EquipmentItem[] = [
+  {
+    slug: "bose-s1-pro",
+    name: "Bose S1 Pro PA Speaker",
+    category: "Speakers",
+    description: "Portable, clear-sounding PA speakers for speeches, background music, and smaller events.",
+    image: "/bose-s1-pro.png",
+    options: [
+      { label: "Pair (2 speakers)", price: 95 },
+      { label: "Single speaker", price: 55 },
+    ],
+    details: [
+      "150W per speaker",
+      "Bluetooth and AUX playback",
+      "Power cables & Speaker stands included",
+    ],
+  },
+  {
+    slug: "yamaha-dxr15",
+    name: "Yamaha DXR15 PA Speaker",
+    category: "Speakers",
+    description: "High-output active PA speakers for parties, live music, and larger venues.",
+    image: "/yamaha-dxr15-product.jpg",
+    options: [
+      { label: "Pair (2 speakers)", price: 135 },
+      { label: "Single speaker", price: 75 },
+    ],
+    details: [
+      "1100W peak per speaker",
+      "15-inch active PA speaker",
+      "Power cables & Speaker stands included",
+    ],
+  },
+  {
+    slug: "behringer-xm8500",
+    name: "Behringer Ultravoice XM8500 Dynamic Microphone",
+    category: "Microphones",
+    description: "Reliable wired dynamic microphone for speeches, vocals, announcements, and live events.",
+    image: "/behringer-xm8500.jpg",
+    options: [{ label: "Single microphone", price: 10 }],
+    details: ["Single microphone hire", "Availability confirmed before hire"],
+  },
+  {
+    slug: "shure-sm58",
+    name: "Shure SM58",
+    category: "Microphones",
+    description: "Industry-standard vocal microphone for speeches, singing, announcements, and live performance.",
+    image: "/shure-sm58.jpg",
+    options: [{ label: "Single microphone", price: 15 }],
+    details: ["Single microphone hire", "Availability confirmed before hire"],
+  },
+  {
+    slug: "shure-sm57",
+    name: "Shure SM57",
+    category: "Microphones",
+    description: "Versatile dynamic microphone for instruments, amps, percussion, and stage use.",
+    image: "/shure-sm57.webp",
+    options: [{ label: "Single microphone", price: 15 }],
+    details: ["Single microphone hire", "Availability confirmed before hire"],
+  },
+  {
+    slug: "shure-sm7b",
+    name: "Shure SM7B",
+    category: "Microphones",
+    description: "Broadcast-style dynamic microphone for vocals, podcasting, voiceover, and studio applications.",
+    image: "/shure-sm7b.jpg",
+    options: [{ label: "Single microphone", price: 35 }],
+    details: ["Single microphone hire", "Availability confirmed before hire"],
+  },
+  {
+    slug: "k60-wireless",
+    name: "K60 Wireless Microphone",
+    category: "Microphones",
+    description: "Wireless handheld microphone system for speeches, presentations, karaoke, and events.",
+    image: "/k60-wireless-microphone.webp",
+    options: [{ label: "Single microphone", price: 25 }],
+    details: ["Wireless receiver included", "Availability confirmed before hire"],
+  },
+  ...Object.entries(addOnCatalog)
+    .filter(([slug]) => slug !== "wireless-microphones")
+    .map(([slug, addOn]) => ({
+    slug: `hire-${slug}`,
+    name: addOn.name.replace(" Upgrade", ""),
+    category: "Mixers, microphones & lighting",
+    description: `Add this item on its own when you only need ${addOn.name.toLowerCase().replace(" upgrade", "")}.`,
+    image: addOn.image,
+    imageSize: addOn.imageSize,
+    options: [{ label: "Single item", price: addOn.price }],
+    details: ["Collected from Abbotsford 3067", "Availability confirmed before hire"],
+    })),
+];
 
 export const hireTerms = [
   {
@@ -279,7 +406,17 @@ export const faqs = [
   {
     question: "Which package is right for my event?",
     answer:
-      "Choose based on your guest count and event type. Speech & Presentation is best for smaller speeches and presentations. Standard Party & Events is the all-rounder for parties and private functions. Big Celebration is for weddings and larger events. Add-ons are available if you need anything extra.",
+      "Choose based on your guest count and event type. Speech & Presentation is best for smaller speeches and presentations. Standard Party & Events is the all-rounder for parties and private functions. Big Celebration is for weddings and larger events. Individual equipment is available when you only need specific items.",
+  },
+  {
+    question: "Can I hire individual equipment?",
+    answer:
+      "Yes. Browse the individual equipment catalogue to hire specific speakers, microphones, mixers, DI boxes, lighting, and accessories without choosing a package.",
+  },
+  {
+    question: "Can I combine a package with individual equipment?",
+    answer:
+      "Yes. Add a package and any extra equipment you need to your cart, then submit one booking request for the complete selection.",
   },
   {
     question: "What is included in every package?",
@@ -309,6 +446,6 @@ export const faqs = [
   {
     question: "How do I book a package?",
     answer:
-      "Choose a package, submit an enquiry with your event date, guest count, and details, and we will confirm availability and the pickup arrangements with you.",
+      "Choose a package, add any individual equipment you need, and continue to booking from your cart. Submit your event date, guest count, and details, and we will review availability before confirming the request and pickup arrangements with you.",
   },
 ];

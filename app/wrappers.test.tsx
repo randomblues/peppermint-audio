@@ -122,6 +122,7 @@ describe("app wrappers and metadata", () => {
     expect(sitemap()).toEqual([
       { url: business.website, changeFrequency: "weekly", priority: 1 },
       { url: `${business.website}/packages`, changeFrequency: "monthly", priority: 0.7 },
+      { url: `${business.website}/equipment`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${business.website}/how-it-works`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${business.website}/faq`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${business.website}/contact`, changeFrequency: "monthly", priority: 0.7 },

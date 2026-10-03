@@ -90,6 +90,7 @@ export function TimePicker({ id, label, value, onChange, error }: TimePickerProp
         aria-expanded={open}
         className={cn(
           "flex h-12 w-full items-center justify-between rounded-lg border bg-background px-3 text-left text-base outline-none transition-colors sm:text-sm",
+          "[@media(pointer:coarse)]:hidden",
           "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
           value ? "text-foreground" : "text-muted-foreground",
           error && "border-destructive ring-3 ring-destructive/20",
@@ -123,7 +124,7 @@ export function TimePicker({ id, label, value, onChange, error }: TimePickerProp
         <div
           role="dialog"
           aria-label={`Choose ${label.toLowerCase()}`}
-          className="absolute right-0 z-30 mt-2 w-[min(22rem,100%)] rounded-xl border bg-popover p-4 text-popover-foreground shadow-xl"
+          className="absolute right-0 z-30 mt-2 w-[min(22rem,100%)] rounded-xl border bg-popover p-4 text-popover-foreground shadow-xl [@media(pointer:coarse)]:hidden"
         >
           <div className="flex items-center justify-between">
             <div>

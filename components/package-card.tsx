@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
 
@@ -12,7 +14,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { addOnCatalog, type PackageTier } from "@/lib/site-content";
+import { useCart } from "@/components/cart-provider";
+import type { PackageTier } from "@/lib/site-content";
 
 type PackageCardProps = {
   pkg: PackageTier;
@@ -21,6 +24,8 @@ type PackageCardProps = {
 };
 
 export function PackageCard({ pkg, compact = false, priority = false }: PackageCardProps) {
+  const { addItem } = useCart();
+
   return (
     <Card className="h-full justify-between overflow-hidden border">
       <div className="relative h-40">
@@ -50,39 +55,34 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
                 <li key={item}>- {item}</li>
               ))}
             </ul>
-            <div className="mt-6 border-t pt-4">
-              <p className="text-sm font-medium text-foreground">Optional add-ons</p>
-              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-                {pkg.addOnSlugs.map((slug) => {
-                  const addOn = addOnCatalog[slug];
-
-                  return (
-                    <li key={slug} className="flex items-center justify-between gap-4">
-                      <span>{addOn.name}</span>
-                      <span className="shrink-0 font-medium text-foreground">+${addOn.price}</span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
+            <p className="mt-5 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+              Need anything extra?{" "}
+              <Link href="/equipment" className="font-medium text-primary hover:underline">
+                Browse individual equipment
+              </Link>{" "}
+              and add it to your cart.
+            </p>
           </>
         )}
       </CardContent>
-      <CardFooter className={compact ? undefined : "flex-col gap-2"}>
+      <CardFooter className="flex-col gap-2">
         <Button
           className="w-full"
           nativeButton={false}
           render={
             <Link
-              href={compact ? `/packages?package=${pkg.slug}` : `/contact?package=${pkg.slug}`}
+              href={`/packages?package=${pkg.slug}`}
             />
           }
         >
-          {compact ? "View package details" : "Enquire about this package"}
+          View package details
         </Button>
         {!compact ? (
-          <Button className="w-full" nativeButton={false} render={<Link href={`/booking?package=${pkg.slug}`} />}>
-            Book this package
+          <Button
+            className="w-full"
+            onClick={() => addItem({ id: `package:${pkg.slug}`, name: pkg.name, kind: "package", price: pkg.price })}
+          >
+            Add package to cart
           </Button>
         ) : null}
       </CardFooter>

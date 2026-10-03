@@ -8,6 +8,9 @@ describe("TimePicker", () => {
     const onChange = vi.fn();
     render(<TimePicker id="pickup-time" label="Pickup time" value="" onChange={onChange} />);
 
+    expect(screen.getByRole("button", { name: /Pickup time/ })).toHaveClass(
+      "[@media(pointer:coarse)]:hidden",
+    );
     fireEvent.click(screen.getByRole("button", { name: /Pickup time/ }));
     const dialog = screen.getByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText("Pickup time hour"), { target: { value: "10" } });

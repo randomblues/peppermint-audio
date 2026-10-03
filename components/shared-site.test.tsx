@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Footer } from "./footer";
 import { Navbar } from "./navbar";
 import { PackageCard } from "./package-card";
+import { EquipmentCard } from "./equipment-card";
 import { CustomerReviews } from "./customer-reviews";
 import { PhoneCallButton } from "./phone-call-button";
 import { Section } from "./section";
@@ -25,13 +26,48 @@ describe("Navbar", () => {
 
     expect(screen.getByRole("banner")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Peppermint Audio" })).toHaveAttribute("href", "/");
-    expect(screen.getByRole("link", { name: "Packages" })).toHaveAttribute("href", "/packages");
+    expect(screen.getByRole("button", { name: "Products" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "How It Works" })).toHaveAttribute("href", "/how-it-works");
     expect(screen.getByRole("link", { name: "FAQ" })).toHaveAttribute("href", "/faq");
     const bookingLinks = screen.getAllByText("Book now").map((element) => element.closest("a"));
     expect(bookingLinks).toHaveLength(1);
     expect(bookingLinks.every((link) => link?.getAttribute("href") === "/booking")).toBe(true);
     expect(screen.getByRole("button", { name: "Open menu" })).toBeInTheDocument();
+  });
+
+  describe("EquipmentCard", () => {
+    it("defaults to the pair option and carries a changed selection into the enquiry", () => {
+      const item = {
+        slug: "test-speaker",
+        name: "Test Speaker",
+        category: "Speakers",
+        description: "A test speaker.",
+        image: "https://images.unsplash.com/test",
+        options: [
+          { label: "Pair (2 speakers)", price: 95 },
+          { label: "Single speaker", price: 55 },
+        ],
+        details: ["Portable"],
+      };
+
+      render(<EquipmentCard item={item} />);
+
+      expect(screen.getByRole("button", { name: "Pair (2 speakers) $95" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Single speaker $55" }));
+
+      expect(screen.getByRole("button", { name: "Single speaker $55" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      expect(screen.getByText("View equipment details").closest("a")).toHaveAttribute(
+        "href",
+        "/equipment/test-speaker",
+      );
+    });
+
   });
 });
 
@@ -48,7 +84,7 @@ describe("Footer", () => {
 });
 
 describe("PackageCard", () => {
-  it("renders package data, inclusions, add-ons, and booking links", () => {
+  it("renders package data and cart actions", () => {
     const pkg = packageTiers[1];
     render(<PackageCard pkg={pkg} />);
 
@@ -56,16 +92,11 @@ describe("PackageCard", () => {
     expect(screen.getByText(`$${pkg.price}`)).toBeInTheDocument();
     expect(screen.getByText(`Ideal for ${pkg.capacity}`)).toBeInTheDocument();
     expect(screen.getByText(`- ${pkg.inclusions[0]}`)).toBeInTheDocument();
-    expect(screen.getByText("Wireless Microphone Upgrade")).toBeInTheDocument();
-    expect(screen.getAllByText("+$20").length).toBeGreaterThan(0);
-    expect(screen.getByText("Enquire about this package").closest("a")).toHaveAttribute(
+    expect(screen.getByText("View package details").closest("a")).toHaveAttribute(
       "href",
-      `/contact?package=${pkg.slug}`,
+      `/packages?package=${pkg.slug}`,
     );
-    expect(screen.getByText("Book this package").closest("a")).toHaveAttribute(
-      "href",
-      `/booking?package=${pkg.slug}`,
-    );
+    expect(screen.getByRole("button", { name: "Add package to cart" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: pkg.name })).toHaveAttribute("src", expect.stringContaining("pexels"));
   });
 
@@ -76,6 +107,7 @@ describe("PackageCard", () => {
     expect(screen.getByText(pkg.summary)).toBeInTheDocument();
     expect(screen.queryByText(`- ${pkg.inclusions[0]}`)).not.toBeInTheDocument();
     expect(screen.queryByText("Optional add-ons")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add package to cart" })).not.toBeInTheDocument();
     expect(screen.getByText("View package details").closest("a")).toHaveAttribute(
       "href",
       `/packages?package=${pkg.slug}`,

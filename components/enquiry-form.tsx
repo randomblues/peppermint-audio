@@ -179,7 +179,7 @@ export function EnquiryForm({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="packageInterest">Package Interest</Label>
+            <Label htmlFor="packageInterest">Package or equipment</Label>
             <Controller
               control={control}
               name="packageInterest"
@@ -189,6 +189,9 @@ export function EnquiryForm({
                     <SelectValue placeholder="Select a package" />
                   </SelectTrigger>
                   <SelectContent align="start">
+                    {packageName && !packageTiers.some((pkg) => pkg.name === packageName) ? (
+                      <SelectItem value={packageName}>{packageName}</SelectItem>
+                    ) : null}
                     {packageTiers.map((pkg) => (
                       <SelectItem key={pkg.slug} value={pkg.name}>
                         {pkg.name}

@@ -45,6 +45,15 @@ export default function Home() {
               >
                 View Packages
               </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                className="border-white/25 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+                nativeButton={false}
+                render={<Link href="/equipment" />}
+              >
+                Hire individual equipment
+              </Button>
               <PhoneCallButton phone={business.phone} />
             </div>
             <div className="mt-8 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
@@ -111,6 +120,26 @@ export default function Home() {
             </div>
             <Button nativeButton={false} render={<Link href="/contact?package=custom" />}>
               Build a custom package
+            </Button>
+          </CardContent>
+        </Card>
+      </Section>
+
+      <Section
+        eyebrow="Individual hire"
+        title="Only need one or two items?"
+        description="Hire a single speaker, a pair, a microphone, mixer, DI box, or lighting item without taking a full package."
+      >
+        <Card className="border">
+          <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle>Build a smaller hire</CardTitle>
+              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+                Choose the exact equipment you need, including single-speaker and pair options, then enquire about availability.
+              </p>
+            </div>
+            <Button nativeButton={false} render={<Link href="/equipment" />}>
+              Browse equipment
             </Button>
           </CardContent>
         </Card>

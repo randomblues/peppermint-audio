@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { trackGoogleAdsBookingSubmission } from "@/lib/google-ads";
 import { getMelbourneToday } from "@/lib/date-utils";
-import { addOnCatalog, packageTiers, hireTerms } from "@/lib/site-content";
+import { packageTiers, hireTerms } from "@/lib/site-content";
 import { bookingSchema, type BookingFormInputValues } from "@/lib/validation/booking";
 
 const steps = [
@@ -100,13 +100,17 @@ function fieldError(errors: Record<string, string>, name: string) {
 
 type BookingFormProps = {
   initialPackageSlug?: string;
+  initialEquipmentName?: string;
 };
 
-export function BookingForm({ initialPackageSlug }: BookingFormProps) {
+export function BookingForm({ initialPackageSlug, initialEquipmentName }: BookingFormProps) {
   const [step, setStep] = useState(0);
   const [values, setValues] = useState<BookingFormState>(() => ({
     ...initialState,
-    packageInterest: packageTiers.find((pkg) => pkg.slug === initialPackageSlug)?.name ?? "",
+    packageInterest:
+      packageTiers.find((pkg) => pkg.slug === initialPackageSlug)?.name ??
+      initialEquipmentName ??
+      "",
   }));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
@@ -148,12 +152,6 @@ export function BookingForm({ initialPackageSlug }: BookingFormProps) {
   function updateValue(name: keyof BookingFormInputValues, value: string) {
     setValues((current) => ({ ...current, [name]: value }));
     setErrors((current) => ({ ...current, [name]: "" }));
-  }
-
-  function toggleAddOn(slug: string) {
-    const selected = values.addOns ? values.addOns.split(",").filter(Boolean) : [];
-    const next = selected.includes(slug) ? selected.filter((value) => value !== slug) : [...selected, slug];
-    updateValue("addOns", next.join(","));
   }
 
   function validateCurrentStep() {
@@ -299,10 +297,20 @@ export function BookingForm({ initialPackageSlug }: BookingFormProps) {
 
         {step === 3 ? (
           <div className="space-y-8">
+            {initialEquipmentName && values.packageInterest === initialEquipmentName ? (
+              <div className="rounded-xl border border-primary bg-primary/5 p-5">
+                <p className="text-sm font-semibold uppercase tracking-wide text-primary">Individual equipment</p>
+                <p className="mt-2 text-lg font-semibold">{initialEquipmentName}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  This item is selected for your booking request. You can also choose a complete package below instead.
+                </p>
+              </div>
+            ) : null}
             <fieldset className="space-y-4">
               <legend className="text-base font-semibold">Choose your package</legend>
               <p className="text-sm text-muted-foreground">
-                Start with the complete setup that best fits your event. You can add optional add-ons after you choose.
+                Start with the complete setup that best fits your event, or submit the individual equipment selected above.
+                If you need anything extra with a package, browse individual equipment and add it to your cart before continuing.
               </p>
               <div className="grid gap-4 lg:grid-cols-3">
                 {packageTiers.map((pkg) => {
@@ -357,45 +365,6 @@ export function BookingForm({ initialPackageSlug }: BookingFormProps) {
               </div>
             </fieldset>
             {fieldError(errors, "packageInterest")}
-            {values.packageInterest ? (() => {
-              const selectedPackage = packageTiers.find((pkg) => pkg.name === values.packageInterest);
-              const selectedAddOns = (values.addOns ?? "").split(",").filter(Boolean);
-              return selectedPackage && selectedPackage.addOnSlugs.length > 0 ? (
-                <div className="rounded-xl border border-dashed bg-muted/30 p-5">
-                  <div className="max-w-2xl">
-                    <p className="font-semibold">Add-ons <span className="font-normal text-muted-foreground">(optional)</span></p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Your <span className="font-medium text-foreground">{selectedPackage.name}</span> already includes everything you need to get started. Select any add-ons that suit your event.
-                    </p>
-                  </div>
-                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                    {selectedPackage.addOnSlugs.map((slug) => {
-                      const addOn = addOnCatalog[slug];
-                      if (!addOn) return null;
-                      const inputId = `add-on-${slug}`;
-
-                      return (
-                        <label
-                          key={slug}
-                          htmlFor={inputId}
-                          className="flex cursor-pointer items-center gap-3 rounded-lg border bg-background p-3 text-sm transition-colors hover:border-primary/50"
-                        >
-                          <input
-                            id={inputId}
-                            type="checkbox"
-                            checked={selectedAddOns.includes(slug)}
-                            onChange={() => toggleAddOn(slug)}
-                            className="size-4 accent-primary"
-                          />
-                          <span>{addOn.name}</span>
-                          <span className="ml-auto shrink-0 text-muted-foreground">+${addOn.price}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : null;
-            })() : null}
           </div>
         ) : null}
 

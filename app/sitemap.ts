@@ -5,6 +5,7 @@ import { business } from "@/lib/site-content";
 const publicRoutes = [
   "",
   "/packages",
+  "/equipment",
   "/how-it-works",
   "/faq",
   "/contact",

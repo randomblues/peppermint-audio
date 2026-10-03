@@ -5,9 +5,11 @@ import { MenuIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   NavigationMenu,
+  NavigationMenuContent,
   NavigationMenuItem,
   NavigationMenuLink,
   NavigationMenuList,
+  NavigationMenuTrigger,
 } from "@/components/ui/navigation-menu";
 import {
   Sheet,
@@ -18,9 +20,9 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { business } from "@/lib/site-content";
+import { CartButton } from "@/components/cart-button";
 
 const navLinks = [
-  { href: "/packages", label: "Packages" },
   { href: "/how-it-works", label: "How It Works" },
   { href: "/faq", label: "FAQ" },
   { href: "/contact", label: "Contact" },
@@ -42,6 +44,29 @@ export function Navbar() {
         </Link>
         <NavigationMenu className="hidden md:flex">
           <NavigationMenuList>
+            <NavigationMenuItem>
+              <NavigationMenuTrigger>Products</NavigationMenuTrigger>
+              <NavigationMenuContent>
+                <div className="grid w-64 gap-1 p-2">
+                  <NavigationMenuLink render={<Link href="/packages" />}>
+                    <span>
+                      <span className="block font-medium">Packages</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Complete ready-to-use systems
+                      </span>
+                    </span>
+                  </NavigationMenuLink>
+                  <NavigationMenuLink render={<Link href="/equipment" />}>
+                    <span>
+                      <span className="block font-medium">Individual equipment</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Hire only what you need
+                      </span>
+                    </span>
+                  </NavigationMenuLink>
+                </div>
+              </NavigationMenuContent>
+            </NavigationMenuItem>
             {navLinks.map((link) => (
               <NavigationMenuItem key={link.href}>
                 <NavigationMenuLink
@@ -55,6 +80,7 @@ export function Navbar() {
           </NavigationMenuList>
         </NavigationMenu>
         <div className="flex items-center gap-2">
+          <CartButton />
           <Button className="hidden md:inline-flex" nativeButton={false} render={<Link href="/booking" />}>
             Book now
           </Button>
@@ -78,6 +104,25 @@ export function Navbar() {
                 <SheetDescription>Audio system hire in Melbourne</SheetDescription>
               </SheetHeader>
               <div className="grid gap-1 p-4">
+                <p className="px-3 pb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                  Products
+                </p>
+                <Button
+                  variant="ghost"
+                  className="justify-start"
+                  nativeButton={false}
+                  render={<Link href="/packages" />}
+                >
+                  Packages
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="justify-start"
+                  nativeButton={false}
+                  render={<Link href="/equipment" />}
+                >
+                  Individual equipment
+                </Button>
                 {navLinks.map((link) => (
                   <Button
                     key={link.href}

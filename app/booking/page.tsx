@@ -14,14 +14,28 @@ export const metadata: Metadata = {
 };
 
 type BookingPageProps = {
-  searchParams: Promise<{ package?: string }>;
+  searchParams: Promise<{ package?: string; equipment?: string; cart?: string }>;
 };
 
 export default async function BookingPage({ searchParams }: BookingPageProps) {
-  const { package: requestedPackage } = await searchParams;
+  const { package: requestedPackage, equipment: requestedEquipment, cart: requestedCart } = await searchParams;
   const selectedPackage = packageTiers.some((pkg) => pkg.slug === requestedPackage)
     ? requestedPackage
     : undefined;
+  let selectedEquipment = requestedEquipment;
+
+  if (requestedCart) {
+    try {
+      const cart = JSON.parse(requestedCart) as Array<{ name?: unknown; option?: unknown; quantity?: unknown }>;
+      const summary = cart
+        .filter((item) => typeof item.name === "string")
+        .map((item) => `${item.quantity && Number(item.quantity) > 1 ? `${item.quantity} × ` : ""}${item.name}${typeof item.option === "string" ? ` (${item.option})` : ""}`)
+        .join(", ");
+      if (summary) selectedEquipment = summary;
+    } catch {
+      selectedEquipment = requestedEquipment;
+    }
+  }
 
   return (
     <Section
@@ -29,7 +43,7 @@ export default async function BookingPage({ searchParams }: BookingPageProps) {
       title="Making a booking"
       description="The booking is only confirmed after Peppermint Audio reviews availability and confirms it."
     >
-      <BookingForm initialPackageSlug={selectedPackage} />
+      <BookingForm initialPackageSlug={selectedPackage} initialEquipmentName={selectedEquipment} />
     </Section>
   );
 }

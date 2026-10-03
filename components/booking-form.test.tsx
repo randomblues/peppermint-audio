@@ -66,12 +66,7 @@ describe("BookingForm", () => {
     fireEvent.click(packages[0]);
     expect(packages[0]).toBeChecked();
 
-    const addOn = screen.queryByRole("checkbox", { name: /extra|subwoofer|microphone/i });
-    if (addOn) {
-      expect(screen.getByText("Add-ons")).toBeInTheDocument();
-      fireEvent.click(addOn);
-      expect(addOn).toBeChecked();
-    }
+    expect(screen.queryByText("Add-ons")).not.toBeInTheDocument();
   });
 
   it("preselects a package when opened from a package page", () => {

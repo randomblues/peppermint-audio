@@ -164,8 +164,36 @@ The focused test command is preferred while iterating; the full suite and build 
 - Apply `supabase/001_booking_management.sql` manually in the production Supabase project after schema changes.
 - Vercel Cron invocation may be difficult to verify from the dashboard; use the authorized route and inspect logs carefully.
 - `after()` moves calendar/email work after the booking response; do not assume those side effects have completed when the HTTP response returns.
+- Use one localhost server per task. Before browser validation, check which process owns the target port, stop stale task-owned servers by PID, start one current server, and use one browser tab/URL consistently. Do not alternate between stale `localhost:3000`, `localhost:3001`, `localhost:3002`, or `localhost:3003` tabs.
+- If a browser tab does not reflect an edit, reload it and verify its URL, port, process, and rendered source before changing code again. Do not assume a stale tab proves the implementation is broken.
+- After a required browser check passes, do not repeat the same validation loop unless code or viewport behavior has changed. Report the result and move on.
 - Preserve unrelated working-tree changes. In particular, inspect `git status --short` before edits and never reset or checkout files as a recovery shortcut.
 - Use `git diff --check` before commits. Do not commit or push unless the user explicitly asks.
+
+## Self-improvement and technical issue log
+
+This section is a persistent, lightweight feedback loop. When a technical issue causes wasted work, a misleading result, a repeated validation loop, or a preventable delay, append a dated entry with the symptom, root cause, prevention rule, and the next action. Read this section before starting similar work and apply the prevention rule. Do not silently repeat a known failure.
+
+### 2026-10-03 — Conflicting localhost development servers
+
+- **Symptom:** Browser tabs showed different versions of the booking page, making current changes appear stuck or missing.
+- **Root cause:** Multiple task-owned Next.js servers were left running on ports 3000–3003, and browser checks alternated between them.
+- **Prevention:** Use one canonical localhost port for the task; inspect and stop stale task-owned processes before starting it; verify the active browser URL and port before judging the UI.
+- **Next action:** Keep browser validation on `http://localhost:3000` unless that port is unavailable, and record the replacement port explicitly.
+
+### 2026-10-03 — Repeated validation after completion
+
+- **Symptom:** The same tests, builds, and browser checks were rerun after they had already passed, delaying delivery.
+- **Root cause:** Validation scope was not closed after a successful result, and stale-server confusion triggered unnecessary rechecks.
+- **Prevention:** Maintain a clear completion checklist; rerun only the check affected by a subsequent code change; report passed checks once and proceed.
+- **Next action:** After the final edit, run the smallest affected tests plus the required final suite/build/browser checks once, then stop unless a concrete failure appears.
+
+### 2026-10-03 — Browser test draft left in local storage
+
+- **Symptom:** The active localhost booking page reopened with a test email, making the page look stuck or incorrectly populated.
+- **Root cause:** Browser validation data was written to the new booking draft storage and was not cleared before the next inspection.
+- **Prevention:** Use clearly disposable test data, clear the booking draft after browser checks, reload the page, and verify the form is clean before handing control back.
+- **Next action:** Never leave test customer data in the active browser tab or local storage.
 
 # Agent working rules
 

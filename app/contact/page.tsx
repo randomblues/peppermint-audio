@@ -13,15 +13,15 @@ export const metadata: Metadata = {
 };
 
 type ContactPageProps = {
-  searchParams: Promise<{ package?: string }>;
+  searchParams: Promise<{ package?: string; equipment?: string }>;
 };
 
 export default async function ContactPage({ searchParams }: ContactPageProps) {
-  const { package: requestedPackage } = await searchParams;
-  const packageName =
-    requestedPackage === "custom"
+  const { package: requestedPackage, equipment: requestedEquipment } = await searchParams;
+  const selectedHire = requestedEquipment
+    ?? (requestedPackage === "custom"
       ? "Custom package"
-      : packageTiers.find((pkg) => pkg.slug === requestedPackage)?.name;
+      : packageTiers.find((pkg) => pkg.slug === requestedPackage)?.name);
 
   return (
     <Section
@@ -30,7 +30,7 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
       description="Have a question, want to enquire about a package, or need help planning your event? Send us a message and we will get back to you."
     >
       <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
-        <EnquiryForm packageName={packageName} />
+        <EnquiryForm packageName={selectedHire} />
         <Card className="border">
           <CardHeader>
             <Badge variant="secondary" className="w-fit">Pickup details</Badge>
