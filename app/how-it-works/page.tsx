@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Section } from "@/components/section";
@@ -6,11 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { business, howItWorks } from "@/lib/site-content";
+import { createPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "How It Works | Peppermint Audio",
+export const metadata = createPageMetadata({
+  title: "How It Works",
   description: "How audio system hire pickup works from Abbotsford Melbourne 3067.",
-};
+  path: "/how-it-works",
+});
 
 export default function HowItWorksPage() {
   return (

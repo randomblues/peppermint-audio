@@ -1,15 +1,15 @@
-import type { Metadata } from "next";
-
 import { EquipmentCard } from "@/components/equipment-card";
 import { Section } from "@/components/section";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { equipmentCatalog } from "@/lib/site-content";
+import { createPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Equipment Hire | Peppermint Audio",
+export const metadata = createPageMetadata({
+  title: "Equipment Hire",
   description:
     "Hire individual speakers, microphones, mixers, DI boxes, and lighting from Peppermint Audio in Melbourne.",
-};
+  path: "/equipment",
+});
 
 export default function EquipmentPage() {
   return (

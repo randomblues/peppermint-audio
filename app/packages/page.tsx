@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 
 import { PackageCard } from "@/components/package-card";
@@ -7,11 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { packageTiers } from "@/lib/site-content";
+import { createPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Packages | Peppermint Audio",
+export const metadata = createPageMetadata({
+  title: "Packages",
   description: "Simple, complete audio system hire packages for parties, presentations, weddings, and live events in Melbourne.",
-};
+  path: "/packages",
+});
 
 type PackagesPageProps = {
   searchParams: Promise<{ package?: string }>;

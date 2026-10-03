@@ -87,6 +87,7 @@ export default function RootLayout({
       "@type": "City",
       name: business.serviceArea,
     },
+    sameAs: [business.googleReviewsUrl],
     makesOffer: [
       {
         "@type": "Offer",

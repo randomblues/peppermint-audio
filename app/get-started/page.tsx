@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 
@@ -11,15 +10,17 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { createPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Get Started | Peppermint Audio",
+export const metadata = createPageMetadata({
+  title: "Get Started",
   description: "Setup instructions for Peppermint Audio hire packages.",
+  path: "/get-started",
   robots: {
     index: false,
     follow: false,
   },
-};
+});
 
 const youtubeLinks = [
   {

@@ -1,17 +1,14 @@
-import type { Metadata } from "next";
-
 import { BookingForm } from "@/components/booking-form";
 import { Section } from "@/components/section";
 import { packageTiers } from "@/lib/site-content";
+import { createPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Making a Booking | Peppermint Audio",
+export const metadata = createPageMetadata({
+  title: "Making a Booking",
   description:
     "Complete your event details and submit your audio equipment booking with Peppermint Audio in Melbourne.",
-  alternates: {
-    canonical: "/booking",
-  },
-};
+  path: "/booking",
+});
 
 type BookingPageProps = {
   searchParams: Promise<{ package?: string; equipment?: string; cart?: string }>;

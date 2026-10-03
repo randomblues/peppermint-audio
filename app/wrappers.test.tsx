@@ -4,9 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 import RootLayout, { metadata } from "./layout";
 import AdminLoginPage from "./admin/login/page";
 import AdminPage from "./admin/page";
+import { metadata as cartMetadata } from "./cart/page";
+import { generateMetadata as generateEquipmentMetadata } from "./equipment/[slug]/page";
+import { metadata as packagesMetadata } from "./packages/page";
 import robots from "./robots";
 import sitemap from "./sitemap";
-import { business } from "@/lib/site-content";
+import { business, equipmentCatalog } from "@/lib/site-content";
 
 const { redirect, requireAdmin } = vi.hoisted(() => ({
   redirect: vi.fn((path: string) => {
@@ -65,6 +68,18 @@ describe("app wrappers and metadata", () => {
     });
   });
 
+  it("uses route-specific canonical metadata and avoids indexing utility pages", async () => {
+    expect(packagesMetadata.title).toBe("Packages");
+    expect(packagesMetadata.alternates?.canonical).toBe("/packages");
+    expect(cartMetadata.robots).toEqual({ index: false, follow: false });
+
+    const equipmentMetadata = await generateEquipmentMetadata({
+      params: Promise.resolve({ slug: equipmentCatalog[0].slug }),
+    });
+    expect(equipmentMetadata.title).toBe(`${equipmentCatalog[0].name} Hire`);
+    expect(equipmentMetadata.alternates?.canonical).toBe(`/equipment/${equipmentCatalog[0].slug}`);
+  });
+
   it("composes the root document around children and shared chrome", () => {
     render(
       <RootLayout>
@@ -112,14 +127,16 @@ describe("app wrappers and metadata", () => {
 
   it("returns the robots policy and canonical sitemap location", () => {
     expect(robots()).toEqual({
-      rules: { userAgent: "*", allow: "/", disallow: "/api/" },
+      rules: { userAgent: "*", allow: "/", disallow: ["/api/", "/admin/"] },
       sitemap: `${business.website}/sitemap.xml`,
       host: business.website,
     });
   });
 
   it("returns public routes with the expected sitemap priorities", () => {
-    expect(sitemap()).toEqual([
+    const entries = sitemap();
+
+    expect(entries.slice(0, 7)).toEqual([
       { url: business.website, changeFrequency: "weekly", priority: 1 },
       { url: `${business.website}/packages`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${business.website}/equipment`, changeFrequency: "monthly", priority: 0.7 },
@@ -128,5 +145,14 @@ describe("app wrappers and metadata", () => {
       { url: `${business.website}/contact`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${business.website}/booking`, changeFrequency: "monthly", priority: 0.7 },
     ]);
+    expect(entries).toHaveLength(7 + equipmentCatalog.length);
+    for (const item of equipmentCatalog) {
+      expect(entries).toContainEqual({
+        url: `${business.website}/equipment/${item.slug}`,
+        changeFrequency: "monthly",
+        priority: 0.6,
+        ...(item.image ? { images: [`${business.website}${item.image}`] } : {}),
+      });
+    }
   });
 });

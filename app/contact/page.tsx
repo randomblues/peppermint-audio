@@ -1,16 +1,16 @@
-import type { Metadata } from "next";
-
 import { EnquiryForm } from "@/components/enquiry-form";
 import { Section } from "@/components/section";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { business, packageTiers } from "@/lib/site-content";
+import { createPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Contact | Peppermint Audio",
+export const metadata = createPageMetadata({
+  title: "Contact",
   description: "Ask a question or send an enquiry to Peppermint Audio in Melbourne.",
-};
+  path: "/contact",
+});
 
 type ContactPageProps = {
   searchParams: Promise<{ package?: string; equipment?: string }>;

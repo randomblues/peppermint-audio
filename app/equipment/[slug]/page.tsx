@@ -8,6 +8,7 @@ import { Section } from "@/components/section";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { equipmentCatalog } from "@/lib/site-content";
+import { createPageMetadata } from "@/lib/seo";
 
 type EquipmentDetailPageProps = {
   params: Promise<{ slug: string }>;
@@ -21,10 +22,12 @@ export async function generateMetadata({ params }: EquipmentDetailPageProps): Pr
   const { slug } = await params;
   const item = equipmentCatalog.find((candidate) => candidate.slug === slug);
 
-  return {
-    title: item ? `${item.name} Hire | Peppermint Audio` : "Equipment Hire | Peppermint Audio",
-    description: item?.description,
-  };
+  return createPageMetadata({
+    title: item ? `${item.name} Hire` : "Equipment Hire",
+    description: item?.description ?? "Hire individual audio equipment from Peppermint Audio in Melbourne.",
+    path: item ? `/equipment/${item.slug}` : "/equipment",
+    image: item?.image,
+  });
 }
 
 export default async function EquipmentDetailPage({ params }: EquipmentDetailPageProps) {

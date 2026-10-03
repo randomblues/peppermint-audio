@@ -1,12 +1,16 @@
-import type { Metadata } from "next";
-
 import { CartView } from "@/components/cart-view";
 import { Section } from "@/components/section";
+import { createPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Your Hire Cart | Peppermint Audio",
+export const metadata = createPageMetadata({
+  title: "Your Hire Cart",
   description: "Review your selected Peppermint Audio packages and equipment before submitting a booking request.",
-};
+  path: "/cart",
+  robots: {
+    index: false,
+    follow: false,
+  },
+});
 
 export default function CartPage() {
   return (

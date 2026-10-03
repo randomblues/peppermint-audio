@@ -92,6 +92,15 @@ describe("static site pages", () => {
     expect(screen.getByRole("heading", { name: "Frequently Asked Questions" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: faqs[0].question })).toBeInTheDocument();
     expect(screen.getByText(faqs[0].answer)).toBeInTheDocument();
+    expect(JSON.parse(document.querySelector('script[type="application/ld+json"]')?.textContent ?? "")).toMatchObject({
+      "@type": "FAQPage",
+      mainEntity: expect.arrayContaining([
+        expect.objectContaining({
+          "@type": "Question",
+          name: faqs[0].question,
+        }),
+      ]),
+    });
   });
 
   it("how-it-works page labels every step and links to availability", () => {
