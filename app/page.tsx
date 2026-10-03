@@ -47,6 +47,9 @@ export default function Home() {
               </Button>
               <PhoneCallButton phone={business.phone} />
             </div>
+            <p className="mt-4 text-sm font-medium text-foreground/85">
+              Weekend dates can fill quickly — send your event date and we&apos;ll check availability.
+            </p>
             <div className="mt-8 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
               <span>Weddings</span>
               <span>·</span>

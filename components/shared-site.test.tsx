@@ -8,6 +8,7 @@ import { PackageCarousel } from "./package-carousel";
 import { EquipmentCard } from "./equipment-card";
 import { CustomerReviews } from "./customer-reviews";
 import { PhoneCallButton } from "./phone-call-button";
+import { MobileContactBar } from "./mobile-contact-bar";
 import { Section } from "./section";
 import { WhatsAppButton } from "./whatsapp-button";
 import * as googleAds from "@/lib/google-ads";
@@ -168,6 +169,30 @@ describe("WhatsAppButton", () => {
     expect(link).toHaveAttribute("rel", "noreferrer");
     expect(link).toHaveAttribute("href", expect.stringContaining("wa.me/61452316823"));
     expect(link).toHaveTextContent("Chat on WhatsApp");
+  });
+
+  describe("MobileContactBar", () => {
+    beforeEach(() => usePathname.mockReset());
+
+    it("shows tracked availability, WhatsApp, and phone actions on public pages", () => {
+      usePathname.mockReturnValue("/packages");
+      render(<MobileContactBar />);
+
+      expect(screen.getByRole("navigation", { name: "Quick contact actions" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Check availability" })).toHaveAttribute("href", "/booking");
+      expect(screen.getByRole("link", { name: "WhatsApp us" })).toHaveAttribute(
+        "href",
+        expect.stringContaining("wa.me/61452316823"),
+      );
+      expect(screen.getByRole("link", { name: "Call us" })).toHaveAttribute("href", "tel:0452316823");
+    });
+
+    it("is hidden from admin pages", () => {
+      usePathname.mockReturnValue("/admin");
+      render(<MobileContactBar />);
+
+      expect(screen.queryByRole("navigation", { name: "Quick contact actions" })).not.toBeInTheDocument();
+    });
   });
 
   it("tracks WhatsApp clicks", () => {

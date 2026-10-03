@@ -39,6 +39,10 @@ vi.mock("@/components/whatsapp-button", () => ({
   WhatsAppButton: () => <div data-testid="whatsapp">WhatsApp</div>,
 }));
 
+vi.mock("@/components/mobile-contact-bar", () => ({
+  MobileContactBar: () => <div data-testid="mobile-contact-bar">Mobile contact bar</div>,
+}));
+
 vi.mock("@/components/admin-login", () => ({
   AdminLogin: () => <div data-testid="admin-login">Admin login</div>,
 }));

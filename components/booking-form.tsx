@@ -245,6 +245,7 @@ export function BookingForm({ initialPackageSlug, initialEquipmentName }: Bookin
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
           <p>Please note that your booking has not yet been confirmed.</p>
+          <p>We&apos;ll review your event date and get back to you shortly.</p>
           <p>Someone from our team will reach out, if not already, to discuss your booking. Once your booking is confirmed, you will automatically receive a confirmation email.</p>
         </CardContent>
       </Card>

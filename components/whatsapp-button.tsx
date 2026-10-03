@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 
 import { trackGoogleAdsWhatsAppClick } from "@/lib/google-ads";
 
-const whatsappUrl = `https://wa.me/61452316823?text=${encodeURIComponent(
+export const whatsappUrl = `https://wa.me/61452316823?text=${encodeURIComponent(
   "Hi Peppermint Audio, I have an enquiry about hiring an audio system.",
 )}`;
 

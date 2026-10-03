@@ -5,6 +5,7 @@ import Script from "next/script";
 import { Footer } from "@/components/footer";
 import { CartProvider } from "@/components/cart-provider";
 import { MarketingAttribution } from "@/components/marketing-attribution";
+import { MobileContactBar } from "@/components/mobile-contact-bar";
 import { Navbar } from "@/components/navbar";
 import { WhatsAppButton } from "@/components/whatsapp-button";
 import { googleAdsConversionId } from "@/lib/google-ads";
@@ -136,9 +137,10 @@ export default function RootLayout({
           <MarketingAttribution />
           <CartProvider>
             <Navbar />
-            <main className="flex-1 bg-background">{children}</main>
+            <main className="flex-1 bg-background pb-20 md:pb-0">{children}</main>
             <Footer />
             <WhatsAppButton />
+            <MobileContactBar />
           </CartProvider>
         </div>
       </body>
