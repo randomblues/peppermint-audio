@@ -105,6 +105,7 @@ describe("AdminConsole", () => {
       createObjectURL: vi.fn().mockReturnValue("blob:archive"),
       revokeObjectURL: vi.fn(),
     });
+
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
     render(<AdminConsole />);
     fireEvent.click(await screen.findByRole("link", { name: "Archive export" }));
@@ -117,6 +118,28 @@ describe("AdminConsole", () => {
     })));
     expect(click).toHaveBeenCalled();
     expect(await screen.findByRole("status")).toHaveTextContent("Archive downloaded.");
+  });
+
+  it("sends an editable invoice email with an attachment", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ bookings: [booking] }))
+      .mockResolvedValue(jsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AdminConsole />);
+    fireEvent.click(await screen.findByText("Alex Smith"));
+    fireEvent.click(screen.getByRole("button", { name: "Send Email" }));
+    expect(screen.getByLabelText("Invoice email subject")).toHaveValue("Your Peppermint Audio invoice");
+    fireEvent.change(screen.getByLabelText("Invoice email subject"), { target: { value: "Invoice for your event" } });
+    fireEvent.change(screen.getByLabelText("Invoice email message"), { target: { value: "Hello, your invoice is attached." } });
+    const file = new File(["invoice"], "invoice.pdf", { type: "application/pdf" });
+    fireEvent.change(screen.getByLabelText("Invoice attachment"), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole("button", { name: "Send invoice" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/send-invoice-email", expect.objectContaining({ method: "POST", body: expect.any(FormData) })));
+    const body = fetchMock.mock.calls.at(-1)?.[1]?.body as FormData;
+    expect(body.get("subject")).toBe("Invoice for your event");
+    expect(body.get("message")).toBe("Hello, your invoice is attached.");
+    expect(body.get("attachment")).toBe(file);
   });
 
   it("requires delete confirmation and deletes a booking when confirmed", async () => {

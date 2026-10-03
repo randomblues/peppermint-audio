@@ -17,12 +17,14 @@ create table if not exists public.booking_email_log (
   id uuid primary key default gen_random_uuid(),
   booking_id uuid references public.bookings(id) on delete cascade,
   recipient_email text not null,
-  email_type text not null check (email_type in ('booking_request','confirmation','pickup_reminder','custom','enquiry')),
+  email_type text not null check (email_type in ('booking_request','confirmation','pickup_reminder','custom','invoice','enquiry')),
   provider_message_id text,
   sent_at timestamptz not null default now()
 );
 create index if not exists booking_email_log_booking_id_idx on public.booking_email_log(booking_id);
 create index if not exists booking_email_log_sent_at_idx on public.booking_email_log(sent_at);
+alter table public.booking_email_log drop constraint if exists booking_email_log_email_type_check;
+alter table public.booking_email_log add constraint booking_email_log_email_type_check check (email_type in ('booking_request','confirmation','pickup_reminder','custom','invoice','enquiry'));
 alter table public.bookings add column if not exists reminder_sent_at timestamptz;
 alter table public.bookings add column if not exists add_ons text[] not null default '{}';
 alter table public.bookings add column if not exists confirmation_email_sent boolean not null default false;

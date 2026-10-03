@@ -5,6 +5,7 @@ export const customerEmailTypes = [
   "confirmation",
   "pickup_reminder",
   "custom",
+  "invoice",
   "enquiry",
 ] as const;
 
