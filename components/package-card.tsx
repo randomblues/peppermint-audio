@@ -28,14 +28,14 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
 
   return (
     <Card className="h-full justify-between overflow-hidden border">
-      <div className="relative h-40">
+      <div className="relative h-56 bg-white sm:h-64">
         <Image
           src={pkg.image}
           alt={pkg.name}
           fill
           sizes="(max-width: 768px) 100vw, 33vw"
           loading={priority ? "eager" : "lazy"}
-          className="object-cover"
+          className="object-contain"
         />
       </div>
       <CardHeader className={compact ? "flex flex-col gap-2" : undefined}>
@@ -47,7 +47,15 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
       <CardContent>
         <p className="text-sm font-medium text-foreground">Ideal for {pkg.capacity}</p>
         {compact ? (
-          <p className="mt-2 text-sm text-muted-foreground">{pkg.summary}</p>
+          <>
+            <p className="mt-2 text-sm text-muted-foreground">{pkg.summary}</p>
+            <p className="mt-4 text-sm font-semibold text-foreground">Included</p>
+            <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
+              {pkg.inclusions.map((item) => (
+                <li key={item}>- {item}</li>
+              ))}
+            </ul>
+          </>
         ) : (
           <>
             <ul className="mt-4 space-y-2 text-sm text-muted-foreground">

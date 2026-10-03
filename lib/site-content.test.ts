@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { equipmentCatalog } from "./site-content";
+import { equipmentCatalog, packageTiers } from "./site-content";
 
 describe("equipmentCatalog", () => {
   it("includes the microphone and party bar hire items with product images", () => {
     const expectedItems = [
       ["behringer-xm8500", "/behringer-xm8500.jpg", 10],
+      ["behringer-b1200d-pro", "/behringer-b1200d-pro.jpg", 50],
       ["shure-sm58", "/shure-sm58.jpg", 15],
       ["shure-sm57", "/shure-sm57.webp", 15],
       ["shure-sm7b", "/shure-sm7b.jpg", 35],
@@ -30,5 +31,38 @@ describe("equipmentCatalog", () => {
     }
 
     expect(equipmentCatalog.some((item) => item.slug === "hire-wireless-microphones")).toBe(false);
+  });
+
+  it("keeps the speech packages distinct and uses the combined product image", () => {
+    expect(packageTiers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          slug: "speech-presentation-wireless",
+          name: "Speech & Presentation Package",
+          price: 95,
+          image: "/speech-presentation-package.png",
+        }),
+        expect.objectContaining({
+          slug: "speech-presentation",
+          name: "Small Budget Event Package",
+          price: 120,
+          image: "/small-budget-event-package-v2.png",
+        }),
+        expect.objectContaining({
+          slug: "standard-party-events",
+          image: "/standard-party-events-package-v2.png",
+        }),
+        expect.objectContaining({
+          slug: "budget-with-a-boom",
+          name: "Budget With A Boom",
+          price: 170,
+          image: "/budget-with-a-boom-package.png",
+        }),
+        expect.objectContaining({
+          slug: "big-celebration",
+          image: "/big-celebration-package-v3.png",
+        }),
+      ]),
+    );
   });
 });

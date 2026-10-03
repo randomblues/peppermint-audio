@@ -1,14 +1,14 @@
 import Link from "next/link";
 import Image from "next/image";
 
-import { PackageCard } from "@/components/package-card";
+import { PackageCarousel } from "@/components/package-carousel";
 import { CustomerReviews } from "@/components/customer-reviews";
 import { PhoneCallButton } from "@/components/phone-call-button";
 import { Section } from "@/components/section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { business, howItWorks, packageTiers } from "@/lib/site-content";
+import { business, howItWorks } from "@/lib/site-content";
 
 export default function Home() {
   return (
@@ -44,15 +44,6 @@ export default function Home() {
                 render={<Link href="/packages" />}
               >
                 View Packages
-              </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                className="border-white/25 bg-white/10 text-white hover:bg-white/20 hover:text-white"
-                nativeButton={false}
-                render={<Link href="/equipment" />}
-              >
-                Hire individual equipment
               </Button>
               <PhoneCallButton phone={business.phone} />
             </div>
@@ -91,7 +82,7 @@ export default function Home() {
                 <div className="p-3">
                   <p className="font-medium text-foreground">Built around your event</p>
                   <p className="mt-1 text-muted-foreground">
-                    Three clear packages from $120, plus custom options when you need them.
+                    Clear package options from $95, plus custom options when you need them.
                   </p>
                 </div>
               </div>
@@ -102,14 +93,10 @@ export default function Home() {
 
       <Section
         eyebrow="Packages"
-        title="Three simple, complete packages"
+        title="Simple, complete packages"
         description="Choose a ready-to-use package for your guest count. Every option includes the equipment and cables you need for a hassle-free setup."
       >
-        <div className="grid gap-4 md:grid-cols-3">
-          {packageTiers.map((pkg, index) => (
-            <PackageCard key={pkg.slug} pkg={pkg} compact priority={index === 0} />
-          ))}
-        </div>
+        <PackageCarousel />
         <Card className="mt-4 border-dashed">
           <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="max-w-2xl">

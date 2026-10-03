@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 
 const packageNames = [
   "Speech & Presentation Package",
+  "Small Budget Event Package",
+  "Budget With A Boom",
   "Standard Party & Events Package",
   "Big Celebration Package",
 ];

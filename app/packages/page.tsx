@@ -27,7 +27,7 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
     <Section
       eyebrow="Pricing"
       title="Choose your complete PA package"
-      description="Three straightforward options, starting at $120. Every package is ready to plug in and use."
+      description="Straightforward options starting at $95. Every package is ready to plug in and use."
     >
       <Tabs defaultValue={selectedPackage} className="w-full">
         <TabsList

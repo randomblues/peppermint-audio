@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Footer } from "./footer";
 import { Navbar } from "./navbar";
 import { PackageCard } from "./package-card";
+import { PackageCarousel } from "./package-carousel";
 import { EquipmentCard } from "./equipment-card";
 import { CustomerReviews } from "./customer-reviews";
 import { PhoneCallButton } from "./phone-call-button";
@@ -29,9 +30,8 @@ describe("Navbar", () => {
     expect(screen.getByRole("button", { name: "Products" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "How It Works" })).toHaveAttribute("href", "/how-it-works");
     expect(screen.getByRole("link", { name: "FAQ" })).toHaveAttribute("href", "/faq");
-    const bookingLinks = screen.getAllByText("Book now").map((element) => element.closest("a"));
-    expect(bookingLinks).toHaveLength(1);
-    expect(bookingLinks.every((link) => link?.getAttribute("href") === "/booking")).toBe(true);
+    expect(screen.queryByText("Book now")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Open cart/ })).toHaveAttribute("href", "/cart");
     expect(screen.getByRole("button", { name: "Open menu" })).toBeInTheDocument();
   });
 
@@ -85,7 +85,7 @@ describe("Footer", () => {
 
 describe("PackageCard", () => {
   it("renders package data and cart actions", () => {
-    const pkg = packageTiers[1];
+    const pkg = packageTiers[0];
     render(<PackageCard pkg={pkg} />);
 
     expect(screen.getByText(pkg.name)).toBeInTheDocument();
@@ -97,7 +97,23 @@ describe("PackageCard", () => {
       `/packages?package=${pkg.slug}`,
     );
     expect(screen.getByRole("button", { name: "Add package to cart" })).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: pkg.name })).toHaveAttribute("src", expect.stringContaining("pexels"));
+    expect(screen.getByRole("img", { name: pkg.name })).toHaveAttribute(
+      "src",
+      expect.stringContaining("speech-presentation-package.png"),
+    );
+  });
+
+  describe("PackageCarousel", () => {
+    it("renders every package in a horizontally scrollable region", () => {
+      render(<PackageCarousel />);
+
+      expect(screen.getByRole("button", { name: "Previous package" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Next package" })).toBeInTheDocument();
+      expect(screen.getByLabelText("Choose a package")).toBeInTheDocument();
+      for (const pkg of packageTiers) {
+        expect(screen.getByText(pkg.name)).toBeInTheDocument();
+      }
+    });
   });
 
   it("uses compact content and details link when requested", () => {
@@ -105,7 +121,8 @@ describe("PackageCard", () => {
     render(<PackageCard pkg={pkg} compact />);
 
     expect(screen.getByText(pkg.summary)).toBeInTheDocument();
-    expect(screen.queryByText(`- ${pkg.inclusions[0]}`)).not.toBeInTheDocument();
+    expect(screen.getByText(`- ${pkg.inclusions[0]}`)).toBeInTheDocument();
+    expect(screen.getByText("Included")).toBeInTheDocument();
     expect(screen.queryByText("Optional add-ons")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add package to cart" })).not.toBeInTheDocument();
     expect(screen.getByText("View package details").closest("a")).toHaveAttribute(

@@ -159,6 +159,19 @@ export const equipmentCatalog: EquipmentItem[] = [
     ],
   },
   {
+    slug: "behringer-b1200d-pro",
+    name: "Behringer Eurolive B1200D Pro Active Subwoofer",
+    category: "Subwoofers",
+    description: "Active 12-inch subwoofer for adding punch and low-end impact to parties, live music, and larger events.",
+    image: "/behringer-b1200d-pro.jpg",
+    options: [{ label: "Single subwoofer", price: 50 }],
+    details: [
+      "500W active subwoofer",
+      "12-inch low-frequency driver",
+      "Availability confirmed before hire",
+    ],
+  },
+  {
     slug: "behringer-xm8500",
     name: "Behringer Ultravoice XM8500 Dynamic Microphone",
     category: "Microphones",
@@ -275,14 +288,30 @@ export const business = {
 
 export const packageTiers: PackageTier[] = [
   {
-    slug: "speech-presentation",
+    slug: "speech-presentation-wireless",
     name: "Speech & Presentation Package",
+    price: 95,
+    capacity: "up to 40 people",
+    summary: "A Bose S1 Pro speaker and K60 wireless microphone for clear, simple speeches and presentations.",
+    bestFor: "Speeches, presentations, small meetings, and announcements",
+    image: "/speech-presentation-package.png",
+    addOnSlugs: [],
+    inclusions: [
+      "1 x Bose S1 Pro PA Speaker.",
+      "1 x K60 Wireless Microphone with receiver.",
+      "Power cable for the Bose speaker.",
+      "Microphone connection cable.",
+      "Bluetooth or AUX phone connection.",
+    ],
+  },
+  {
+    slug: "speech-presentation",
+    name: "Small Budget Event Package",
     price: 120,
     capacity: "up to 60 people",
     summary: "Two 150W speakers, stands, a wired microphone, and a simple mixer for clear speeches and presentations.",
-    bestFor: "Speeches, presentations, small corporate events, and announcements",
-    image:
-      "https://images.pexels.com/photos/164829/pexels-photo-164829.jpeg?w=600&h=400&fit=crop",
+    bestFor: "Small parties, presentations, community events, and announcements",
+    image: "/small-budget-event-package-v2.png",
     addOnSlugs: [
       "wireless-microphones",
       "party-lights-bar",
@@ -304,14 +333,42 @@ export const packageTiers: PackageTier[] = [
     ],
   },
   {
+    slug: "budget-with-a-boom",
+    name: "Budget With A Boom",
+    price: 170,
+    capacity: "up to 60 people",
+    summary: "The Small Budget Event setup with a Behringer subwoofer for extra low-end impact.",
+    bestFor: "Small parties that want more bass without moving up to a full-scale event system",
+    image: "/budget-with-a-boom-package.png",
+    addOnSlugs: [
+      "wireless-microphones",
+      "party-lights-bar",
+      "di-box",
+      "four-channel-di-box",
+      "spirit-e12-mixer",
+      "behringer-x32",
+      "party-light-par-can",
+    ],
+    inclusions: [
+      "2 x Bose S1 Pro PA Speakers (150W each).",
+      "2 x Speaker Stands.",
+      "1 x Wired Microphone.",
+      "1 x Behringer Eurolive B1200D Pro Active Subwoofer.",
+      "Easy to use 2-channel Behringer Xenyx mixer.",
+      "Power Cables for All Equipment.",
+      "AUX or Bluetooth Phone Connection.",
+      "Long Extension Leads as Needed.",
+      "Multiple XLR Audio Cables as Needed.",
+    ],
+  },
+  {
     slug: "standard-party-events",
     name: "Standard Party & Events Package",
     price: 160,
     capacity: "up to 120 people",
     summary: "Two 1100W peak speakers, stands, a wired microphone, and mixer for parties and private events.",
     bestFor: "Parties, private functions, small corporate events, and live gigs",
-    image:
-      "https://images.pexels.com/photos/7715611/pexels-photo-7715611.jpeg",
+    image: "/standard-party-events-package-v2.png",
     addOnSlugs: [
       "wireless-microphones",
       "party-lights-bar",
@@ -340,8 +397,7 @@ export const packageTiers: PackageTier[] = [
     capacity: "up to 300 people",
     summary: "Two 1100W peak speakers, stands, two wireless microphones, a subwoofer, and mixer for bigger celebrations.",
     bestFor: "Weddings, large parties, celebrations, and live gigs",
-    image:
-      "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=600&h=400&fit=crop",
+    image: "/big-celebration-package-v3.png",
     addOnSlugs: [
       "di-box",
       "four-channel-di-box",
@@ -401,12 +457,12 @@ export const faqs = [
   {
     question: "What packages are available?",
     answer:
-      "There are three complete, ready-to-use packages: Speech & Presentation for up to 60 people at $120, Standard Party & Events for up to 120 people at $160, and Big Celebration for up to 300 people at $240.",
+      "Our complete, ready-to-use packages include the Speech & Presentation Package with a Bose S1 Pro and K60 wireless microphone for up to 40 people at $95, the Small Budget Event Package for up to 60 people at $120, Budget With A Boom with a Behringer subwoofer for up to 60 people at $170, the Standard Party & Events Package for up to 120 people at $160, and the Big Celebration Package for up to 300 people at $240.",
   },
   {
     question: "Which package is right for my event?",
     answer:
-      "Choose based on your guest count and event type. Speech & Presentation is best for smaller speeches and presentations. Standard Party & Events is the all-rounder for parties and private functions. Big Celebration is for weddings and larger events. Individual equipment is available when you only need specific items.",
+      "Choose based on your guest count and event type. Speech & Presentation is best for smaller speeches and presentations when you need a wireless microphone. Small Budget Event is suited to small parties and presentations with a mixer and wired microphone. Budget With A Boom is for smaller parties that want extra bass. Standard Party & Events is the all-rounder for parties and private functions. Big Celebration is for weddings and larger events. Individual equipment is available when you only need specific items.",
   },
   {
     question: "Can I hire individual equipment?",
@@ -421,7 +477,7 @@ export const faqs = [
   {
     question: "What is included in every package?",
     answer:
-      "Every package is a complete setup rather than just a pair of speakers. Depending on the package, you get speakers, stands, microphones, a mixer, power cables, AUX or Bluetooth phone connection, extension leads, and XLR audio cables.",
+      "Every package is a complete setup rather than just a pair of speakers. Depending on the package, you get speakers, stands, microphones, a mixer, subwoofers, power cables, AUX or Bluetooth phone connection, extension leads, and XLR audio cables.",
   },
   {
     question: "Do I need sound or event experience?",

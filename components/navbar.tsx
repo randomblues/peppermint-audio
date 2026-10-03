@@ -80,10 +80,9 @@ export function Navbar() {
           </NavigationMenuList>
         </NavigationMenu>
         <div className="flex items-center gap-2">
-          <CartButton />
-          <Button className="hidden md:inline-flex" nativeButton={false} render={<Link href="/booking" />}>
-            Book now
-          </Button>
+          <div className="ml-2 border-l border-border/70 pl-4">
+            <CartButton />
+          </div>
 
           <Sheet>
             <SheetTrigger
@@ -134,9 +133,6 @@ export function Navbar() {
                     {link.label}
                   </Button>
                 ))}
-                <Button className="mt-2" nativeButton={false} render={<Link href="/booking" />}>
-                  Book now
-                </Button>
               </div>
             </SheetContent>
           </Sheet>

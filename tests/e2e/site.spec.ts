@@ -5,7 +5,7 @@ const publicRoutes = [
   { path: "/packages", heading: "Choose your complete PA package" },
   { path: "/how-it-works", heading: "How It Works" },
   { path: "/faq", heading: "Frequently Asked Questions" },
-  { path: "/contact", heading: "Get a Quote" },
+  { path: "/contact", heading: "Get in touch" },
 ];
 
 test.describe("public pages", () => {
@@ -31,7 +31,12 @@ test.describe("navigation", () => {
     await page.goto("/");
 
     for (const route of publicRoutes.slice(1)) {
-      await page.getByRole("navigation").locator(`a[href="${route.path}"]`).click();
+      if (route.path === "/packages") {
+        await page.getByRole("navigation").getByRole("button", { name: "Products" }).click();
+        await page.getByRole("navigation").locator(`a[href="${route.path}"]`).click();
+      } else {
+        await page.getByRole("navigation").locator(`a[href="${route.path}"]`).click();
+      }
       await expect(page).toHaveURL(new RegExp(`${route.path.replace("/", "\\/")}$`));
       await expect(page.getByRole("heading", { name: route.heading })).toBeVisible();
       await page.goto("/");
@@ -58,7 +63,7 @@ test.describe("FAQ page", () => {
     const question = page.getByRole("button", { name: "What packages are available?" });
     await question.click();
     await expect(
-      page.getByText("There are three complete, ready-to-use packages:", { exact: false }),
+      page.getByText("Our complete, ready-to-use packages include", { exact: false }),
     ).toBeVisible();
   });
 });
@@ -103,7 +108,11 @@ test.describe("contact form", () => {
     await page.getByLabel("Event Details").fill("A birthday party requiring speakers and a microphone.");
 
     await page.locator("#eventDate").click();
-    await page.getByRole("dialog").locator('button[aria-pressed="false"]').first().click();
+    await page
+      .getByRole("dialog")
+      .locator('button[aria-pressed="false"]:not([disabled])')
+      .first()
+      .click();
 
     await page.getByRole("button", { name: "Send enquiry" }).click();
     await expect(page.getByText("Enquiry sent", { exact: true })).toBeVisible();

@@ -44,6 +44,16 @@ const packageGuides = [
   {
     id: "speech",
     title: "Speech & Presentation",
+    equipment: "Bose S1 Pro + K60 Wireless Microphone",
+    steps: [
+      "Place the Bose S1 Pro facing the audience and keep the microphone behind the speaker to help prevent feedback.",
+      "Connect the K60 wireless microphone receiver to the Bose S1 Pro using the supplied microphone connection cable.",
+      "Turn on the receiver and microphone, then connect your phone by Bluetooth or AUX if you are playing background audio.",
+    ],
+  },
+  {
+    id: "small-budget",
+    title: "Small Budget Event",
     equipment: "Bose S1 Pro",
     steps: [
       "Put the Bose speakers on stands, in front of the microphones, facing the audience.",
@@ -58,6 +68,16 @@ const packageGuides = [
     steps: [
       "Put the Yamaha speakers on stands, in front of the microphones, facing the audience.",
       "Connect the mixer MAIN OUT left and right to the inputs on the Yamaha speakers.",
+      "Plug the wired microphone into a microphone channel on the mixer using an XLR cable.",
+    ],
+  },
+  {
+    id: "budget-boom",
+    title: "Budget With A Boom",
+    equipment: "Bose S1 Pro + Behringer B1200D Pro",
+    steps: [
+      "Put the Bose speakers on stands, with the Behringer subwoofer on the floor between them and facing the audience.",
+      "Connect the mixer MAIN OUT to the subwoofer inputs, then connect the subwoofer outputs to the Bose speakers.",
       "Plug the wired microphone into a microphone channel on the mixer using an XLR cable.",
     ],
   },
