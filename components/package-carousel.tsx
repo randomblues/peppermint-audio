@@ -17,6 +17,7 @@ export function PackageCarousel() {
     if (!carousel) return;
 
     function updateFadeEdges() {
+      if (!carousel) return;
       const edgeThreshold = 8;
       setFadeEdges({
         left: carousel.scrollLeft > edgeThreshold,
@@ -64,7 +65,7 @@ export function PackageCarousel() {
           variant="outline"
           aria-label="Previous package"
           onClick={() => moveToPackage(activeIndex - 1)}
-          className="absolute top-1/2 left-2 z-20 -translate-y-1/2 bg-background/90 shadow-lg backdrop-blur-sm"
+          className="absolute top-28 left-2 z-20 -translate-y-1/2 bg-background/90 shadow-lg backdrop-blur-sm"
         >
           <span aria-hidden="true">←</span>
         </Button>
@@ -74,7 +75,7 @@ export function PackageCarousel() {
           variant="outline"
           aria-label="Next package"
           onClick={() => moveToPackage(activeIndex + 1)}
-          className="absolute top-1/2 right-2 z-20 -translate-y-1/2 bg-background/90 shadow-lg backdrop-blur-sm"
+          className="absolute top-28 right-2 z-20 -translate-y-1/2 bg-background/90 shadow-lg backdrop-blur-sm"
         >
           <span aria-hidden="true">→</span>
         </Button>
