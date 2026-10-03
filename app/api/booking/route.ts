@@ -1,6 +1,7 @@
 import { after, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { emailFooterHtml, emailFooterText } from "@/lib/email-footer";
+import { recordCustomerEmail } from "@/lib/email-log";
 import { createBookingCalendarEvent } from "@/lib/google-calendar";
 import { addOnCatalog, packageTiers } from "@/lib/site-content";
 import { createAdminClient, PHOTO_ID_BUCKET } from "@/lib/supabase";
@@ -153,6 +154,18 @@ export async function POST(request: Request) {
       }
       const internalEmailError = emails[0].error;
       const customerEmailError = emails[1].error;
+      if (!customerEmailError) {
+        try {
+          await recordCustomerEmail(admin, {
+            bookingId,
+            recipientEmail: data.email,
+            emailType: "booking_request",
+            providerMessageId: emails[1].data?.id,
+          });
+        } catch (error) {
+          console.error("Customer booking email log failed:", error);
+        }
+      }
       await updateBooking({
         calendar_event_link: calendarEventLink, calendar_error: calendarError,
         internal_email_sent: !internalEmailError, customer_email_sent: !customerEmailError,

@@ -20,6 +20,7 @@ vi.mock("next/server", async () => {
 });
 vi.mock("resend", () => ({ Resend }));
 vi.mock("@/lib/google-calendar", () => ({ createBookingCalendarEvent: calendar }));
+vi.mock("@/lib/email-log", () => ({ recordCustomerEmail: vi.fn() }));
 vi.mock("@/lib/supabase", () => ({
   PHOTO_ID_BUCKET: "booking-photo-ids",
   createAdminClient,

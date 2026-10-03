@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { buildPickupReminderEmail, getMelbourneTomorrow, type PickupReminderBooking } from "@/lib/pickup-reminders";
 import { createAdminClient } from "@/lib/supabase";
+import { recordCustomerEmail } from "@/lib/email-log";
 
 export const runtime = "nodejs";
 
@@ -38,6 +39,16 @@ export async function GET(request: Request) {
       const email = buildPickupReminderEmail(booking);
       const response = await resend.emails.send({ from, to: [booking.email], subject: email.subject, text: email.text, html: email.html });
       if (response.error) throw new Error(response.error.message);
+      try {
+        await recordCustomerEmail(admin, {
+          bookingId: booking.id,
+          recipientEmail: booking.email,
+          emailType: "pickup_reminder",
+          providerMessageId: response.data?.id,
+        });
+      } catch (error) {
+        console.error(`Pickup reminder email log failed for booking ${booking.id}:`, error);
+      }
       const update = await admin.from("bookings").update({ reminder_sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", booking.id).is("reminder_sent_at", null);
       if (update.error) throw new Error(`Reminder sent but could not be marked: ${update.error.message}`);
       sent.push(booking.id);

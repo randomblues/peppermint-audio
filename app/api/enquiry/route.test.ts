@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { send, Resend } = vi.hoisted(() => {
+const { send, recordCustomerEmail, Resend } = vi.hoisted(() => {
   process.env.RESEND_API_KEY = "re_test";
   process.env.ENQUIRY_FROM_EMAIL = "Peppermint Audio <from@example.com>";
   process.env.ENQUIRY_TO_EMAIL = "to@example.com";
   const send = vi.fn();
-  return { send, Resend: vi.fn(() => ({ emails: { send } })) };
+  return { send, recordCustomerEmail: vi.fn(), Resend: vi.fn(() => ({ emails: { send } })) };
 });
 
 vi.mock("resend", () => ({ Resend }));
+vi.mock("@/lib/email-log", () => ({ recordCustomerEmail }));
+vi.mock("@/lib/supabase", () => ({ createAdminClient: vi.fn() }));
 
 import { POST } from "./route";
 

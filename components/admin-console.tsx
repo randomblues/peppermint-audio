@@ -16,6 +16,7 @@ type Booking = Record<string, unknown> & {
   id: string; first_name: string; last_name: string; event_type: string;
   pickup_date: string; dropoff_date?: string; pickup_time?: string | null; dropoff_time?: string | null; status: string;
   internal_notes?: string; photo_id_paths?: string[]; add_ons?: string[];
+  email_logs?: Array<{ id: string; recipient_email: string; email_type: string; provider_message_id?: string | null; sent_at: string }>;
 };
 const statuses = bookingStatuses;
 const statusLabel = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
@@ -28,6 +29,17 @@ const formatTime = (value: unknown) => {
   if (!value) return "—";
   return new Intl.DateTimeFormat("en-AU", { hour: "numeric", minute: "2-digit" }).format(new Date(`1970-01-01T${String(value)}`));
 };
+const emailTypeLabel = (value: string) => ({
+  booking_request: "Booking request",
+  confirmation: "Booking confirmation",
+  pickup_reminder: "Pickup reminder",
+  custom: "Custom email",
+  enquiry: "Enquiry",
+}[value] ?? value);
+const formatSentAt = (value: string) => new Intl.DateTimeFormat("en-AU", {
+  dateStyle: "medium",
+  timeStyle: "short",
+}).format(new Date(value));
 const statusClass = (value: string) => ({
   submitted: "border-amber-200 bg-amber-50 text-amber-700",
   confirmed: "border-blue-200 bg-blue-50 text-blue-700",
@@ -200,10 +212,40 @@ function BookingDetail({ booking, onClose, onUpdate, onPhoto, onDelete, onSendRe
   return <div className="fixed inset-0 z-40 flex justify-end bg-black/30" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <aside role="dialog" aria-modal="true" aria-labelledby="booking-detail-title" className="flex h-full w-full max-w-xl flex-col overflow-hidden bg-background shadow-2xl">
       <div className="flex shrink-0 items-start justify-between border-b bg-background p-4 sm:p-5"><div className="min-w-0 pr-3"><p className="text-sm text-primary">Booking details</p><h2 id="booking-detail-title" className="mt-1 break-words text-xl font-semibold sm:text-2xl">{booking.first_name} {booking.last_name}</h2><p className="truncate text-sm text-muted-foreground">{display(booking.event_type)} · {formatDate(booking.pickup_date)}</p></div><Button variant="ghost" size="icon" onClick={onClose} aria-label="Close details"><X /></Button></div>
-      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4 sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><Badge className={statusClass(booking.status)}>{statusLabel(booking.status)}</Badge><label className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><span>Status</span><select aria-label="Update booking status" value={booking.status} onChange={(e) => void onUpdate(booking.id, { status: e.target.value })} className="h-9 rounded-lg border bg-background px-3 text-sm font-normal text-foreground">{statuses.map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}</select></label></div><div className="grid grid-cols-1 gap-4 rounded-xl border p-4 text-sm sm:grid-cols-2"><Detail label="Customer" value={`${booking.first_name} ${booking.last_name}`} icon={<UserRound />} /><Detail label="Email" value={display(booking.email)} icon={<Mail />} /><Detail label="Mobile" value={display(booking.mobile)} /><Detail label="Event address" value={display(booking.event_address)} />      <Detail label="Pickup" value={`${formatDate(booking.pickup_date)} at ${formatTime(booking.pickup_time)}`} /><Detail label="Drop-off" value={`${formatDate(booking.dropoff_date)} at ${formatTime(booking.dropoff_time)}`} /><Detail label="Package" value={display(booking.package_interest)} /><Detail label="Guests" value={display(booking.guest_count)} /><Detail label="Add-ons" value={booking.add_ons?.length ? booking.add_ons.join(", ") : "None selected"} /></div><div><h3 className="mb-2 text-sm font-semibold">Additional details</h3><p className="break-words rounded-lg bg-muted p-3 text-sm leading-relaxed">{display(booking.additional_details)}</p></div><div><h3 className="mb-2 text-sm font-semibold">Internal notes</h3><textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-24 w-full resize-y rounded-lg border bg-background p-3 text-sm" placeholder="Add a private note for the team…" /><Button size="sm" className="mt-2" onClick={() => void onUpdate(booking.id, { internal_notes: notes })}>Save notes</Button></div><div><div className="mb-2 flex flex-wrap items-center justify-between gap-3"><h3 className="text-sm font-semibold">Actions & outcomes</h3><Button size="sm" onClick={() => setEmailOpen(true)}>Send Email</Button></div><div className="space-y-2 rounded-lg border p-3 text-sm"><Outcome label="Internal email" ok={booking.internal_email_sent === true} /><Outcome label="Customer email" ok={booking.customer_email_sent === true} /><Outcome label="Google Calendar" ok={Boolean(booking.calendar_event_link)} error={display(booking.calendar_error)} />{booking.calendar_event_link ? <a className="mt-2 inline-flex max-w-full items-center gap-1 break-words text-primary hover:underline" href={String(booking.calendar_event_link)} target="_blank" rel="noreferrer">Open Calendar event <ExternalLink className="size-3.5 shrink-0" /></a> : null}</div></div>{booking.photo_id_paths?.length ? <div><h3 className="mb-2 text-sm font-semibold">Photo ID</h3><div className="flex flex-wrap gap-2">{booking.photo_id_paths.map((path) => <Button key={path} variant="outline" size="sm" onClick={() => void onPhoto(path)}>View private ID <ExternalLink /></Button>)}</div></div> : null}<Button variant="destructive" className="w-full" onClick={() => void onDelete(booking.id)}>Permanently delete booking</Button></div>
+      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4 sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><Badge className={statusClass(booking.status)}>{statusLabel(booking.status)}</Badge><label className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><span>Status</span><select aria-label="Update booking status" value={booking.status} onChange={(e) => void onUpdate(booking.id, { status: e.target.value })} className="h-9 rounded-lg border bg-background px-3 text-sm font-normal text-foreground">{statuses.map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}</select></label></div><div className="grid grid-cols-1 gap-4 rounded-xl border p-4 text-sm sm:grid-cols-2"><Detail label="Customer" value={`${booking.first_name} ${booking.last_name}`} icon={<UserRound />} /><Detail label="Email" value={display(booking.email)} icon={<Mail />} /><Detail label="Mobile" value={display(booking.mobile)} /><Detail label="Event address" value={display(booking.event_address)} />      <Detail label="Pickup" value={`${formatDate(booking.pickup_date)} at ${formatTime(booking.pickup_time)}`} /><Detail label="Drop-off" value={`${formatDate(booking.dropoff_date)} at ${formatTime(booking.dropoff_time)}`} /><Detail label="Package" value={display(booking.package_interest)} /><Detail label="Guests" value={display(booking.guest_count)} /><Detail label="Add-ons" value={booking.add_ons?.length ? booking.add_ons.join(", ") : "None selected"} /></div><div><h3 className="mb-2 text-sm font-semibold">Additional details</h3><p className="break-words rounded-lg bg-muted p-3 text-sm leading-relaxed">{display(booking.additional_details)}</p></div><div><h3 className="mb-2 text-sm font-semibold">Internal notes</h3><textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-24 w-full resize-y rounded-lg border bg-background p-3 text-sm" placeholder="Add a private note for the team…" /><Button size="sm" className="mt-2" onClick={() => void onUpdate(booking.id, { internal_notes: notes })}>Save notes</Button></div>      <EmailHistory logs={booking.email_logs ?? []} /><div><div className="mb-2 flex flex-wrap items-center justify-between gap-3"><h3 className="text-sm font-semibold">Actions & outcomes</h3><Button size="sm" onClick={() => setEmailOpen(true)}>Send Email</Button></div><div className="space-y-2 rounded-lg border p-3 text-sm"><Outcome label="Internal email" ok={booking.internal_email_sent === true} /><Outcome label="Customer email" ok={booking.customer_email_sent === true} /><Outcome label="Google Calendar" ok={Boolean(booking.calendar_event_link)} error={display(booking.calendar_error)} />{booking.calendar_event_link ? <a className="mt-2 inline-flex max-w-full items-center gap-1 break-words text-primary hover:underline" href={String(booking.calendar_event_link)} target="_blank" rel="noreferrer">Open Calendar event <ExternalLink className="size-3.5 shrink-0" /></a> : null}</div></div>{booking.photo_id_paths?.length ? <div><h3 className="mb-2 text-sm font-semibold">Photo ID</h3><div className="flex flex-wrap gap-2">{booking.photo_id_paths.map((path) => <Button key={path} variant="outline" size="sm" onClick={() => void onPhoto(path)}>View private ID <ExternalLink /></Button>)}</div></div> : null}<Button variant="destructive" className="w-full" onClick={() => void onDelete(booking.id)}>Permanently delete booking</Button></div>
       {emailOpen ? <div role="dialog" aria-modal="true" aria-labelledby="send-email-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><div className="w-full max-w-md rounded-xl border bg-background p-5 shadow-2xl"><div className="flex items-center justify-between gap-3"><h2 id="send-email-title" className="text-lg font-semibold">Send Email</h2><Button variant="ghost" size="icon" onClick={() => setEmailOpen(false)} aria-label="Close email dialog"><X /></Button></div><p className="mt-1 text-sm text-muted-foreground">Choose an email to send to {display(booking.email)}.</p><div className="mt-5 grid gap-2">{booking.status === "confirmed" ? <Button variant="outline" className="justify-start" onClick={async () => { await onSendConfirmation(booking.id); setEmailOpen(false); }}>Send booking confirmation</Button> : <Button variant="outline" className="justify-start" disabled>Send booking confirmation (confirm booking first)</Button>}<Button variant="outline" className="justify-start" onClick={async () => { await onSendReminder(booking.id); setEmailOpen(false); }}>Send pickup reminder</Button></div><div className="mt-5 border-t pt-5"><h3 className="font-medium">Send custom email</h3><div className="mt-3 grid gap-3"><input aria-label="Custom email subject" value={customSubject} onChange={(event) => setCustomSubject(event.target.value)} placeholder="Subject" className="h-10 rounded-lg border bg-background px-3 text-sm" /><textarea aria-label="Custom email message" value={customMessage} onChange={(event) => setCustomMessage(event.target.value)} placeholder="Write your message…" className="min-h-28 rounded-lg border bg-background p-3 text-sm" /><Button disabled={!customSubject.trim() || !customMessage.trim()} onClick={async () => { const sent = await onSendCustomEmail(booking.id, customSubject, customMessage); if (sent) { setCustomSubject(""); setCustomMessage(""); setEmailOpen(false); } }}>Send custom email</Button></div></div></div></div> : null}
     </aside>
   </div>;
 }
 function Detail({ label, value, icon }: { label: string; value: string; icon?: ReactNode }) { return <div className="min-w-0"><p className="flex items-center gap-1 text-xs text-muted-foreground">{icon ? <span className="inline-flex size-3 shrink-0 items-center justify-center [&>svg]:size-3">{icon}</span> : null}{label}</p><p className="mt-1 break-words font-medium">{value}</p></div>; }
 function Outcome({ label, ok, error }: { label: string; ok: boolean; error?: string }) { return <div className="flex items-center justify-between"><span>{label}</span><span className={ok ? "text-emerald-600" : "text-amber-600"}>{ok ? "Sent / created" : error && error !== "—" ? "Failed" : "Not available"}</span></div>; }
+function EmailHistory({ logs }: { logs: NonNullable<Booking["email_logs"]> }) {
+  return (
+    <section className="rounded-xl border bg-muted/30 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold">Email history</h3>
+          <p className="mt-1 text-xs text-muted-foreground">Customer email delivery records are kept for 30 days.</p>
+        </div>
+        <Badge variant="secondary">{logs.length}</Badge>
+      </div>
+      {logs.length ? (
+        <div className="mt-4 divide-y rounded-lg border bg-background">
+          {logs.map((log) => (
+            <div key={log.id} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">{emailTypeLabel(log.email_type)}</p>
+                <p className="truncate text-xs text-muted-foreground">{log.recipient_email}</p>
+              </div>
+              <p className="shrink-0 text-xs text-muted-foreground">{formatSentAt(log.sent_at)}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-4 rounded-lg border border-dashed bg-background p-4 text-sm text-muted-foreground">
+          No customer emails have been logged for this booking yet.
+        </p>
+      )}
+    </section>
+  );
+}

@@ -12,6 +12,12 @@ const booking = {
   status: "submitted",
   internal_notes: "Call about access",
   photo_id_paths: ["private/alex-id.jpg"],
+  email_logs: [{
+    id: "email-one",
+    recipient_email: "alex@example.com",
+    email_type: "confirmation",
+    sent_at: "2026-10-03T00:00:00.000Z",
+  }],
 };
 
 function jsonResponse(body: unknown, ok = true) {
@@ -63,6 +69,8 @@ describe("AdminConsole", () => {
     const open = vi.spyOn(window, "open").mockImplementation(() => null);
     render(<AdminConsole />);
     fireEvent.click(await screen.findByText("Alex Smith"));
+    expect(screen.getByText("Email history")).toBeInTheDocument();
+    expect(screen.getByText("Booking confirmation")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Update booking status"), { target: { value: "confirmed" } });
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/bookings", expect.objectContaining({

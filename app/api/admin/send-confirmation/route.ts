@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdmin } from "@/lib/admin-auth";
 import { sendBookingConfirmationEmail } from "@/lib/send-booking-confirmation";
+import { recordCustomerEmail } from "@/lib/email-log";
 
 export async function POST(request: Request) {
   const session = await requireAdmin();
@@ -27,6 +28,16 @@ export async function POST(request: Request) {
 
   try {
     const id = await sendBookingConfirmationEmail(result.data);
+    try {
+      await recordCustomerEmail(session.admin, {
+        bookingId: body.bookingId,
+        recipientEmail: result.data.email,
+        emailType: "confirmation",
+        providerMessageId: id,
+      });
+    } catch (error) {
+      console.error("Confirmation email log failed:", error);
+    }
     const update = await session.admin.from("bookings")
       .update({ confirmation_email_sent: true, updated_at: new Date().toISOString() })
       .eq("id", body.bookingId);

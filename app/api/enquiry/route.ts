@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 
 import { emailFooterText } from "@/lib/email-footer";
+import { recordCustomerEmail } from "@/lib/email-log";
+import { createAdminClient } from "@/lib/supabase";
 import { enquirySchema } from "@/lib/validation/enquiry";
 
 const resendApiKey = process.env.RESEND_API_KEY;
@@ -80,13 +82,23 @@ export async function POST(request: Request) {
       emailFooterText,
     ].join("\n");
 
-    await resend.emails.send({
+    const response = await resend.emails.send({
       from: fromEmail,
       to: [toEmail],
       replyTo: email,
       subject: `New enquiry: ${eventType} on ${eventDate}`,
       text,
     });
+    if (response.error) throw new Error(response.error.message);
+    try {
+      await recordCustomerEmail(createAdminClient(), {
+        recipientEmail: email,
+        emailType: "enquiry",
+        providerMessageId: response.data?.id,
+      });
+    } catch (error) {
+      console.error("Enquiry email log failed:", error);
+    }
 
     return NextResponse.json({ ok: true });
   } catch {

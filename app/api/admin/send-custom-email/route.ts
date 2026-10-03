@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 
 import { emailFooterHtml, emailFooterText } from "@/lib/email-footer";
+import { recordCustomerEmail } from "@/lib/email-log";
 import { requireAdmin } from "@/lib/admin-auth";
 
 function escapeHtml(value: string) {
@@ -59,5 +60,15 @@ export async function POST(request: Request) {
     `,
   });
   if (response.error) return NextResponse.json({ error: "Custom email could not be sent." }, { status: 502 });
+  try {
+    await recordCustomerEmail(session.admin, {
+      bookingId: body.bookingId,
+      recipientEmail: booking.data.email,
+      emailType: "custom",
+      providerMessageId: response.data?.id,
+    });
+  } catch (error) {
+    console.error("Custom email log failed:", error);
+  }
   return NextResponse.json({ ok: true, id: response.data?.id });
 }

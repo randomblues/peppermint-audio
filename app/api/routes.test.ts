@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => {
     zipGenerate: vi.fn(),
     send,
     sendBookingConfirmationEmail: vi.fn(),
+    recordCustomerEmail: vi.fn(),
     Resend: vi.fn(() => ({ emails: { send } })),
   };
 });
@@ -33,6 +34,9 @@ vi.mock("jszip", () => ({
 vi.mock("resend", () => ({ Resend: mocks.Resend }));
 vi.mock("@/lib/send-booking-confirmation", () => ({
   sendBookingConfirmationEmail: mocks.sendBookingConfirmationEmail,
+}));
+vi.mock("@/lib/email-log", () => ({
+  recordCustomerEmail: mocks.recordCustomerEmail,
 }));
 
 import { GET as getBookings, PATCH as patchBooking, DELETE as deleteBooking } from "./admin/bookings/route";
@@ -69,6 +73,7 @@ describe("admin booking routes", () => {
     const query = {
       select: vi.fn().mockReturnThis(),
       order: vi.fn().mockReturnThis(),
+      in: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       or: vi.fn().mockResolvedValue({ data: [{ id: "b1" }], error: null }),
     };
@@ -77,7 +82,7 @@ describe("admin booking routes", () => {
     const response = await getBookings(request("/api/admin/bookings?search=Jane&status=confirmed"));
 
     expect(response.status).toBe(200);
-    expect(await responseJson(response)).toEqual({ bookings: [{ id: "b1" }] });
+    expect(await responseJson(response)).toEqual({ bookings: [{ id: "b1", email_logs: [] }] });
     expect(query.eq).toHaveBeenCalledWith("status", "confirmed");
     expect(query.or).toHaveBeenCalledWith("email.ilike.%Jane%,first_name.ilike.%Jane%,last_name.ilike.%Jane%,event_type.ilike.%Jane%");
   });

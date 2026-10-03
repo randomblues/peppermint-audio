@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { buildPickupReminderEmail, createAdminClient, getMelbourneTomorrow, send, Resend } = vi.hoisted(() => {
+const { buildPickupReminderEmail, createAdminClient, getMelbourneTomorrow, recordCustomerEmail, send, Resend } = vi.hoisted(() => {
   const send = vi.fn();
   return {
     buildPickupReminderEmail: vi.fn(() => ({ subject: "Pickup reminder", text: "Reminder text", html: "<p>Reminder</p>" })),
     createAdminClient: vi.fn(),
     getMelbourneTomorrow: vi.fn(() => "2026-09-29"),
+    recordCustomerEmail: vi.fn(),
     send,
     Resend: vi.fn(() => ({ emails: { send } })),
   };
@@ -14,6 +15,7 @@ const { buildPickupReminderEmail, createAdminClient, getMelbourneTomorrow, send,
 vi.mock("resend", () => ({ Resend }));
 vi.mock("@/lib/pickup-reminders", () => ({ buildPickupReminderEmail, getMelbourneTomorrow }));
 vi.mock("@/lib/supabase", () => ({ createAdminClient }));
+vi.mock("@/lib/email-log", () => ({ recordCustomerEmail }));
 
 import { GET, isCronAuthorized } from "./route";
 
@@ -137,6 +139,7 @@ describe("GET /api/cron/pickup-reminders", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ pickupDate: "2026-09-29", selected: 2, sent: 2, failures: [] });
     expect(buildPickupReminderEmail).toHaveBeenCalledTimes(2);
+    expect(recordCustomerEmail).toHaveBeenCalledTimes(2);
     expect(send).toHaveBeenCalledTimes(2);
     expect(send).toHaveBeenNthCalledWith(1, expect.objectContaining({ from: "Peppermint Audio <from@example.com>", to: ["one@example.com"] }));
     expect(send).toHaveBeenNthCalledWith(2, expect.objectContaining({ to: ["two@example.com"] }));

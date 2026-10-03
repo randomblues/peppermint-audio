@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { PHOTO_ID_BUCKET } from "@/lib/supabase";
 import { sendBookingConfirmationEmail } from "@/lib/send-booking-confirmation";
+import { recordCustomerEmail } from "@/lib/email-log";
 
 export async function GET(request: Request) {
   const session = await requireAdmin();
@@ -14,7 +15,24 @@ export async function GET(request: Request) {
   if (search) query = query.or(`email.ilike.%${search}%,first_name.ilike.%${search}%,last_name.ilike.%${search}%,event_type.ilike.%${search}%`);
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ bookings: data });
+  const bookingIds = (data ?? []).map((booking) => booking.id);
+  const emailLogs = bookingIds.length
+    ? await session.admin
+      .from("booking_email_log")
+      .select("id,booking_id,recipient_email,email_type,provider_message_id,sent_at")
+      .in("booking_id", bookingIds)
+      .order("sent_at", { ascending: false })
+    : { data: [], error: null };
+  if (emailLogs.error) return NextResponse.json({ error: emailLogs.error.message }, { status: 500 });
+  const logsByBooking = new Map<string, typeof emailLogs.data>();
+  for (const log of emailLogs.data ?? []) {
+    const logs = logsByBooking.get(log.booking_id) ?? [];
+    logs.push(log);
+    logsByBooking.set(log.booking_id, logs);
+  }
+  return NextResponse.json({
+    bookings: (data ?? []).map((booking) => ({ ...booking, email_logs: logsByBooking.get(booking.id) ?? [] })),
+  });
 }
 
 export async function PATCH(request: Request) {
@@ -51,7 +69,17 @@ export async function PATCH(request: Request) {
     confirmation = result.data;
     if (!confirmation.confirmation_email_sent) {
       try {
-        await sendBookingConfirmationEmail(confirmation);
+        const providerMessageId = await sendBookingConfirmationEmail(confirmation);
+        try {
+          await recordCustomerEmail(session.admin, {
+            bookingId: body.id,
+            recipientEmail: confirmation.email,
+            emailType: "confirmation",
+            providerMessageId,
+          });
+        } catch (error) {
+          console.error("Confirmation email log failed:", error);
+        }
       } catch (error) {
         console.error("Booking confirmation email failed:", error);
         const message = error instanceof Error ? error.message : "Booking confirmation email could not be sent.";
