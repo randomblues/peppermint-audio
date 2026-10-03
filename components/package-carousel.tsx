@@ -11,6 +11,8 @@ export function PackageCarousel() {
   const [fadeEdges, setFadeEdges] = useState({ left: false, right: true });
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const packageRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const programmaticTarget = useRef<number | null>(null);
+  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const carousel = carouselRef.current;
@@ -25,6 +27,34 @@ export function PackageCarousel() {
           carousel.scrollLeft + carousel.clientWidth <
           carousel.scrollWidth - edgeThreshold,
       });
+
+      const targetIndex = programmaticTarget.current;
+      const targetCard = targetIndex === null ? null : packageRefs.current[targetIndex];
+      if (
+        targetCard &&
+        Math.abs(targetCard.offsetLeft - carousel.scrollLeft) > edgeThreshold
+      ) {
+        return;
+      }
+      programmaticTarget.current = null;
+
+      const nearestIndex = packageRefs.current.reduce(
+        (closestIndex, packageCard, index) => {
+          if (!packageCard) return closestIndex;
+
+          const closestCard = packageRefs.current[closestIndex];
+          if (!closestCard) return index;
+
+          return Math.abs(packageCard.offsetLeft - carousel.scrollLeft) <
+            Math.abs(closestCard.offsetLeft - carousel.scrollLeft)
+            ? index
+            : closestIndex;
+        },
+        0,
+      );
+      setActiveIndex((currentIndex) =>
+        currentIndex === nearestIndex ? currentIndex : nearestIndex,
+      );
     }
 
     updateFadeEdges();
@@ -45,15 +75,26 @@ export function PackageCarousel() {
     const carousel = carouselRef.current;
     const packageCard = packageRefs.current[activeIndex];
     if (carousel && packageCard && typeof carousel.scrollTo === "function") {
+      programmaticTarget.current = activeIndex;
       carousel.scrollTo({
         left: packageCard.offsetLeft,
         behavior: "smooth",
       });
+      if (scrollTimer.current) clearTimeout(scrollTimer.current);
+      scrollTimer.current = setTimeout(() => {
+        programmaticTarget.current = null;
+      }, 700);
     }
+
+    return () => {
+      if (scrollTimer.current) clearTimeout(scrollTimer.current);
+    };
   }, [activeIndex]);
 
   function moveToPackage(index: number) {
-    setActiveIndex((index + packageTiers.length) % packageTiers.length);
+    const nextIndex = Math.max(0, Math.min(index, packageTiers.length - 1));
+    programmaticTarget.current = nextIndex;
+    setActiveIndex(nextIndex);
   }
 
   return (
@@ -65,7 +106,9 @@ export function PackageCarousel() {
           variant="outline"
           aria-label="Previous package"
           onClick={() => moveToPackage(activeIndex - 1)}
-          className="absolute top-28 left-2 z-20 -translate-y-1/2 bg-background/90 shadow-lg backdrop-blur-sm"
+          disabled={activeIndex === 0}
+          title="Previous package"
+          className="absolute top-28 left-3 z-20 size-10 -translate-y-1/2 rounded-full border-0 bg-foreground text-background shadow-lg transition-transform hover:scale-105 hover:bg-foreground/90 disabled:opacity-40"
         >
           <span aria-hidden="true">←</span>
         </Button>
@@ -75,7 +118,9 @@ export function PackageCarousel() {
           variant="outline"
           aria-label="Next package"
           onClick={() => moveToPackage(activeIndex + 1)}
-          className="absolute top-28 right-2 z-20 -translate-y-1/2 bg-background/90 shadow-lg backdrop-blur-sm"
+          disabled={activeIndex === packageTiers.length - 1}
+          title="Next package"
+          className="absolute top-28 right-3 z-20 size-10 -translate-y-1/2 rounded-full border-0 bg-foreground text-background shadow-lg transition-transform hover:scale-105 hover:bg-foreground/90 disabled:opacity-40"
         >
           <span aria-hidden="true">→</span>
         </Button>
@@ -95,7 +140,7 @@ export function PackageCarousel() {
         ) : null}
         <div
           ref={carouselRef}
-          className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain scroll-smooth pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {packageTiers.map((pkg, index) => (
             <div
@@ -103,7 +148,7 @@ export function PackageCarousel() {
               ref={(element) => {
                 packageRefs.current[index] = element;
               }}
-              className="min-w-[min(21rem,88vw)] snap-start sm:min-w-[24rem]"
+              className="min-w-[calc(100%-1rem)] snap-start sm:min-w-[calc((100%-1rem)/2)] lg:min-w-[calc((100%-2rem)/3)]"
               aria-label={`Package ${index + 1}`}
             >
               <PackageCard pkg={pkg} compact priority={index === 0} />

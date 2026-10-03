@@ -116,6 +116,16 @@ describe("PackageCard", () => {
       }
       expect(screen.queryByTestId("package-carousel-left-fade")).not.toBeInTheDocument();
     });
+
+    it("advances the selected package when the next control is clicked", () => {
+      render(<PackageCarousel />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Next package" }));
+
+      expect(
+        screen.getByRole("button", { name: `Show ${packageTiers[1].name}` }),
+      ).toHaveAttribute("aria-current", "true");
+    });
   });
 
   it("uses compact content and details link when requested", () => {
