@@ -8,8 +8,10 @@ const validBooking = {
   mobile: "0412345678",
   eventType: "Birthday",
   eventAddress: "10 Smith Street",
-  pickupDate: "2026-10-01",
-  dropoffDate: "2026-10-02",
+  pickupDate: "2099-10-01",
+  dropoffDate: "2099-10-02",
+  pickupTime: "10:00",
+  dropoffTime: "17:00",
   packageInterest: "standard-party-events",
   guestCount: "1",
   additionalDetails: "",
@@ -36,5 +38,12 @@ describe("bookingSchema", () => {
     expect(bookingSchema.safeParse({ ...validBooking, termsAccepted: "yes" }).success).toBe(false);
     expect(bookingSchema.safeParse({ ...validBooking, additionalDetails: "x".repeat(3000) }).success).toBe(true);
     expect(bookingSchema.safeParse({ ...validBooking, additionalDetails: "x".repeat(3001) }).success).toBe(false);
+  });
+
+  it("rejects dates before today and drop-off dates before pickup", () => {
+    expect(bookingSchema.safeParse({ ...validBooking, pickupDate: "2000-01-01" }).success).toBe(false);
+    expect(bookingSchema.safeParse({ ...validBooking, dropoffDate: "2099-09-30" }).success).toBe(false);
+    expect(bookingSchema.safeParse({ ...validBooking, pickupTime: "25:00" }).success).toBe(false);
+    expect(bookingSchema.safeParse({ ...validBooking, pickupDate: "2099-10-01", dropoffDate: "2099-10-01", pickupTime: "17:00", dropoffTime: "10:00" }).success).toBe(false);
   });
 });

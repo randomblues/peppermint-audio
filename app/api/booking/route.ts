@@ -64,6 +64,7 @@ export async function POST(request: Request) {
     const insert = await admin.from("bookings").insert({
       id: bookingId, email: data.email, first_name: data.firstName, last_name: data.lastName, mobile: data.mobile,
       event_type: data.eventType, event_address: data.eventAddress, pickup_date: data.pickupDate, dropoff_date: data.dropoffDate,
+      pickup_time: data.pickupTime, dropoff_time: data.dropoffTime,
       package_interest: data.packageInterest, add_ons: selectedAddOns, guest_count: data.guestCount, additional_details: data.additionalDetails,
       terms_accepted: data.termsAccepted === "accepted", photo_id_paths: objectPaths, status: "submitted",
       internal_email_sent: false, customer_email_sent: false,
@@ -87,7 +88,7 @@ export async function POST(request: Request) {
       const text = [
       "New audio equipment booking", `Name: ${data.firstName} ${data.lastName}`, `Email: ${data.email}`, `Mobile: ${data.mobile}`,
       `Event type: ${data.eventType}`, `Event address: ${data.eventAddress}`, `Estimated guests: ${data.guestCount}`,
-      `Pickup date: ${data.pickupDate}`, `Drop-off date: ${data.dropoffDate}`, `Package: ${data.packageInterest}`, "",
+      `Pickup: ${data.pickupDate} at ${data.pickupTime}`, `Drop-off: ${data.dropoffDate} at ${data.dropoffTime}`, `Package: ${data.packageInterest}`, "",
       `Add-ons: ${selectedAddOns.length ? selectedAddOns.join(", ") : "None selected"}`, "",
       "Additional details:", data.additionalDetails || "None provided", "",
       "Terms: Customer confirmed they have read and agree to the PA Equipment Hire Terms & Conditions.",
@@ -105,8 +106,8 @@ export async function POST(request: Request) {
       from: fromEmail, to: [data.email], replyTo: toEmail, subject: "Your booking request has been received",
       text: [
         `Hi ${data.firstName},`, "", "Thanks for submitting your booking request to Peppermint Audio.", "",
-        `Event: ${data.eventType}`, `Event address: ${data.eventAddress}`, `Pickup date: ${formatEmailDate(data.pickupDate)}`,
-        `Drop-off date: ${formatEmailDate(data.dropoffDate)}`, `Package: ${data.packageInterest}`, `Estimated guests: ${data.guestCount}`,
+        `Event: ${data.eventType}`, `Event address: ${data.eventAddress}`, `Pickup: ${formatEmailDate(data.pickupDate)} at ${data.pickupTime}`,
+        `Drop-off: ${formatEmailDate(data.dropoffDate)} at ${data.dropoffTime}`, `Package: ${data.packageInterest}`, `Estimated guests: ${data.guestCount}`,
         `Add-ons: ${selectedAddOns.length ? selectedAddOns.join(", ") : "None selected"}`,
         "", "We have received your booking request and photo ID. Your request is not confirmed yet; our team will review availability and be in touch shortly.", "",
         emailFooterText,
@@ -126,8 +127,8 @@ export async function POST(request: Request) {
                 <table role="presentation" style="width:100%;border-collapse:collapse;font-size:14px;line-height:1.5">
                   <tr><td style="padding:7px 12px 7px 0;color:#777b75">Event</td><td style="padding:7px 0;color:#20211f;font-weight:bold">${escapeHtml(data.eventType)}</td></tr>
                   <tr><td style="padding:7px 12px 7px 0;color:#777b75">Address</td><td style="padding:7px 0;color:#20211f">${escapeHtml(data.eventAddress)}</td></tr>
-                  <tr><td style="padding:7px 12px 7px 0;color:#777b75">Pickup</td><td style="padding:7px 0;color:#20211f">${formatEmailDate(data.pickupDate)}</td></tr>
-                  <tr><td style="padding:7px 12px 7px 0;color:#777b75">Drop-off</td><td style="padding:7px 0;color:#20211f">${formatEmailDate(data.dropoffDate)}</td></tr>
+                  <tr><td style="padding:7px 12px 7px 0;color:#777b75">Pickup</td><td style="padding:7px 0;color:#20211f">${formatEmailDate(data.pickupDate)} at ${escapeHtml(data.pickupTime)}</td></tr>
+                  <tr><td style="padding:7px 12px 7px 0;color:#777b75">Drop-off</td><td style="padding:7px 0;color:#20211f">${formatEmailDate(data.dropoffDate)} at ${escapeHtml(data.dropoffTime)}</td></tr>
                   <tr><td style="padding:7px 12px 7px 0;color:#777b75">Package</td><td style="padding:7px 0;color:#20211f">${escapeHtml(data.packageInterest)}</td></tr>
                   <tr><td style="padding:7px 12px 7px 0;color:#777b75">Guests</td><td style="padding:7px 0;color:#20211f">${data.guestCount}</td></tr>
                   <tr><td style="padding:7px 12px 7px 0;color:#777b75">Add-ons</td><td style="padding:7px 0;color:#20211f">${escapeHtml(selectedAddOns.length ? selectedAddOns.join(", ") : "None selected")}</td></tr>

@@ -36,4 +36,16 @@ describe("DatePicker", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(onBlur).toHaveBeenCalled();
   });
+
+  it("disables dates before the configured minimum", () => {
+    render(<DatePicker id="event-date" value="2026-10-15" minDate="2026-10-15" onChange={vi.fn()} onBlur={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "15 October 2026" }));
+    fireEvent.click(screen.getByRole("button", { name: "Previous month" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Choose event date" });
+    const dateButtons = within(dialog).getAllByRole("button").filter((button) => button.hasAttribute("aria-pressed"));
+    expect(dateButtons.length).toBeGreaterThan(0);
+    expect(dateButtons.every((button) => button.hasAttribute("disabled"))).toBe(true);
+  });
 });

@@ -6,7 +6,7 @@ import { BookingForm } from "./booking-form";
 function chooseDate(label: string) {
   fireEvent.click(screen.getAllByRole("button", { name: label })[0]);
   const dialog = screen.getByRole("dialog");
-  fireEvent.click(within(dialog).getAllByRole("button").find((button) => button.getAttribute("aria-pressed") !== null)!);
+  fireEvent.click(within(dialog).getAllByRole("button").find((button) => button.getAttribute("aria-pressed") !== null && !button.hasAttribute("disabled"))!);
 }
 
 function advanceToPackage() {
@@ -21,6 +21,8 @@ function advanceToPackage() {
   fireEvent.click(screen.getByRole("button", { name: "Next" }));
   chooseDate("Select a date");
   chooseDate("Select a date");
+  fireEvent.change(screen.getByLabelText("Pickup time"), { target: { value: "10:00" } });
+  fireEvent.change(screen.getByLabelText("Drop-off time"), { target: { value: "17:00" } });
   fireEvent.click(screen.getByRole("button", { name: "Next" }));
 }
 

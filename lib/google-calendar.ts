@@ -9,6 +9,8 @@ type BookingCalendarDetails = {
   eventAddress: string;
   pickupDate: string;
   dropoffDate: string;
+  pickupTime?: string | null;
+  dropoffTime?: string | null;
   packageInterest: string;
   addOns: string[];
   guestCount: number;
@@ -63,6 +65,13 @@ export async function createBookingCalendarEvent(details: BookingCalendarDetails
   const calendar = google.calendar({ version: "v3", auth: client });
   const calendarId = process.env.GOOGLE_CALENDAR_ID ?? "primary";
 
+  const start = details.pickupTime
+    ? { dateTime: `${details.pickupDate}T${details.pickupTime}:00`, timeZone: "Australia/Melbourne" }
+    : { date: details.pickupDate };
+  const end = details.dropoffTime
+    ? { dateTime: `${details.dropoffDate}T${details.dropoffTime}:00`, timeZone: "Australia/Melbourne" }
+    : { date: addOneDay(details.dropoffDate) };
+
   const response = await calendar.events.insert({
     calendarId,
     requestBody: {
@@ -74,13 +83,15 @@ export async function createBookingCalendarEvent(details: BookingCalendarDetails
         `Package: ${details.packageInterest}`,
         `Add-ons: ${details.addOns.length ? details.addOns.join(", ") : "None selected"}`,
         `Estimated guests: ${details.guestCount}`,
+        ...(details.pickupTime ? [`Pickup: ${details.pickupDate} at ${details.pickupTime}`] : []),
+        ...(details.dropoffTime ? [`Drop-off: ${details.dropoffDate} at ${details.dropoffTime}`] : []),
         "",
         "Additional details:",
         details.additionalDetails || "None provided",
       ].join("\n"),
       location: details.eventAddress,
-      start: { date: details.pickupDate },
-      end: { date: addOneDay(details.dropoffDate) },
+      start,
+      end,
       reminders: { useDefault: true },
     },
   });

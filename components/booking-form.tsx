@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { trackGoogleAdsBookingSubmission } from "@/lib/google-ads";
+import { getMelbourneToday } from "@/lib/date-utils";
 import { addOnCatalog, packageTiers, hireTerms } from "@/lib/site-content";
 import { bookingSchema, type BookingFormInputValues } from "@/lib/validation/booking";
 
@@ -35,6 +36,8 @@ const initialValues: BookingFormInputValues = {
   eventAddress: "",
   pickupDate: "",
   dropoffDate: "",
+  pickupTime: "",
+  dropoffTime: "",
   packageInterest: "",
   addOns: "",
   guestCount: 1,
@@ -124,7 +127,7 @@ export function BookingForm({ initialPackageSlug }: BookingFormProps) {
     const fieldsByStep: Array<Array<keyof BookingFormInputValues>> = [
       ["email", "firstName", "lastName", "mobile"],
       ["eventType", "eventAddress", "guestCount"],
-      ["pickupDate", "dropoffDate"],
+      ["pickupDate", "dropoffDate", "pickupTime", "dropoffTime"],
       ["packageInterest"],
       ["additionalDetails"],
       [],
@@ -251,9 +254,13 @@ export function BookingForm({ initialPackageSlug }: BookingFormProps) {
 
         {step === 2 ? (
           <div className="space-y-5">
-            <p className="text-sm text-muted-foreground">Please enter the agreed pickup and drop-off dates for your hire.</p>
-            <DateField label="Pickup date" value={values.pickupDate} onChange={(value) => updateValue("pickupDate", value)} error={errors.pickupDate} />
-            <DateField label="Drop-off date" value={values.dropoffDate} onChange={(value) => updateValue("dropoffDate", value)} error={errors.dropoffDate} />
+            <p className="text-sm text-muted-foreground">Please enter your preferred pickup and drop-off dates and times. We will confirm the exact window with you.</p>
+            <DateField label="Pickup date" value={values.pickupDate} onChange={(value) => updateValue("pickupDate", value)} error={errors.pickupDate} minDate={getMelbourneToday()} />
+            <DateField label="Drop-off date" value={values.dropoffDate} onChange={(value) => updateValue("dropoffDate", value)} error={errors.dropoffDate} minDate={values.pickupDate || getMelbourneToday()} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Pickup time" name="pickupTime" value={values.pickupTime} onChange={(value) => updateValue("pickupTime", value)} error={errors.pickupTime} type="time" />
+              <Field label="Drop-off time" name="dropoffTime" value={values.dropoffTime} onChange={(value) => updateValue("dropoffTime", value)} error={errors.dropoffTime} type="time" />
+            </div>
           </div>
         ) : null}
 
@@ -477,11 +484,11 @@ function Field({ label, name, value, onChange, error, type = "text", placeholder
   );
 }
 
-function DateField({ label, value, onChange, error }: { label: string; value: string; onChange: (value: string) => void; error?: string }) {
+function DateField({ label, value, onChange, error, minDate }: { label: string; value: string; onChange: (value: string) => void; error?: string; minDate: string }) {
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
-      <DatePicker id={label.toLowerCase().replaceAll(" ", "-")} value={value} onChange={onChange} onBlur={() => undefined} invalid={Boolean(error)} />
+      <DatePicker id={label.toLowerCase().replaceAll(" ", "-")} value={value} onChange={onChange} onBlur={() => undefined} minDate={minDate} invalid={Boolean(error)} />
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
     </div>
   );

@@ -11,6 +11,7 @@ type DatePickerProps = {
   onChange: (value: string) => void;
   onBlur: () => void;
   invalid?: boolean;
+  minDate?: string;
 };
 
 const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -43,7 +44,7 @@ function formatDisplayDate(date: Date | null) {
   }).format(date);
 }
 
-export function DatePicker({ id, value, onChange, onBlur, invalid = false }: DatePickerProps) {
+export function DatePicker({ id, value, onChange, onBlur, invalid = false, minDate }: DatePickerProps) {
   const selectedDate = parseDate(value);
   const [open, setOpen] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState(
@@ -141,6 +142,7 @@ export function DatePicker({ id, value, onChange, onBlur, invalid = false }: Dat
             {days.map((day, index) => {
               const date = day ? new Date(year, month, day) : null;
               const dateValue = date ? formatDateValue(date) : "";
+              const isBeforeMinDate = Boolean(minDate && dateValue < minDate);
 
               return (
                 <span key={`${dateValue}-${index}`} className="p-0.5">
@@ -152,7 +154,9 @@ export function DatePicker({ id, value, onChange, onBlur, invalid = false }: Dat
                       className={cn(
                         "flex aspect-square w-full items-center justify-center rounded-md text-sm hover:bg-muted",
                         dateValue === value && "bg-primary text-primary-foreground hover:bg-primary/90",
+                        isBeforeMinDate && "cursor-not-allowed text-muted-foreground/40 hover:bg-transparent",
                       )}
+                      disabled={isBeforeMinDate}
                       onClick={() => selectDay(day)}
                     >
                       {day}

@@ -28,6 +28,8 @@ const details = {
   eventAddress: "10 Smith Street",
   pickupDate: "2026-12-31",
   dropoffDate: "2027-01-01",
+  pickupTime: "10:00",
+  dropoffTime: "17:00",
   packageInterest: "Big Events",
   addOns: ["Wireless Microphone", "Subwoofer"],
   guestCount: 100,
@@ -70,7 +72,7 @@ describe("Google Calendar integration", () => {
     expect(eventsInsert).not.toHaveBeenCalled();
   });
 
-  it("builds an all-day event and advances the exclusive end date", async () => {
+  it("builds a timed event when pickup and drop-off times are provided", async () => {
     process.env.GOOGLE_CALENDAR_REFRESH_TOKEN = "refresh-token";
     process.env.GOOGLE_CALENDAR_ID = "work-calendar";
     await expect(createBookingCalendarEvent(details)).resolves.toBe("https://calendar.google.test/event");
@@ -80,12 +82,20 @@ describe("Google Calendar integration", () => {
       requestBody: expect.objectContaining({
         summary: "PA Hire - Wedding - Sam Jones",
         location: "10 Smith Street",
-        start: { date: "2026-12-31" },
-        end: { date: "2027-01-02" },
+        start: { dateTime: "2026-12-31T10:00:00", timeZone: "Australia/Melbourne" },
+        end: { dateTime: "2027-01-01T17:00:00", timeZone: "Australia/Melbourne" },
         reminders: { useDefault: true },
         description: expect.stringContaining("Add-ons: Wireless Microphone, Subwoofer"),
       }),
     });
+
+  });
+
+  it("builds an all-day event for older bookings without times", async () => {
+    process.env.GOOGLE_CALENDAR_REFRESH_TOKEN = "refresh-token";
+    await createBookingCalendarEvent({ ...details, pickupTime: null, dropoffTime: null });
+    expect(eventsInsert.mock.calls[0][0].requestBody.start).toEqual({ date: "2026-12-31" });
+    expect(eventsInsert.mock.calls[0][0].requestBody.end).toEqual({ date: "2027-01-02" });
   });
 
   it("returns null when Google does not provide an event link", async () => {

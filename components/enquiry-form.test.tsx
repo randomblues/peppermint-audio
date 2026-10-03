@@ -12,7 +12,7 @@ function fillEnquiry() {
   fireEvent.change(screen.getByLabelText("Event Details"), { target: { value: "A party with speakers and microphones." } });
   fireEvent.click(screen.getByRole("button", { name: /date/i }));
   const dialog = screen.getByRole("dialog");
-  fireEvent.click(within(dialog).getAllByRole("button").find((button) => button.getAttribute("aria-pressed") !== null)!);
+  fireEvent.click(within(dialog).getAllByRole("button").find((button) => button.getAttribute("aria-pressed") !== null && !button.hasAttribute("disabled"))!);
 }
 
 describe("EnquiryForm", () => {
@@ -46,5 +46,15 @@ describe("EnquiryForm", () => {
     expect(JSON.parse(request.mock.calls[1][1].body)).toMatchObject({
       attribution: {},
     });
+  });
+
+  it("shows a visible error when the network request fails", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    render(<EnquiryForm />);
+    fillEnquiry();
+
+    fireEvent.click(screen.getByRole("button", { name: "Send enquiry" }));
+
+    expect(await screen.findByText("Could not send enquiry right now. Please check your connection and try again.")).toBeInTheDocument();
   });
 });

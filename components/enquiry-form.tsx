@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { trackGoogleAdsConversion } from "@/lib/google-ads";
+import { getMelbourneToday } from "@/lib/date-utils";
 import { packageTiers } from "@/lib/site-content";
 import {
   enquirySchema,
@@ -75,11 +76,17 @@ export function EnquiryForm({
       }
     }
 
-    const response = await fetch("/api/enquiry", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...values, attribution }),
-    });
+    let response: Response;
+    try {
+      response = await fetch("/api/enquiry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...values, attribution }),
+      });
+    } catch {
+      setServerError("Could not send enquiry right now. Please check your connection and try again.");
+      return;
+    }
 
     if (!response.ok) {
       const payload = (await response.json().catch(() => null)) as
@@ -149,6 +156,7 @@ export function EnquiryForm({
                     value={field.value}
                     onChange={field.onChange}
                     onBlur={field.onBlur}
+                    minDate={getMelbourneToday()}
                     invalid={Boolean(errors.eventDate)}
                   />
                 )}

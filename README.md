@@ -34,7 +34,7 @@ Marketing website for a Melbourne PA equipment hire business, built with:
 
 ## Booking management
 
-Run `supabase/001_booking_management.sql` in the Supabase SQL editor, then create administrator users under Supabase Authentication > Users. Bookings are submitted at `/booking` with `submitted` status and managed at `/admin`; change a request to `confirmed` only after availability is reviewed. The customer automatically receives a confirmation email when the request is confirmed. Photo IDs remain in the private `booking-photo-ids` bucket and are only available through short-lived signed links.
+Run `supabase/001_booking_management.sql` in the Supabase SQL editor, then create administrator users under Supabase Authentication > Users. Rerun the migration after schema changes so existing databases receive the pickup/drop-off time columns. Bookings are submitted at `/booking` with `submitted` status and managed at `/admin`; change a request to `confirmed` only after availability is reviewed. The customer automatically receives a confirmation email when the request is confirmed. Photo IDs remain in the private `booking-photo-ids` bucket and are only available through short-lived signed links.
 
 The admin bookings view includes a **Send Email** menu with booking confirmation, pickup reminder, and custom email options. The confirmation option is available for confirmed bookings and can be used to resend the confirmation email.
 
@@ -47,6 +47,10 @@ The admin bookings view includes a **Send Email** menu with booking confirmation
 ```bash
 npm run dev
 ```
+
+## Browser testing
+
+**Use https://peppermint-audio.vercel.app/ for browser testing and manual website checks. Do not use https://www.peppermintaudio.com.au/ from this environment because Netskope can interfere with the custom domain.**
 
 ## Verify
 

@@ -1,10 +1,15 @@
 import { z } from "zod";
+import { getMelbourneToday } from "@/lib/date-utils";
 
 export const enquirySchema = z.object({
   name: z.string().min(2, "Please enter your name"),
   email: z.string().email("Please enter a valid email"),
   phone: z.string().min(8, "Please enter a contact number"),
-  eventDate: z.string().min(1, "Please select an event date"),
+  eventDate: z
+    .string()
+    .min(1, "Please select an event date")
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Please select a valid event date")
+    .refine((value) => value >= getMelbourneToday(), "Event date must be today or later"),
   eventType: z.string().min(2, "Please enter event type"),
   packageInterest: z.string().min(2, "Please choose a package"),
   guestCount: z.coerce
@@ -27,4 +32,3 @@ export const enquirySchema = z.object({
 
 export type EnquiryFormInputValues = z.input<typeof enquirySchema>;
 export type EnquiryFormValues = z.output<typeof enquirySchema>;
-

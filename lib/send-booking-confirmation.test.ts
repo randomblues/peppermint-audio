@@ -31,6 +31,22 @@ describe("sendBookingConfirmationEmail", () => {
       from: "Peppermint Audio <from@example.com>",
       to: ["customer@example.com"],
       subject: expect.stringContaining("booking is confirmed"),
+      text: expect.not.stringContaining("Same-day pickup details:"),
+    }));
+  });
+
+  it("adds pickup reminder instructions only when the booking was made on pickup day", async () => {
+    send.mockResolvedValue({ data: { id: "email-1" }, error: null });
+
+    await sendBookingConfirmationEmail({
+      ...booking,
+      pickup_date: "2026-10-03",
+      created_at: "2026-10-03T10:00:00+11:00",
+      additional_details: "Please call on arrival.",
+    });
+
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({
+      text: expect.stringContaining("Same-day pickup details:"),
     }));
   });
 

@@ -36,6 +36,8 @@ const validFields = {
   eventAddress: "10 Example Street, Melbourne",
   pickupDate: "2026-10-09",
   dropoffDate: "2026-10-11",
+  pickupTime: "10:00",
+  dropoffTime: "17:00",
   packageInterest: "Standard Party & Events Package",
   addOns: "wireless-microphones",
   guestCount: "80",
@@ -131,6 +133,7 @@ describe("POST /api/booking", () => {
 
     const insertedBooking = insertMock.mock.calls[0]?.[0];
     expect(insertedBooking?.status).toBe("submitted");
+    expect(insertedBooking).toMatchObject({ pickup_time: "10:00", dropoff_time: "17:00" });
     expect(calendar).toHaveBeenCalledWith(expect.objectContaining({ addOns: ["Wireless Microphone Upgrade"] }));
     expect(send).toHaveBeenCalledTimes(2);
     expect(send).toHaveBeenCalledWith(expect.objectContaining({ to: ["to@example.com"], attachments: expect.any(Array) }));

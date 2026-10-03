@@ -5,7 +5,7 @@ const validEnquiry = {
   name: "Sam Jones",
   email: "customer@example.com",
   phone: "0412345678",
-  eventDate: "2026-10-01",
+  eventDate: "2099-10-01",
   eventType: "Birthday",
   packageInterest: "standard",
   guestCount: "1",
@@ -30,5 +30,6 @@ describe("enquirySchema", () => {
     expect(enquirySchema.safeParse({ ...validEnquiry, message: "Too short" }).success).toBe(false);
     expect(enquirySchema.safeParse({ ...validEnquiry, name: "A" }).success).toBe(false);
     expect(enquirySchema.safeParse({ ...validEnquiry, eventDate: "" }).success).toBe(false);
+    expect(enquirySchema.safeParse({ ...validEnquiry, eventDate: "2000-01-01" }).success).toBe(false);
   });
 });

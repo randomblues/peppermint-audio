@@ -33,13 +33,17 @@ export async function PATCH(request: Request) {
     event_type: string;
     pickup_date: string;
     dropoff_date: string;
+    pickup_time?: string | null;
+    dropoff_time?: string | null;
+    created_at?: string | null;
     package_interest: string;
     add_ons: string[] | null;
+    additional_details?: string | null;
     confirmation_email_sent: boolean;
   } | null = null;
   if (body.status === "confirmed") {
     const result = await session.admin.from("bookings")
-      .select("email,first_name,event_type,pickup_date,dropoff_date,package_interest,add_ons,confirmation_email_sent")
+      .select("email,first_name,event_type,pickup_date,dropoff_date,pickup_time,dropoff_time,created_at,package_interest,add_ons,additional_details,confirmation_email_sent")
       .eq("id", body.id)
       .single();
     if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 });

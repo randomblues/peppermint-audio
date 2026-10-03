@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   } | null = null;
   if (body.bookingId) {
     const result = await session.admin.from("bookings")
-      .select("email,first_name,last_name,event_type,pickup_date,package_interest,add_ons,additional_details")
+      .select("email,first_name,last_name,event_type,pickup_date,pickup_time,package_interest,add_ons,additional_details")
       .eq("id", body.bookingId)
       .single();
     if (result.error) {

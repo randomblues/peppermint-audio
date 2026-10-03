@@ -133,6 +133,8 @@ Never put secret values in source files, test fixtures committed with real crede
 
 Every behavior change requires unit tests. The suite currently covers API routes, booking/enquiry forms, admin operations, calendar helpers, validation, email templates, shared components, metadata pages, and UI primitives.
 
+**For browser testing and manual website checks, always use https://peppermint-audio.vercel.app/. Do not use https://www.peppermintaudio.com.au/ from this environment because Netskope can interfere with the custom domain.**
+
 Use:
 
 ```bash
