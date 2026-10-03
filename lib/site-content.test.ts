@@ -39,7 +39,7 @@ describe("equipmentCatalog", () => {
         expect.objectContaining({
           slug: "speech-presentation-wireless",
           name: "Speech & Presentation Package",
-          price: 70,
+          price: 65,
           image: "/speech-presentation-package.png",
         }),
         expect.objectContaining({

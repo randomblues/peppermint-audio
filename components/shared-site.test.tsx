@@ -114,6 +114,7 @@ describe("PackageCard", () => {
       for (const pkg of packageTiers) {
         expect(screen.getByText(pkg.name)).toBeInTheDocument();
       }
+      expect(screen.queryByTestId("package-carousel-left-fade")).not.toBeInTheDocument();
     });
   });
 

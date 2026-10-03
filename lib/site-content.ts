@@ -290,7 +290,7 @@ export const packageTiers: PackageTier[] = [
   {
     slug: "speech-presentation-wireless",
     name: "Speech & Presentation Package",
-    price: 70,
+    price: 65,
     capacity: "up to 40 people",
     summary: "A portable Bose PA speaker and wireless microphone for clear, simple speeches and presentations.",
     bestFor: "Speeches, presentations, small meetings, and announcements",
@@ -461,7 +461,7 @@ export const faqs = [
   {
     question: "What packages are available?",
     answer:
-      "Our complete, ready-to-use packages include the Speech & Presentation Package with a portable Bose PA speaker and wireless microphone for up to 40 people at $70, the Small Budget Event Package for up to 60 people at $120, Budget With A Boom with a Behringer subwoofer for up to 60 people at $170, the Standard Party & Events Package for up to 120 people at $160, and the Big Celebration Package for up to 300 people at $240.",
+      "Our complete, ready-to-use packages include the Speech & Presentation Package with a portable Bose PA speaker and wireless microphone for up to 40 people at $65, the Small Budget Event Package for up to 60 people at $120, Budget With A Boom with a Behringer subwoofer for up to 60 people at $170, the Standard Party & Events Package for up to 120 people at $160, and the Big Celebration Package for up to 300 people at $240.",
   },
   {
     question: "Which package is right for my event?",

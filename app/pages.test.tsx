@@ -66,7 +66,7 @@ describe("static site pages", () => {
   it("falls back to the first package for an unknown request", async () => {
     render(await PackagesPage({ searchParams: Promise.resolve({ package: "does-not-exist" }) }));
 
-    expect(screen.getByRole("tab", { name: /Speech & Presentation Package.*up to 40 people.*\$70/i })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: /Speech & Presentation Package.*up to 40 people.*\$65/i })).toHaveAttribute(
       "aria-selected",
       "true",
     );
