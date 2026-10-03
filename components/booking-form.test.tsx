@@ -60,7 +60,8 @@ describe("BookingForm", () => {
     const trackSubmission = vi.spyOn(googleAds, "trackGoogleAdsBookingSubmission");
     const request = vi.fn().mockResolvedValueOnce({
       ok: false,
-      json: async () => ({ error: "Booking service unavailable" }),
+      status: 413,
+      json: async () => null,
     });
     vi.stubGlobal("fetch", request);
     render(<BookingForm />);
@@ -81,7 +82,7 @@ describe("BookingForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("checkbox", { name: /I have read and agree/i }));
     fireEvent.click(screen.getByRole("button", { name: "Submit booking details" }));
-    expect(await screen.findByText("Booking service unavailable")).toBeInTheDocument();
+    expect(await screen.findByText("Your photo ID files are too large. Please choose smaller images and try again.")).toBeInTheDocument();
     expect(trackSubmission).not.toHaveBeenCalled();
 
     request.mockResolvedValueOnce({ ok: true, json: async () => ({}) });

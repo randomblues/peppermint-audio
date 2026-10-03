@@ -6,7 +6,7 @@ import { addOnCatalog, packageTiers } from "@/lib/site-content";
 import { createAdminClient, PHOTO_ID_BUCKET } from "@/lib/supabase";
 import { bookingSchema } from "@/lib/validation/booking";
 
-const maxFileSize = 10 * 1024 * 1024;
+const maxFileSize = 1.5 * 1024 * 1024;
 const resendApiKey = process.env.RESEND_API_KEY;
 const fromEmail = process.env.ENQUIRY_FROM_EMAIL;
 const toEmail = process.env.ENQUIRY_TO_EMAIL;

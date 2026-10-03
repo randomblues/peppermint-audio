@@ -23,6 +23,9 @@ const steps = [
   "Deposit + terms",
 ];
 
+const maxPhotoIdSize = 1.5 * 1024 * 1024;
+const maxPhotoIdDimension = 1800;
+
 const initialValues: BookingFormInputValues = {
   email: "",
   firstName: "",
@@ -44,6 +47,48 @@ type BookingFormState = BookingFormInputValues & {
 };
 
 const initialState: BookingFormState = { ...initialValues, idFiles: [] };
+
+async function preparePhotoIdFile(file: File) {
+  if (file.size <= maxPhotoIdSize || !file.type.startsWith("image/")) {
+    if (file.size > maxPhotoIdSize) {
+      throw new Error("Each photo ID file must be smaller than 1.5 MB. Please choose a smaller file.");
+    }
+    return file;
+  }
+
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    throw new Error("The photo ID images could not be prepared. Please choose smaller files and try again.");
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const element = new Image();
+      element.onload = () => resolve(element);
+      element.onerror = () => reject(new Error("The photo ID images could not be read. Please choose different files."));
+      element.src = objectUrl;
+    });
+    const scale = Math.min(1, maxPhotoIdDimension / image.width, maxPhotoIdDimension / image.height);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("The photo ID images could not be prepared. Please choose smaller files and try again.");
+    }
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const compressed = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, "image/jpeg", 0.78);
+    });
+    if (!compressed || compressed.size > maxPhotoIdSize) {
+      throw new Error("Each photo ID file must be smaller than 1.5 MB. Please choose a smaller file.");
+    }
+    const filename = file.name.replace(/\.[^/.]+$/, "") || "photo-id";
+    return new File([compressed], `${filename}.jpg`, { type: "image/jpeg", lastModified: file.lastModified });
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
 
 function fieldError(errors: Record<string, string>, name: string) {
   return errors[name] ? <p className="text-xs text-destructive">{errors[name]}</p> : null;
@@ -131,13 +176,18 @@ export function BookingForm({ initialPackageSlug }: BookingFormProps) {
     Object.entries(values).forEach(([name, value]) => {
       if (name !== "idFiles") formData.append(name, String(value));
     });
-    values.idFiles.forEach((file) => formData.append("idFiles", file));
 
     try {
+      const preparedFiles = await Promise.all(values.idFiles.map(preparePhotoIdFile));
+      preparedFiles.forEach((file) => formData.append("idFiles", file));
       const response = await fetch("/api/booking", { method: "POST", body: formData });
       const payload = (await response.json().catch(() => null)) as { error?: string } | null;
 
       if (!response.ok) {
+        if (response.status === 413) {
+          setServerError("Your photo ID files are too large. Please choose smaller images and try again.");
+          return;
+        }
         setServerError(payload?.error ?? "Could not send your booking details right now.");
         return;
       }
@@ -320,7 +370,7 @@ export function BookingForm({ initialPackageSlug }: BookingFormProps) {
         {step === 5 ? (
           <div className="space-y-4">
             <p>Please upload clear images of both the <strong>front and back</strong> of your valid photo ID.</p>
-            <p className="text-sm text-muted-foreground">Upload up to 2 supported files. Images or PDF, maximum 10 MB per file.</p>
+            <p className="text-sm text-muted-foreground">Upload up to 2 supported files. Images or PDF, maximum 1.5 MB per file.</p>
             <Input
               type="file"
               accept="image/*,.pdf"
