@@ -197,30 +197,28 @@ describe("AdminPaymentPanel", () => {
     expect(await screen.findByText("Payment update failed (502): The server returned an invalid response.")).toBeInTheDocument();
   });
 
-  it("uses PATCH when saving line items before creating a payment request", async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        text: async () => JSON.stringify({ ok: true }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        text: async () => JSON.stringify({ paymentUrl: "https://example.com/pay/token", paymentToken: "token", hireAmountCents: 20000, securityDepositCents: 10000 }),
-      });
+  it("saves line items without creating or sending a payment request", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({ ok: true, hireAmountCents: 20000 }),
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     render(<AdminPaymentPanel booking={booking()} onChanged={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Increase Audio hire quantity" }));
-    fireEvent.click(screen.getByRole("button", { name: "Send invoice" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/admin/bookings", expect.objectContaining({
-      method: "PATCH",
-    }));
-    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/admin/payments/create-checkout", expect.objectContaining({
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock).toHaveBeenCalledWith("/api/admin/payments/update-booking", expect.objectContaining({
       method: "POST",
+      body: JSON.stringify({
+        bookingId: "booking-1",
+        hireLineItems: [{ ...lineItems[0], quantity: 2 }],
+        saveOnly: true,
+      }),
     }));
+    expect(await screen.findByText("Hire items saved to this booking. Send the invoice when you are ready.")).toBeInTheDocument();
   });
 
   it("adds a catalogue item and recalculates the hire total", () => {
@@ -234,6 +232,6 @@ describe("AdminPaymentPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add item" }));
 
     expect(screen.getByText(/Hire total is calculated from these items/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save hire items" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
   });
 });

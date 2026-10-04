@@ -183,20 +183,15 @@ export function AdminPaymentPanel({ booking, onChanged, collapsible = true }: { 
       setError("Add at least one priced hire item before saving.");
       return;
     }
-    const saved = existingMethod
-      ? await submit("/api/admin/payments/update-booking", {
-        bookingId: booking.id,
-        paymentMethod: selectedMethod,
-        hireLineItems: lineItems,
-        securityDepositAmount: depositAmount || "0",
-        gstInclusive,
-        ...(selectedMethod === "bank_transfer" ? { bankTransferOption } : {}),
-      })
-      : await submit("/api/admin/bookings", { id: booking.id, hire_line_items: lineItems }, "PATCH");
+    const saved = await submit("/api/admin/payments/update-booking", {
+      bookingId: booking.id,
+      hireLineItems: lineItems,
+      saveOnly: true,
+    });
     if (!saved) return;
     setSavedLineItems(lineItems);
     onChanged({ hire_line_items: lineItems, hire_amount_cents: hireTotalCents });
-    setMessage(existingMethod ? "Booking updated and the invoice was sent again using the same reference." : "Hire items saved to this booking.");
+    setMessage("Hire items saved to this booking. Send the invoice when you are ready.");
   }
 
   function addCatalogItem() {
@@ -364,7 +359,7 @@ export function AdminPaymentPanel({ booking, onChanged, collapsible = true }: { 
               <Button type="button" variant="outline" onClick={addCustomItem}><Plus className="size-4" />Add custom</Button>
             </div>
           ) : null}
-          {canEditLineItems && lineItemsChanged ? <Button type="button" variant="outline" onClick={() => void saveLineItems()} disabled={processing}>Save hire items</Button> : null}
+          {canEditLineItems && lineItemsChanged ? <div className="flex justify-end border-t pt-3"><Button type="button" size="sm" onClick={() => void saveLineItems()} disabled={processing}>Save</Button></div> : null}
         </section>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-lg bg-muted/40 p-3 text-sm"><p className="font-medium">Calculated hire total</p><p className="mt-1 text-lg font-semibold">{formatAudCents(hireTotalCents)}</p></div>

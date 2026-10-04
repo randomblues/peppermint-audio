@@ -20,6 +20,7 @@ type UpdateRequest = {
   bankTransferOption?: unknown;
   billToName?: unknown;
   billToEmail?: unknown;
+  saveOnly?: unknown;
 };
 
 function isMissingStripeCustomerError(error: unknown) {
@@ -103,6 +104,9 @@ export async function POST(request: Request) {
   if (body.gstInclusive !== undefined && typeof body.gstInclusive !== "boolean") {
     return NextResponse.json({ error: "GST-inclusive selection must be true or false." }, { status: 400 });
   }
+  if (body.saveOnly !== undefined && typeof body.saveOnly !== "boolean") {
+    return NextResponse.json({ error: "Save-only selection must be true or false." }, { status: 400 });
+  }
   if (body.bankTransferOption !== undefined && !isBankTransferOption(body.bankTransferOption)) {
     return NextResponse.json({ error: "A valid bank-transfer option is required." }, { status: 400 });
   }
@@ -131,12 +135,21 @@ export async function POST(request: Request) {
   const update: Record<string, unknown> = {
     hire_line_items: hireLineItems,
     hire_amount_cents: hireAmountCents,
-    security_deposit_cents: depositCents,
-    gst_inclusive: gstInclusive,
     updated_at: new Date().toISOString(),
   };
 
   try {
+    if (body.saveOnly === true) {
+      const write = await session.admin.from("bookings").update(update).eq("id", bookingId);
+      if (write.error) return NextResponse.json({ error: write.error.message }, { status: 500 });
+      return NextResponse.json({ ok: true, bookingId, hireAmountCents });
+    }
+
+    Object.assign(update, {
+      security_deposit_cents: depositCents,
+      gst_inclusive: gstInclusive,
+    });
+
     if (!targetMethod) {
       const write = await session.admin.from("bookings").update(update).eq("id", bookingId);
       if (write.error) return NextResponse.json({ error: write.error.message }, { status: 500 });

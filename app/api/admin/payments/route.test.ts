@@ -402,6 +402,38 @@ describe("admin payment routes", () => {
     expect(mocks.sendInvoiceEmail).toHaveBeenCalledWith(expect.anything(), "booking-original", null, true, "payid", {}, true, true);
   });
 
+  it("saves hire items without sending or changing the payment request", async () => {
+    const read = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({
+        data: revisableBooking(),
+        error: null,
+      }),
+    };
+    const update = {
+      update: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    };
+    mocks.requireAdmin.mockResolvedValue({ user: { id: "admin-1" }, admin: { from: vi.fn().mockReturnValueOnce(read).mockReturnValueOnce(update) } });
+
+    const response = await updateBooking(request("/api/admin/payments/update-booking", {
+      bookingId: "booking-original",
+      hireLineItems: [{ ...hireLineItems[0], quantity: 2 }],
+      saveOnly: true,
+    }));
+
+    expect(response.status).toBe(200);
+    expect(update.update).toHaveBeenCalledWith(expect.objectContaining({
+      hire_line_items: [{ ...hireLineItems[0], quantity: 2 }],
+      hire_amount_cents: 20000,
+    }));
+    expect(update.update).not.toHaveBeenCalledWith(expect.objectContaining({
+      payment_method: expect.anything(),
+    }));
+    expect(mocks.sendInvoiceEmail).not.toHaveBeenCalled();
+  });
+
   it("ignores missing Stripe intents when revising an existing Stripe booking", async () => {
     const read = {
       select: vi.fn().mockReturnThis(),
