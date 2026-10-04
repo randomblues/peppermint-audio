@@ -306,6 +306,48 @@ describe("admin payment routes", () => {
     expect(mocks.sendInvoiceEmail).toHaveBeenCalledWith(expect.anything(), "booking-original", null, true, "payid", {}, true, true);
   });
 
+  it("ignores missing Stripe intents when revising an existing Stripe booking", async () => {
+    const read = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({
+        data: revisableBooking({
+          payment_method: "stripe_card_hold",
+          hire_payment_status: "pending",
+          deposit_payment_status: "pending",
+          stripe_hire_payment_intent_id: "pi_missing_hire",
+          stripe_deposit_payment_intent_id: "pi_missing_deposit",
+        }),
+        error: null,
+      }),
+    };
+    const update = {
+      update: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    };
+    mocks.requireAdmin.mockResolvedValue({ user: { id: "admin-1" }, admin: { from: vi.fn().mockReturnValueOnce(read).mockReturnValueOnce(update) } });
+    mocks.paymentIntentRetrieve
+      .mockRejectedValueOnce({ type: "StripeInvalidRequestError", code: "resource_missing", message: "No such payment_intent: 'pi_missing_hire'" })
+      .mockRejectedValueOnce({ type: "StripeInvalidRequestError", code: "resource_missing", message: "No such payment_intent: 'pi_missing_deposit'" });
+
+    const response = await updateBooking(request("/api/admin/payments/update-booking", {
+      bookingId: "booking-original",
+      paymentMethod: "bank_transfer",
+      hireLineItems,
+      securityDepositAmount: "100",
+      gstInclusive: true,
+      bankTransferOption: "both",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(update.update).toHaveBeenCalledWith(expect.objectContaining({
+      payment_method: "bank_transfer",
+      stripe_hire_payment_intent_id: null,
+      stripe_deposit_payment_intent_id: null,
+    }));
+    expect(mocks.sendInvoiceEmail).toHaveBeenCalledWith(expect.anything(), "booking-original", null, true, "both", {}, true, true);
+  });
+
   it("rejects changes after the hire has been paid", async () => {
     const read = {
       select: vi.fn().mockReturnThis(),

@@ -28,7 +28,16 @@ function siteUrl(request: Request) {
 
 async function cancelPendingIntent(stripe: ReturnType<typeof getStripe>, paymentIntentId: string | null | undefined) {
   if (!paymentIntentId) return;
-  const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+  let intent: Awaited<ReturnType<typeof stripe.paymentIntents.retrieve>>;
+  try {
+    intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+  } catch (error) {
+    const maybeStripeError = error as { code?: string; type?: string; message?: string };
+    const missingIntent = maybeStripeError.code === "resource_missing"
+      || (maybeStripeError.type === "StripeInvalidRequestError" && maybeStripeError.message?.includes("No such payment_intent"));
+    if (missingIntent) return;
+    throw error;
+  }
   if (["requires_payment_method", "requires_confirmation", "requires_action"].includes(intent.status)) {
     await stripe.paymentIntents.cancel(paymentIntentId);
   }
