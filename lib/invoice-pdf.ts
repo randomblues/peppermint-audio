@@ -1,4 +1,6 @@
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 import { business } from "@/lib/site-content";
 
@@ -58,13 +60,15 @@ export async function buildInvoicePdf(details: InvoicePdfDetails) {
   const page = document.addPage([pageWidth, pageHeight]);
   const regular = await document.embedFont(StandardFonts.Helvetica);
   const bold = await document.embedFont(StandardFonts.HelveticaBold);
+  const logoBytes = new Uint8Array(await readFile(join(process.cwd(), "public", "logo-white.png")));
+  const logo = await document.embedPng(logoBytes);
   const dark = rgb(0.11, 0.16, 0.14);
   const muted = rgb(0.35, 0.37, 0.35);
   const green = rgb(0.24, 0.47, 0.37);
   let y = pageHeight - margin;
 
   page.drawRectangle({ x: 0, y: pageHeight - 112, width: pageWidth, height: 112, color: dark });
-  page.drawText(pdfText(business.name), { x: margin, y: pageHeight - 58, size: 21, font: bold, color: rgb(1, 1, 1) });
+  page.drawImage(logo, { x: margin, y: pageHeight - 75, width: 182, height: 38.4 });
   page.drawText(pdfText(details.title), { x: margin, y: pageHeight - 86, size: 12, font: regular, color: rgb(0.78, 0.9, 0.83) });
   page.drawText(pdfText(details.documentNumber), { x: pageWidth - margin - 150, y: pageHeight - 58, size: 10, font: regular, color: rgb(1, 1, 1) });
   page.drawText(pdfText(details.issuedAt), { x: pageWidth - margin - 150, y: pageHeight - 76, size: 9, font: regular, color: rgb(0.82, 0.84, 0.83) });

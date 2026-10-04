@@ -23,6 +23,7 @@ describe("invoice PDF generation", () => {
     });
 
     expect(Buffer.from(pdf).subarray(0, 5).toString()).toBe("%PDF-");
+    expect(Buffer.from(pdf).toString("latin1")).toContain("/Subtype /Image");
     expect(pdf.byteLength).toBeGreaterThan(500);
   });
 });
