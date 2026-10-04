@@ -9,6 +9,12 @@ const booking = {
   email: "alex@example.com",
   event_type: "Party",
   pickup_date: "2026-10-01",
+  dropoff_date: "2026-10-02",
+  pickup_time: "10:00",
+  dropoff_time: "16:00",
+  package_interest: "essential",
+  add_ons: ["Wireless microphone"],
+  additional_details: "Please call on arrival.",
   status: "submitted",
   internal_notes: "Call about access",
   photo_id_paths: ["private/alex-id.jpg"],
@@ -61,6 +67,23 @@ describe("AdminConsole", () => {
     expect(fetchMock).toHaveBeenLastCalledWith("/api/admin/bookings?search=Alex&status=confirmed", { cache: "no-store" });
   });
 
+  it("searches email history by booking and opens the selected booking history", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ bookings: [booking] }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AdminConsole />);
+    await screen.findByText("Alex Smith");
+
+    fireEvent.click(screen.getByRole("link", { name: "Email history" }));
+    expect(await screen.findByRole("heading", { name: "Email history" })).toBeInTheDocument();
+    expect(screen.getByText("1 email")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Search email history"), { target: { value: "Alex" } });
+    expect(screen.getByText("Alex Smith")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Alex Smith alex@example.com/ }));
+    const historyDialog = screen.getByRole("dialog", { name: "Alex Smith" });
+    expect(historyDialog).toBeInTheDocument();
+    expect(historyDialog).toHaveTextContent("Booking confirmation");
+  });
+
   it("updates status and notes, sends a reminder, and opens photo links", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(jsonResponse({ bookings: [booking] }))
@@ -69,8 +92,7 @@ describe("AdminConsole", () => {
     const open = vi.spyOn(window, "open").mockImplementation(() => null);
     render(<AdminConsole />);
     fireEvent.click(await screen.findByText("Alex Smith"));
-    expect(screen.getByText("Email history")).toBeInTheDocument();
-    expect(screen.getByText("Booking confirmation")).toBeInTheDocument();
+    expect(screen.queryByText("Customer email delivery records are kept for 30 days.")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Send Email" })).toBeInTheDocument();
     expect(screen.queryByText("Actions & outcomes")).not.toBeInTheDocument();
     expect(screen.queryByText("Internal email")).not.toBeInTheDocument();
@@ -86,15 +108,18 @@ describe("AdminConsole", () => {
       method: "PATCH", body: JSON.stringify({ id: "one", internal_notes: "Ready for pickup" }),
     })));
     fireEvent.click(screen.getByRole("button", { name: "Send Email" }));
-    fireEvent.click(screen.getByRole("button", { name: "Send booking confirmation" }));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/send-confirmation", expect.objectContaining({
-      method: "POST", body: JSON.stringify({ bookingId: "one" }),
-    })));
-    fireEvent.click(screen.getByRole("button", { name: "Send Email" }));
-    fireEvent.click(screen.getByRole("button", { name: "Send pickup reminder" }));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/test-reminder", expect.objectContaining({
-      method: "POST", body: JSON.stringify({ bookingId: "one" }),
-    })));
+    expect(screen.getByRole("heading", { name: "Compose email" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Send booking confirmation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Send pickup reminder" })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Booking confirmation" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Pickup reminder" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Load an email template"), { target: { value: "booking-confirmation" } });
+    expect(screen.getByLabelText("Email subject")).toHaveValue("Your booking with Peppermint Audio has been confirmed.");
+    expect((screen.getByLabelText("Email message") as HTMLTextAreaElement).value).toContain("Your booking with Peppermint Audio has been confirmed.");
+    fireEvent.change(screen.getByLabelText("Load an email template"), { target: { value: "pickup-reminder" } });
+    expect((screen.getByLabelText("Email subject") as HTMLInputElement).value).toContain("Pickup reminder for");
+    expect((screen.getByLabelText("Email message") as HTMLTextAreaElement).value).toContain("181 Nicholson St, Abbotsford VIC 3067");
+    expect((screen.getByLabelText("Email message") as HTMLTextAreaElement).value).toContain("Wireless microphone");
     fireEvent.click(screen.getByRole("button", { name: "View private ID" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/photo-link?path=private%2Falex-id.jpg"));
     expect(open).toHaveBeenCalledWith("https://signed.example/id.jpg", "_blank", "noopener,noreferrer");
@@ -124,7 +149,7 @@ describe("AdminConsole", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("Archive downloaded.");
   });
 
-  it("sends an editable invoice email with an attachment", async () => {
+  it("sends an email with an optional attachment", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(jsonResponse({ bookings: [booking] }))
       .mockResolvedValue(jsonResponse({ ok: true }));
@@ -132,14 +157,15 @@ describe("AdminConsole", () => {
     render(<AdminConsole />);
     fireEvent.click(await screen.findByText("Alex Smith"));
     fireEvent.click(screen.getByRole("button", { name: "Send Email" }));
-    expect(screen.getByLabelText("Invoice email subject")).toHaveValue("Your Peppermint Audio invoice");
-    fireEvent.change(screen.getByLabelText("Invoice email subject"), { target: { value: "Invoice for your event" } });
-    fireEvent.change(screen.getByLabelText("Invoice email message"), { target: { value: "Hello, your invoice is attached." } });
+    fireEvent.change(screen.getByLabelText("Load an email template"), { target: { value: "invoice" } });
+    expect(screen.getByLabelText("Email subject")).toHaveValue("Your Peppermint Audio invoice");
+    fireEvent.change(screen.getByLabelText("Email subject"), { target: { value: "Invoice for your event" } });
+    fireEvent.change(screen.getByLabelText("Email message"), { target: { value: "Hello, your invoice is attached." } });
     const file = new File(["invoice"], "invoice.pdf", { type: "application/pdf" });
-    fireEvent.change(screen.getByLabelText("Invoice attachment"), { target: { files: [file] } });
-    fireEvent.click(screen.getByRole("button", { name: "Send invoice" }));
+    fireEvent.change(screen.getByLabelText("Email attachment"), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole("button", { name: "Send email" }));
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/send-invoice-email", expect.objectContaining({ method: "POST", body: expect.any(FormData) })));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/send-custom-email", expect.objectContaining({ method: "POST", body: expect.any(FormData) })));
     const body = fetchMock.mock.calls.at(-1)?.[1]?.body as FormData;
     expect(body.get("subject")).toBe("Invoice for your event");
     expect(body.get("message")).toBe("Hello, your invoice is attached.");

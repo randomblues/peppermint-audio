@@ -11,10 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { bookingStatuses, filterBookings, isUpcoming, statusCounts } from "@/lib/admin-dashboard";
+import { buildBookingConfirmationEmail } from "@/lib/booking-confirmation-email";
+import { buildPickupReminderEmail } from "@/lib/pickup-reminders";
 
 type Booking = Record<string, unknown> & {
   id: string; first_name: string; last_name: string; event_type: string;
   pickup_date: string; dropoff_date?: string; pickup_time?: string | null; dropoff_time?: string | null; status: string;
+  email?: string; package_interest?: string; additional_details?: string | null;
   internal_notes?: string; photo_id_paths?: string[]; add_ons?: string[];
   email_logs?: Array<{ id: string; recipient_email: string; email_type: string; provider_message_id?: string | null; sent_at: string }>;
 };
@@ -33,7 +36,7 @@ const emailTypeLabel = (value: string) => ({
   booking_request: "Booking request",
   confirmation: "Booking confirmation",
   pickup_reminder: "Pickup reminder",
-  custom: "Custom email",
+  custom: "Email",
   invoice: "Invoice email",
   enquiry: "Enquiry",
 }[value] ?? value);
@@ -47,6 +50,64 @@ const statusClass = (value: string) => ({
   completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
   cancelled: "border-red-200 bg-red-50 text-red-700",
 }[value] ?? "border-border bg-muted text-muted-foreground");
+const emailTemplates = [
+  { value: "blank", label: "Blank email" },
+  { value: "booking-confirmation", label: "Booking confirmation" },
+  { value: "pickup-reminder", label: "Pickup reminder" },
+  { value: "invoice", label: "Invoice email" },
+  { value: "payment-reminder", label: "Payment reminder" },
+  { value: "pickup-details", label: "Pickup details" },
+] as const;
+function emailTemplateContent(value: string, booking: Booking) {
+  if (value === "booking-confirmation") {
+    const email = buildBookingConfirmationEmail({
+      firstName: booking.first_name,
+      eventType: booking.event_type,
+      pickupDate: booking.pickup_date,
+      dropoffDate: booking.dropoff_date ?? booking.pickup_date,
+      pickupTime: booking.pickup_time,
+      dropoffTime: booking.dropoff_time,
+      packageInterest: booking.package_interest ?? "Your selected package",
+      addOns: booking.add_ons ?? [],
+      pickupInstructions: {
+        package_interest: booking.package_interest ?? "",
+        add_ons: booking.add_ons ?? [],
+        additional_details: booking.additional_details ?? null,
+      },
+    });
+    return { subject: email.subject, message: email.text };
+  }
+  if (value === "pickup-reminder") {
+    const email = buildPickupReminderEmail({
+      email: booking.email ?? "",
+      first_name: booking.first_name,
+      last_name: booking.last_name,
+      event_type: booking.event_type,
+      pickup_date: booking.pickup_date,
+      pickup_time: booking.pickup_time,
+      package_interest: booking.package_interest ?? "",
+      add_ons: booking.add_ons ?? [],
+      additional_details: booking.additional_details ?? null,
+    });
+    return { subject: email.subject, message: email.text };
+  }
+  const templates: Record<string, { subject: string; message: string }> = {
+    blank: { subject: "", message: "" },
+    invoice: {
+      subject: "Your Peppermint Audio invoice",
+      message: "Hi,\n\nPlease find your invoice attached for your Peppermint Audio booking.\n\nIf you have any questions, please get in touch.",
+    },
+    "payment-reminder": {
+      subject: "Payment reminder for your Peppermint Audio booking",
+      message: "Hi,\n\nJust a quick reminder about payment for your Peppermint Audio booking.\n\nPlease get in touch if you have any questions.",
+    },
+    "pickup-details": {
+      subject: "Pickup details for your Peppermint Audio booking",
+      message: "Hi,\n\nHere are the pickup details for your Peppermint Audio booking.\n\nPlease get in touch if you have any questions.",
+    },
+  };
+  return templates[value] ?? templates.blank;
+}
 async function responseError(response: Response, fallback: string) {
   try {
     const data = await response.json() as { error?: string };
@@ -56,7 +117,7 @@ async function responseError(response: Response, fallback: string) {
   }
 }
 type SummaryCard = { key: string; label: string; icon: ComponentType<{ className?: string }>; color: string; count: number };
-type AdminSection = "bookings" | "archive";
+type AdminSection = "bookings" | "email-history" | "archive";
 
 export function AdminConsole() {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -65,6 +126,7 @@ export function AdminConsole() {
   const [status, setStatus] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [emailHistorySearch, setEmailHistorySearch] = useState("");
   const [range, setRange] = useState({ from: "", to: "" });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -73,6 +135,7 @@ export function AdminConsole() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [mobileNav, setMobileNav] = useState(false);
   const [section, setSection] = useState<AdminSection>("bookings");
+  const [selectedEmailHistory, setSelectedEmailHistory] = useState<Booking | null>(null);
 
   const showMessage = useCallback((nextMessage: string, type: "success" | "error") => {
     setMessage(nextMessage);
@@ -97,7 +160,8 @@ export function AdminConsole() {
   }, [load]);
   useEffect(() => {
     const syncSection = () => {
-      setSection(window.location.hash === "#archive" ? "archive" : "bookings");
+      const hash = window.location.hash;
+      setSection(hash === "#archive" ? "archive" : hash === "#email-history" ? "email-history" : "bookings");
       setMessage("");
     };
     syncSection();
@@ -113,6 +177,17 @@ export function AdminConsole() {
   const visibleBookings = useMemo(() => filterBookings(bookings, { status, from: dateFrom, to: dateTo }), [bookings, status, dateFrom, dateTo]);
   const counts = useMemo(() => statusCounts(bookings), [bookings]);
   const upcomingCount = useMemo(() => bookings.filter((booking) => isUpcoming(booking)).length, [bookings]);
+  const filteredEmailHistoryBookings = useMemo(() => {
+    const query = emailHistorySearch.trim().toLowerCase();
+    if (!query) return bookings;
+    return bookings.filter((booking) => [
+      booking.first_name,
+      booking.last_name,
+      booking.email,
+      booking.event_type,
+      ...(booking.email_logs ?? []).flatMap((log) => [log.recipient_email, emailTypeLabel(log.email_type)]),
+    ].some((value) => String(value ?? "").toLowerCase().includes(query)));
+  }, [bookings, emailHistorySearch]);
 
   async function update(id: string, values: { status?: string; internal_notes?: string }) {
     try {
@@ -143,47 +218,41 @@ export function AdminConsole() {
     if (!response.ok) { showMessage(await responseError(response, "Delete failed."), "error"); return; }
     setBookings((current) => current.filter((booking) => booking.id !== id)); setSelected(null); showMessage("Booking deleted.", "success");
   }
-  async function sendReminder(id: string) {
+  async function sendEmail(id: string, subject: string, message: string, attachment: File | null) {
     try {
-      const response = await fetch("/api/admin/test-reminder", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bookingId: id }) });
-      if (!response.ok) { showMessage(await responseError(response, "Email reminder failed."), "error"); return; }
-      showMessage("Email reminder sent.", "success");
-    } catch { showMessage("Email reminder failed. Check your connection and try again.", "error"); }
-  }
-  async function sendConfirmation(id: string) {
-    try {
-      const response = await fetch("/api/admin/send-confirmation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bookingId: id }) });
-      if (!response.ok) { showMessage(await responseError(response, "Booking confirmation email failed."), "error"); return; }
-      showMessage("Booking confirmation email sent.", "success");
-    } catch { showMessage("Booking confirmation email failed. Check your connection and try again.", "error"); }
-  }
-  async function sendCustomEmail(id: string, subject: string, message: string) {
-    try {
-      const response = await fetch("/api/admin/send-custom-email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bookingId: id, subject, message }) });
-      if (!response.ok) { showMessage(await responseError(response, "Custom email failed."), "error"); return false; }
-      showMessage("Custom email sent.", "success");
+      const body = new FormData();
+      body.append("bookingId", id);
+      body.append("subject", subject);
+      body.append("message", message);
+      if (attachment) body.append("attachment", attachment);
+      const response = await fetch("/api/admin/send-custom-email", { method: "POST", body });
+      if (!response.ok) { showMessage(await responseError(response, "Email failed."), "error"); return false; }
+      showMessage("Email sent.", "success");
       return true;
-    } catch { showMessage("Custom email failed. Check your connection and try again.", "error"); return false; }
+    } catch { showMessage("Email failed. Check your connection and try again.", "error"); return false; }
   }
   async function signOut() { await fetch("/api/admin/logout", { method: "POST" }); window.location.href = "/admin/login"; }
   function navigateSection(nextSection: AdminSection, event: React.MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
     setSection(nextSection);
     setMobileNav(false);
+    setSelectedEmailHistory(null);
     setMessage("");
     window.history.replaceState(null, "", `#${nextSection}`);
   }
+  const sectionHeading = section === "archive" ? "Archive export" : section === "email-history" ? "Email history" : "Booking management";
+  const sectionDescription = section === "archive" ? "Securely download booking records" : section === "email-history" ? "Search customer email delivery records" : "Keep every event moving smoothly";
 
   return (
     <div className="min-h-screen bg-muted/30">
       <aside className={`fixed inset-y-0 left-0 z-30 w-64 border-r bg-card p-5 transition-transform md:translate-x-0 ${mobileNav ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex items-center gap-3 border-b pb-6"><div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground"><ShieldCheck className="size-5" /></div><div><p className="font-semibold">Peppermint Audio</p><p className="text-xs text-muted-foreground">Operations console</p></div></div>
-        <nav className="mt-6 space-y-1" aria-label="Admin sections"><a className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${section === "bookings" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"}`} href="#bookings" aria-current={section === "bookings" ? "page" : undefined} onClick={(event) => navigateSection("bookings", event)}><LayoutDashboard className="size-4" />Bookings</a><a className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${section === "archive" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"}`} href="#archive" aria-current={section === "archive" ? "page" : undefined} onClick={(event) => navigateSection("archive", event)}><Archive className="size-4" />Archive export</a></nav>
+        <nav className="mt-6 space-y-1" aria-label="Admin sections"><a className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${section === "bookings" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"}`} href="#bookings" aria-current={section === "bookings" ? "page" : undefined} onClick={(event) => navigateSection("bookings", event)}><LayoutDashboard className="size-4" />Bookings</a><a className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${section === "email-history" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"}`} href="#email-history" aria-current={section === "email-history" ? "page" : undefined} onClick={(event) => navigateSection("email-history", event)}><Mail className="size-4" />Email history</a><a className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${section === "archive" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"}`} href="#archive" aria-current={section === "archive" ? "page" : undefined} onClick={(event) => navigateSection("archive", event)}><Archive className="size-4" />Archive export</a></nav>
         <div className="absolute bottom-5 left-5 right-5 border-t pt-4"><Button variant="ghost" className="w-full justify-start gap-3" onClick={() => void signOut()}><LogOut className="size-4" />Sign out</Button></div>
       </aside>
       {mobileNav && <button aria-label="Close navigation" className="fixed inset-0 z-20 bg-black/20 md:hidden" onClick={() => setMobileNav(false)} />}
       <div className="md:pl-64">
-        <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur"><div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-8"><Button variant="ghost" size="icon" className="shrink-0 md:hidden" onClick={() => setMobileNav(true)}><Menu /></Button><div className="hidden min-w-0 md:block"><p className="text-sm font-medium">{section === "archive" ? "Archive export" : "Booking management"}</p><p className="text-xs text-muted-foreground">{section === "archive" ? "Securely download booking records" : "Keep every event moving smoothly"}</p></div><div className="flex shrink-0 items-center gap-3"><span className="hidden text-xs text-muted-foreground sm:inline">{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" })}` : "Not updated yet"}</span><Button variant="outline" size="sm" className="gap-2" onClick={() => void load()} disabled={loading}><RefreshCw className={loading ? "size-3.5 animate-spin" : "size-3.5"} />Refresh</Button><Button variant="ghost" size="icon" className="md:hidden" onClick={() => void signOut()}><LogOut /></Button></div></div></header>
+        <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur"><div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-8"><Button variant="ghost" size="icon" className="shrink-0 md:hidden" onClick={() => setMobileNav(true)}><Menu /></Button><div className="hidden min-w-0 md:block"><p className="text-sm font-medium">{sectionHeading}</p><p className="text-xs text-muted-foreground">{sectionDescription}</p></div><div className="flex shrink-0 items-center gap-3"><span className="hidden text-xs text-muted-foreground sm:inline">{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" })}` : "Not updated yet"}</span><Button variant="outline" size="sm" className="gap-2" onClick={() => void load()} disabled={loading}><RefreshCw className={loading ? "size-3.5 animate-spin" : "size-3.5"} />Refresh</Button><Button variant="ghost" size="icon" className="md:hidden" onClick={() => void signOut()}><LogOut /></Button></div></div></header>
         <main className="mx-auto w-full max-w-6xl space-y-7 p-4 sm:p-8">
           {message && <p role="status" className={`rounded-lg border px-4 py-2.5 text-sm ${messageType === "error" ? "border-destructive/20 bg-destructive/5 text-destructive" : "border-primary/20 bg-primary/5 text-primary"}`}>{message}</p>}
           {section === "bookings" ? <><section className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-medium text-primary">Good to see you</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Bookings overview</h1><p className="mt-1 text-sm text-muted-foreground">Review enquiries, confirm details, and prepare every event.</p></div><div className="flex items-center gap-2 text-xs text-muted-foreground"><Clock3 className="size-3.5" />{lastUpdated ? `Last updated ${lastUpdated.toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short" })}` : "Loading latest data"}</div></section>
@@ -192,32 +261,22 @@ export function AdminConsole() {
             <Card><CardContent className="grid gap-4 p-3 sm:grid-cols-[repeat(2,minmax(10rem,1fr))] lg:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(10rem,1fr))]"><label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground sm:col-span-2 lg:col-span-1"><span>Search</span><span className="relative"><Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" /><input aria-label="Search bookings" placeholder="Search name, email or event" value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 w-full min-w-0 rounded-lg border bg-background pl-9 pr-3 text-sm font-normal text-foreground outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring" /></span></label><label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground"><span>Status</span><select aria-label="Filter by status" value={status} onChange={(e) => setStatus(e.target.value)} className="h-10 w-full rounded-lg border bg-background px-3 text-sm font-normal text-foreground"><option value="">All statuses</option>{statuses.map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}</select></label><label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground"><span>Pickup from</span><input aria-label="Bookings from date" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm font-normal text-foreground" /></label><label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground"><span>Pickup to</span><input aria-label="Bookings to date" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm font-normal text-foreground" /></label></CardContent></Card>
             {error ? <Card><CardContent className="flex flex-col items-center gap-3 p-10 text-center"><XCircle className="size-8 text-destructive" /><p className="font-medium">We couldn&apos;t load bookings</p><p className="text-sm text-muted-foreground">{error}</p><Button variant="outline" onClick={() => void load()}>Try again</Button></CardContent></Card> : loading ? <Card><CardContent className="p-10 text-center text-sm text-muted-foreground"><RefreshCw className="mx-auto mb-3 size-6 animate-spin" />Loading bookings…</CardContent></Card> : visibleBookings.length === 0 ? <Card><CardContent className="p-12 text-center"><CalendarDays className="mx-auto mb-3 size-8 text-muted-foreground" /><p className="font-medium">No bookings match these filters</p><p className="mt-1 text-sm text-muted-foreground">Try clearing a filter or check back after a new enquiry.</p></CardContent></Card> : <Card><div className="divide-y">{visibleBookings.map((booking) => <button key={booking.id} onClick={() => setSelected(booking)} className="flex w-full flex-wrap items-center gap-4 p-4 text-left transition-colors hover:bg-muted/50 sm:flex-nowrap"><div className="flex min-w-0 flex-1 items-center gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">{booking.first_name[0]}{booking.last_name[0]}</div><div className="min-w-0"><p className="truncate font-medium">{booking.first_name} {booking.last_name}</p><p className="truncate text-sm text-muted-foreground">{display(booking.email)}</p></div></div><div className="w-36"><p className="text-sm font-medium">{display(booking.event_type)}</p><p className="text-xs text-muted-foreground">{formatDate(booking.pickup_date)}</p></div><Badge className={statusClass(booking.status)}>{statusLabel(booking.status)}</Badge><ChevronRight className="ml-auto size-4 text-muted-foreground" /></button>)}</div></Card>}
           </section>
-          </> : <section id="archive" aria-labelledby="archive-title" className="space-y-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-medium text-primary">Data management</p><h1 id="archive-title" className="mt-1 text-3xl font-semibold tracking-tight">Archive export</h1><p className="mt-1 text-sm text-muted-foreground">Create a secure backup of booking records and private photo IDs.</p></div><a href="#bookings" onClick={(event) => navigateSection("bookings", event)} className="inline-flex items-center rounded-lg border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted">Back to bookings</a></div><div className="rounded-xl border border-dashed border-amber-300 bg-amber-50/60 p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div className="flex gap-3"><div className="rounded-lg bg-amber-100 p-2 text-amber-700"><Archive className="size-5" /></div><div><h2 className="font-semibold text-amber-950">Export booking archive</h2><p className="mt-1 max-w-xl text-sm text-amber-900/70">Download a ZIP of booking records and private photo IDs for a specific pickup date range. Handle this file securely.</p></div></div><div className="flex flex-wrap gap-2"><input aria-label="Archive from date" type="date" value={range.from} onChange={(e) => setRange({ ...range, from: e.target.value })} className="h-9 rounded-lg border border-amber-200 bg-background px-3 text-sm" /><input aria-label="Archive to date" type="date" value={range.to} onChange={(e) => setRange({ ...range, to: e.target.value })} className="h-9 rounded-lg border border-amber-200 bg-background px-3 text-sm" /><Button variant="outline" className="gap-2 border-amber-300 bg-background" onClick={() => void exportArchive()}><Download className="size-4" />Export ZIP</Button></div></div></div></section>}
+          </> : section === "email-history" ? <EmailHistoryPage bookings={filteredEmailHistoryBookings} search={emailHistorySearch} onSearch={setEmailHistorySearch} onSelect={setSelectedEmailHistory} /> : <section id="archive" aria-labelledby="archive-title" className="space-y-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-medium text-primary">Data management</p><h1 id="archive-title" className="mt-1 text-3xl font-semibold tracking-tight">Archive export</h1><p className="mt-1 text-sm text-muted-foreground">Create a secure backup of booking records and private photo IDs.</p></div><a href="#bookings" onClick={(event) => navigateSection("bookings", event)} className="inline-flex items-center rounded-lg border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted">Back to bookings</a></div><div className="rounded-xl border border-dashed border-amber-300 bg-amber-50/60 p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div className="flex gap-3"><div className="rounded-lg bg-amber-100 p-2 text-amber-700"><Archive className="size-5" /></div><div><h2 className="font-semibold text-amber-950">Export booking archive</h2><p className="mt-1 max-w-xl text-sm text-amber-900/70">Download a ZIP of booking records and private photo IDs for a specific pickup date range. Handle this file securely.</p></div></div><div className="flex flex-wrap gap-2"><input aria-label="Archive from date" type="date" value={range.from} onChange={(e) => setRange({ ...range, from: e.target.value })} className="h-9 rounded-lg border border-amber-200 bg-background px-3 text-sm" /><input aria-label="Archive to date" type="date" value={range.to} onChange={(e) => setRange({ ...range, to: e.target.value })} className="h-9 rounded-lg border border-amber-200 bg-background px-3 text-sm" /><Button variant="outline" className="gap-2 border-amber-300 bg-background" onClick={() => void exportArchive()}><Download className="size-4" />Export ZIP</Button></div></div></div></section>}
         </main>
       </div>
-      {selected && <BookingDetail booking={selected} onClose={() => setSelected(null)} onUpdate={update} onPhoto={signedLink} onDelete={deleteBooking} onSendReminder={sendReminder} onSendConfirmation={sendConfirmation} onSendCustomEmail={sendCustomEmail} onSendInvoiceEmail={async (id, subject, message, file) => { const body = new FormData(); body.append("bookingId", id); body.append("subject", subject); body.append("message", message); body.append("attachment", file); try { const response = await fetch("/api/admin/send-invoice-email", { method: "POST", body }); if (!response.ok) { showMessage(await responseError(response, "Invoice email failed."), "error"); return false; } showMessage("Invoice email sent.", "success"); return true; } catch { showMessage("Invoice email failed. Check your connection and try again.", "error"); return false; } }} />}
+      {selected && <BookingDetail booking={selected} onClose={() => setSelected(null)} onUpdate={update} onPhoto={signedLink} onDelete={deleteBooking} onSendEmail={sendEmail} />}
+      {selectedEmailHistory && <EmailHistoryDetail booking={selectedEmailHistory} onClose={() => setSelectedEmailHistory(null)} />}
     </div>
   );
 }
 
-function BookingDetail({ booking, onClose, onUpdate, onPhoto, onDelete, onSendReminder, onSendConfirmation, onSendCustomEmail, onSendInvoiceEmail }: { booking: Booking; onClose: () => void; onUpdate: (id: string, values: { status?: string; internal_notes?: string }) => Promise<void>; onPhoto: (path: string) => Promise<void>; onDelete: (id: string) => Promise<void>; onSendReminder: (id: string) => Promise<void>; onSendConfirmation: (id: string) => Promise<void>; onSendCustomEmail: (id: string, subject: string, message: string) => Promise<boolean>; onSendInvoiceEmail: (id: string, subject: string, message: string, file: File) => Promise<boolean> }) {
+function BookingDetail({ booking, onClose, onUpdate, onPhoto, onDelete, onSendEmail }: { booking: Booking; onClose: () => void; onUpdate: (id: string, values: { status?: string; internal_notes?: string }) => Promise<void>; onPhoto: (path: string) => Promise<void>; onDelete: (id: string) => Promise<void>; onSendEmail: (id: string, subject: string, message: string, attachment: File | null) => Promise<boolean> }) {
   const [notes, setNotes] = useState(booking.internal_notes ?? "");
   const [emailOpen, setEmailOpen] = useState(false);
+  const [emailTemplate, setEmailTemplate] = useState("");
   const [customSubject, setCustomSubject] = useState("");
   const [customMessage, setCustomMessage] = useState("");
-  const [invoiceSubject, setInvoiceSubject] = useState("Your Peppermint Audio invoice");
-  const [invoiceMessage, setInvoiceMessage] = useState("Hi,\n\nPlease find your invoice attached for your Peppermint Audio booking.\n\nIf you have any questions, please get in touch.");
-  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
-  async function sendInvoiceEmail(id: string) {
-    if (!invoiceFile) return false;
-    const sent = await onSendInvoiceEmail(id, invoiceSubject, invoiceMessage, invoiceFile);
-    if (sent) {
-      setInvoiceSubject("Your Peppermint Audio invoice");
-      setInvoiceMessage("Hi,\n\nPlease find your invoice attached for your Peppermint Audio booking.\n\nIf you have any questions, please get in touch.");
-      setInvoiceFile(null);
-    }
-    return sent;
-  }
+  const [customFile, setCustomFile] = useState<File | null>(null);
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
     document.addEventListener("keydown", handleKey);
@@ -226,39 +285,191 @@ function BookingDetail({ booking, onClose, onUpdate, onPhoto, onDelete, onSendRe
   return <div className="fixed inset-0 z-40 flex justify-end bg-black/30" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <aside role="dialog" aria-modal="true" aria-labelledby="booking-detail-title" className="flex h-full w-full max-w-xl flex-col overflow-hidden bg-background shadow-2xl">
       <div className="flex shrink-0 items-start justify-between border-b bg-background p-4 sm:p-5"><div className="min-w-0 pr-3"><p className="text-sm text-primary">Booking details</p><h2 id="booking-detail-title" className="mt-1 break-words text-xl font-semibold sm:text-2xl">{booking.first_name} {booking.last_name}</h2><p className="truncate text-sm text-muted-foreground">{display(booking.event_type)} · {formatDate(booking.pickup_date)}</p></div><Button variant="ghost" size="icon" onClick={onClose} aria-label="Close details"><X /></Button></div>
-      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4 sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><Badge className={statusClass(booking.status)}>{statusLabel(booking.status)}</Badge><label className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><span>Status</span><select aria-label="Update booking status" value={booking.status} onChange={(e) => void onUpdate(booking.id, { status: e.target.value })} className="h-9 rounded-lg border bg-background px-3 text-sm font-normal text-foreground">{statuses.map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}</select></label></div><div className="grid grid-cols-1 gap-4 rounded-xl border p-4 text-sm sm:grid-cols-2"><Detail label="Customer" value={`${booking.first_name} ${booking.last_name}`} icon={<UserRound />} /><Detail label="Email" value={display(booking.email)} icon={<Mail />} /><Detail label="Mobile" value={display(booking.mobile)} /><Detail label="Event address" value={display(booking.event_address)} />      <Detail label="Pickup" value={`${formatDate(booking.pickup_date)} at ${formatTime(booking.pickup_time)}`} /><Detail label="Drop-off" value={`${formatDate(booking.dropoff_date)} at ${formatTime(booking.dropoff_time)}`} /><Detail label="Package" value={display(booking.package_interest)} /><Detail label="Guests" value={display(booking.guest_count)} /><Detail label="Add-ons" value={booking.add_ons?.length ? booking.add_ons.join(", ") : "None selected"} /></div><div><h3 className="mb-2 text-sm font-semibold">Additional details</h3><p className="break-words rounded-lg bg-muted p-3 text-sm leading-relaxed">{display(booking.additional_details)}</p></div><div><h3 className="mb-2 text-sm font-semibold">Internal notes</h3><textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-24 w-full resize-y rounded-lg border bg-background p-3 text-sm" placeholder="Add a private note for the team…" /><Button size="sm" className="mt-2" onClick={() => void onUpdate(booking.id, { internal_notes: notes })}>Save notes</Button></div>      <EmailHistory logs={booking.email_logs ?? []} /><div className="flex justify-end"><Button size="sm" onClick={() => setEmailOpen(true)}>Send Email</Button></div>{booking.photo_id_paths?.length ? <div><h3 className="mb-2 text-sm font-semibold">Photo ID</h3><div className="flex flex-wrap gap-2">{booking.photo_id_paths.map((path) => <Button key={path} variant="outline" size="sm" onClick={() => void onPhoto(path)}>View private ID <ExternalLink /></Button>)}</div></div> : null}<Button variant="destructive" className="w-full" onClick={() => void onDelete(booking.id)}>Permanently delete booking</Button></div>
-      {emailOpen ? <div role="dialog" aria-modal="true" aria-labelledby="send-email-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><div className="w-full max-w-md rounded-xl border bg-background p-5 shadow-2xl"><div className="flex items-center justify-between gap-3"><h2 id="send-email-title" className="text-lg font-semibold">Send Email</h2><Button variant="ghost" size="icon" onClick={() => setEmailOpen(false)} aria-label="Close email dialog"><X /></Button></div><p className="mt-1 text-sm text-muted-foreground">Choose an email to send to {display(booking.email)}.</p><div className="mt-5 grid gap-2">{booking.status === "confirmed" ? <Button variant="outline" className="justify-start" onClick={async () => { await onSendConfirmation(booking.id); setEmailOpen(false); }}>Send booking confirmation</Button> : <Button variant="outline" className="justify-start" disabled>Send booking confirmation (confirm booking first)</Button>}<Button variant="outline" className="justify-start" onClick={async () => { await onSendReminder(booking.id); setEmailOpen(false); }}>Send pickup reminder</Button></div><div className="mt-5 border-t pt-5"><h3 className="font-medium">Send invoice</h3><div className="mt-3 grid gap-3"><input aria-label="Invoice email subject" value={invoiceSubject} onChange={(event) => setInvoiceSubject(event.target.value)} className="h-10 rounded-lg border bg-background px-3 text-sm" /><textarea aria-label="Invoice email message" value={invoiceMessage} onChange={(event) => setInvoiceMessage(event.target.value)} className="min-h-28 rounded-lg border bg-background p-3 text-sm" /><input key={invoiceFile?.name ?? "empty-invoice"} aria-label="Invoice attachment" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx" onChange={(event) => setInvoiceFile(event.target.files?.[0] ?? null)} className="block w-full text-sm" /><Button disabled={!invoiceSubject.trim() || !invoiceMessage.trim() || !invoiceFile} onClick={async () => { const sent = await sendInvoiceEmail(booking.id); if (sent) { setEmailOpen(false); } }}>Send invoice</Button></div></div><div className="mt-5 border-t pt-5"><h3 className="font-medium">Send custom email</h3><div className="mt-3 grid gap-3"><input aria-label="Custom email subject" value={customSubject} onChange={(event) => setCustomSubject(event.target.value)} placeholder="Subject" className="h-10 rounded-lg border bg-background px-3 text-sm" /><textarea aria-label="Custom email message" value={customMessage} onChange={(event) => setCustomMessage(event.target.value)} placeholder="Write your message…" className="min-h-28 rounded-lg border bg-background p-3 text-sm" /><Button disabled={!customSubject.trim() || !customMessage.trim()} onClick={async () => { const sent = await onSendCustomEmail(booking.id, customSubject, customMessage); if (sent) { setCustomSubject(""); setCustomMessage(""); setEmailOpen(false); } }}>Send custom email</Button></div></div></div></div> : null}
+      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4 sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><Badge className={statusClass(booking.status)}>{statusLabel(booking.status)}</Badge><label className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><span>Status</span><select aria-label="Update booking status" value={booking.status} onChange={(e) => void onUpdate(booking.id, { status: e.target.value })} className="h-9 rounded-lg border bg-background px-3 text-sm font-normal text-foreground">{statuses.map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}</select></label></div><div className="grid grid-cols-1 gap-4 rounded-xl border p-4 text-sm sm:grid-cols-2"><Detail label="Customer" value={`${booking.first_name} ${booking.last_name}`} icon={<UserRound />} /><Detail label="Email" value={display(booking.email)} icon={<Mail />} /><Detail label="Mobile" value={display(booking.mobile)} /><Detail label="Event address" value={display(booking.event_address)} />      <Detail label="Pickup" value={`${formatDate(booking.pickup_date)} at ${formatTime(booking.pickup_time)}`} /><Detail label="Drop-off" value={`${formatDate(booking.dropoff_date)} at ${formatTime(booking.dropoff_time)}`} /><Detail label="Package" value={display(booking.package_interest)} /><Detail label="Guests" value={display(booking.guest_count)} /><Detail label="Add-ons" value={booking.add_ons?.length ? booking.add_ons.join(", ") : "None selected"} /></div><div><h3 className="mb-2 text-sm font-semibold">Additional details</h3><p className="break-words rounded-lg bg-muted p-3 text-sm leading-relaxed">{display(booking.additional_details)}</p></div><div><h3 className="mb-2 text-sm font-semibold">Internal notes</h3><textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-24 w-full resize-y rounded-lg border bg-background p-3 text-sm" placeholder="Add a private note for the team…" /><Button size="sm" className="mt-2" onClick={() => void onUpdate(booking.id, { internal_notes: notes })}>Save notes</Button></div><div className="flex justify-end"><Button size="sm" onClick={() => setEmailOpen(true)}>Send Email</Button></div>{booking.photo_id_paths?.length ? <div><h3 className="mb-2 text-sm font-semibold">Photo ID</h3><div className="flex flex-wrap gap-2">{booking.photo_id_paths.map((path) => <Button key={path} variant="outline" size="sm" onClick={() => void onPhoto(path)}>View private ID <ExternalLink /></Button>)}</div></div> : null}<Button variant="destructive" className="w-full" onClick={() => void onDelete(booking.id)}>Permanently delete booking</Button></div>
+      {emailOpen ? (
+        <div role="dialog" aria-modal="true" aria-labelledby="send-email-title" className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/40 sm:items-center sm:p-4">
+          <div className="flex h-full w-full max-w-2xl flex-col overflow-hidden border bg-background shadow-2xl sm:h-auto sm:max-h-[min(90vh,840px)] sm:rounded-2xl">
+            <header className="flex shrink-0 items-start justify-between gap-4 border-b px-5 py-4 sm:px-6">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="mt-0.5 rounded-lg bg-primary/10 p-2 text-primary"><Mail className="size-5" /></div>
+                <div className="min-w-0">
+                  <h2 id="send-email-title" className="text-lg font-semibold">Send an email</h2>
+                  <p className="mt-1 truncate text-sm text-muted-foreground">To {display(booking.email)}</p>
+                </div>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setEmailOpen(false)} aria-label="Close email dialog"><X /></Button>
+            </header>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+              <div className="space-y-6">
+                <section aria-labelledby="email-composer-title" className="rounded-xl border bg-muted/20 p-4 sm:p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-lg bg-background p-2 text-primary shadow-sm"><Mail className="size-4" /></div>
+                    <div>
+                      <h3 id="email-composer-title" className="font-semibold">Compose email</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">Choose a template or write a message, then send it to this customer.</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 space-y-4">
+                    <div className="space-y-1.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <label htmlFor="email-template" className="text-sm font-medium">Load a template <span className="font-normal text-muted-foreground">(optional)</span></label>
+                        <select id="email-template" aria-label="Load an email template" value={emailTemplate} onChange={(event) => {
+                          setEmailTemplate(event.target.value);
+                          const template = emailTemplateContent(event.target.value, booking);
+                          setCustomSubject(template.subject);
+                          setCustomMessage(template.message);
+                        }} className="h-9 max-w-full rounded-lg border bg-background px-2.5 text-sm">
+                          <option value="">Choose a template…</option>
+                          {emailTemplates.map((template) => <option key={template.value} value={template.value}>{template.label}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label htmlFor="email-subject" className="text-sm font-medium">Subject</label>
+                      <input id="email-subject" aria-label="Email subject" value={customSubject} onChange={(event) => setCustomSubject(event.target.value)} placeholder="e.g. Details for your event" className="h-10 w-full rounded-lg border bg-background px-3 text-sm" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label htmlFor="email-message" className="text-sm font-medium">Message</label>
+                      <textarea id="email-message" aria-label="Email message" value={customMessage} onChange={(event) => setCustomMessage(event.target.value)} placeholder="Write your message…" className="min-h-32 w-full resize-y rounded-lg border bg-background p-3 text-sm leading-relaxed" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label htmlFor="email-attachment" className="text-sm font-medium">Attachment <span className="font-normal text-muted-foreground">(optional)</span></label>
+                      <input key={customFile?.name ?? "empty-email"} id="email-attachment" aria-label="Email attachment" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" onChange={(event) => setCustomFile(event.target.files?.[0] ?? null)} className="block w-full cursor-pointer rounded-lg border bg-background text-sm file:mr-3 file:border-0 file:border-r file:bg-muted file:px-3 file:py-2 file:text-sm file:font-medium" />
+                      <p className="text-xs text-muted-foreground">{customFile ? customFile.name : "Optional · up to 10 MB"}</p>
+                    </div>
+                    <Button className="w-full sm:w-auto" disabled={!customSubject.trim() || !customMessage.trim()} onClick={async () => { const sent = await onSendEmail(booking.id, customSubject, customMessage, customFile); if (sent) { setCustomSubject(""); setCustomMessage(""); setCustomFile(null); setEmailTemplate(""); setEmailOpen(false); } }}>Send email</Button>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </aside>
   </div>;
 }
-function Detail({ label, value, icon }: { label: string; value: string; icon?: ReactNode }) { return <div className="min-w-0"><p className="flex items-center gap-1 text-xs text-muted-foreground">{icon ? <span className="inline-flex size-3 shrink-0 items-center justify-center [&>svg]:size-3">{icon}</span> : null}{label}</p><p className="mt-1 break-words font-medium">{value}</p></div>; }
-function EmailHistory({ logs }: { logs: NonNullable<Booking["email_logs"]> }) {
+function EmailHistoryPage({ bookings, search, onSearch, onSelect }: { bookings: Booking[]; search: string; onSearch: (value: string) => void; onSelect: (booking: Booking) => void }) {
+  const emailCount = bookings.reduce((total, booking) => total + (booking.email_logs?.length ?? 0), 0);
   return (
-    <section className="rounded-xl border bg-muted/30 p-4">
-      <div className="flex items-start justify-between gap-3">
+    <section id="email-history" aria-labelledby="email-history-title" className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h3 className="text-sm font-semibold">Email history</h3>
-          <p className="mt-1 text-xs text-muted-foreground">Customer email delivery records are kept for 30 days.</p>
+          <p className="text-sm font-medium text-primary">Customer communications</p>
+          <h1 id="email-history-title" className="mt-1 text-3xl font-semibold tracking-tight">Email history</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Search a booking to see every customer email sent to them in the last 30 days.</p>
         </div>
-        <Badge variant="secondary">{logs.length}</Badge>
+        <div className="text-xs text-muted-foreground">{bookings.length} {bookings.length === 1 ? "booking" : "bookings"} · {emailCount} {emailCount === 1 ? "email" : "emails"}</div>
       </div>
-      {logs.length ? (
-        <div className="mt-4 divide-y rounded-lg border bg-background">
-          {logs.map((log) => (
-            <div key={log.id} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <p className="text-sm font-medium">{emailTypeLabel(log.email_type)}</p>
-                <p className="truncate text-xs text-muted-foreground">{log.recipient_email}</p>
-              </div>
-              <p className="shrink-0 text-xs text-muted-foreground">{formatSentAt(log.sent_at)}</p>
-            </div>
-          ))}
-        </div>
+      <Card>
+        <CardContent className="p-3">
+          <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground">
+            <span>Search bookings</span>
+            <span className="relative">
+              <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+              <input aria-label="Search email history" placeholder="Search name, email or event" value={search} onChange={(event) => onSearch(event.target.value)} className="h-10 w-full rounded-lg border bg-background pl-9 pr-3 text-sm font-normal text-foreground outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring" />
+            </span>
+          </label>
+        </CardContent>
+      </Card>
+      {bookings.length ? (
+        <Card>
+          <div className="divide-y">
+            {bookings.map((booking) => {
+              const logs = booking.email_logs ?? [];
+              const latest = logs.slice().sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime())[0];
+              return (
+                <button key={booking.id} onClick={() => onSelect(booking)} className="flex w-full flex-wrap items-center gap-4 p-4 text-left transition-colors hover:bg-muted/50 sm:flex-nowrap">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">{booking.first_name[0]}{booking.last_name[0]}</div>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{booking.first_name} {booking.last_name}</p>
+                      <p className="truncate text-sm text-muted-foreground">{display(booking.email)}</p>
+                    </div>
+                  </div>
+                  <div className="min-w-32">
+                    <p className="text-sm font-medium">{display(booking.event_type)}</p>
+                    <p className="text-xs text-muted-foreground">{formatDate(booking.pickup_date)}</p>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Mail className="size-4" />
+                    <span>{logs.length} {logs.length === 1 ? "email" : "emails"}</span>
+                  </div>
+                  <div className="w-full text-xs text-muted-foreground sm:w-44 sm:text-right">{latest ? `Last sent ${formatSentAt(latest.sent_at)}` : "No emails sent yet"}</div>
+                  <ChevronRight className="ml-auto size-4 shrink-0 text-muted-foreground" />
+                </button>
+              );
+            })}
+          </div>
+        </Card>
       ) : (
-        <p className="mt-4 rounded-lg border border-dashed bg-background p-4 text-sm text-muted-foreground">
-          No customer emails have been logged for this booking yet.
-        </p>
+        <Card><CardContent className="p-12 text-center"><Mail className="mx-auto mb-3 size-8 text-muted-foreground" /><p className="font-medium">No bookings match this search</p><p className="mt-1 text-sm text-muted-foreground">Try searching by customer name, email, or event.</p></CardContent></Card>
       )}
     </section>
+  );
+}
+function Detail({ label, value, icon }: { label: string; value: string; icon?: ReactNode }) { return <div className="min-w-0"><p className="flex items-center gap-1 text-xs text-muted-foreground">{icon ? <span className="inline-flex size-3 shrink-0 items-center justify-center [&>svg]:size-3">{icon}</span> : null}{label}</p><p className="mt-1 break-words font-medium">{value}</p></div>; }
+function EmailHistoryDetail({ booking, onClose }: { booking: Booking; onClose: () => void }) {
+  const logs = (booking.email_logs ?? []).slice().sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime());
+  return (
+    <div className="fixed inset-0 z-40 flex justify-end bg-black/40" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <aside role="dialog" aria-modal="true" aria-labelledby="email-history-detail-title" className="flex h-full w-full max-w-xl flex-col overflow-hidden border-l bg-background shadow-2xl">
+        <header className="flex shrink-0 items-start justify-between border-b px-5 py-5 sm:px-6">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="rounded-xl bg-primary/10 p-2.5 text-primary"><Mail className="size-5" /></div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Customer communications</p>
+              <h2 id="email-history-detail-title" className="mt-1 truncate text-xl font-semibold">{booking.first_name} {booking.last_name}</h2>
+              <p className="truncate text-sm text-muted-foreground">{display(booking.email)}</p>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close email history"><X /></Button>
+        </header>
+        <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
+          <div className="rounded-2xl border bg-muted/20 p-4 sm:p-5">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Email activity</p>
+                <p className="mt-1 text-3xl font-semibold tracking-tight">{logs.length}</p>
+                <p className="text-sm text-muted-foreground">{logs.length === 1 ? "communication sent" : "communications sent"}</p>
+              </div>
+              <div className="rounded-full border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground">Retained for 30 days</div>
+            </div>
+          </div>
+          <div className="mt-8">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="font-semibold">Communication timeline</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Every delivery recorded for this customer.</p>
+              </div>
+              {logs.length ? <Badge variant="secondary">{logs.length}</Badge> : null}
+            </div>
+            {logs.length ? (
+              <ol className="relative space-y-3 before:absolute before:bottom-5 before:left-[17px] before:top-5 before:w-px before:bg-border">
+                {logs.map((log) => (
+                  <li key={log.id} className="relative flex gap-3">
+                    <div className="z-10 mt-3 flex size-9 shrink-0 items-center justify-center rounded-full border bg-background text-primary shadow-sm"><Mail className="size-4" /></div>
+                    <div className="min-w-0 flex-1 rounded-xl border bg-card p-4 shadow-sm">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <p className="font-medium">{emailTypeLabel(log.email_type)}</p>
+                        <p className="text-xs text-muted-foreground">{formatSentAt(log.sent_at)}</p>
+                      </div>
+                      <p className="mt-2 truncate text-sm text-muted-foreground">Delivered to {log.recipient_email}</p>
+                      {log.provider_message_id ? <p className="mt-2 truncate font-mono text-[11px] text-muted-foreground/70">ID {log.provider_message_id}</p> : null}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <div className="rounded-xl border border-dashed bg-muted/10 p-8 text-center">
+                <Mail className="mx-auto mb-3 size-8 text-muted-foreground" />
+                <p className="font-medium">No communications recorded</p>
+                <p className="mt-1 text-sm text-muted-foreground">Emails sent to this customer will appear here.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </aside>
+    </div>
   );
 }

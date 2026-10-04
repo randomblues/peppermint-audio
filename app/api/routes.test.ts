@@ -200,6 +200,38 @@ describe("admin booking routes", () => {
     }));
   });
 
+  it("sends a custom email with an optional attachment", async () => {
+    const read = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: { email: "customer@example.com" }, error: null }),
+    };
+    mocks.requireAdmin.mockResolvedValue(adminSession({ from: vi.fn().mockReturnValue(read) }));
+    vi.stubEnv("RESEND_API_KEY", "key");
+    vi.stubEnv("ENQUIRY_FROM_EMAIL", "Peppermint Audio <from@example.com>");
+    const form = new Map<string, unknown>([
+      ["bookingId", "b1"],
+      ["subject", "Your documents"],
+      ["message", "Please find the document attached."],
+      ["attachment", {
+        name: "details.pdf",
+        size: 15,
+        arrayBuffer: async () => new TextEncoder().encode("document contents").buffer,
+      }],
+    ]) as unknown as FormData;
+
+    const response = await sendCustomEmail({
+      headers: new Headers({ "content-type": "multipart/form-data; boundary=test" }),
+      formData: async () => form,
+    } as Request);
+
+    expect(response.status).toBe(200);
+    expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({
+      subject: "Your documents",
+      attachments: [{ filename: "details.pdf", content: Buffer.from("document contents").toString("base64") }],
+    }));
+  });
+
   it("sends an invoice email with the uploaded attachment", async () => {
     const read = {
       select: vi.fn().mockReturnThis(),
