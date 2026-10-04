@@ -444,6 +444,45 @@ describe("admin payment routes", () => {
     expect(mocks.sendInvoiceEmail).toHaveBeenCalledWith(expect.anything(), "booking-original", null, true, "both", {}, true, true);
   });
 
+  it("replaces a missing Stripe customer when revising an existing Stripe booking", async () => {
+    const read = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({
+        data: revisableBooking({
+          payment_method: "stripe_card_hold",
+          hire_payment_status: "pending",
+          deposit_payment_status: "pending",
+          stripe_customer_id: "cus_missing",
+        }),
+        error: null,
+      }),
+    };
+    const update = {
+      update: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    };
+    mocks.requireAdmin.mockResolvedValue({ user: { id: "admin-1" }, admin: { from: vi.fn().mockReturnValueOnce(read).mockReturnValueOnce(update) } });
+    mocks.customerRetrieve.mockRejectedValueOnce({ code: "resource_missing", message: "No such customer: 'cus_missing'" });
+    mocks.customerCreate.mockResolvedValueOnce({ id: "cus_replacement" });
+
+    const response = await updateBooking(request("/api/admin/payments/update-booking", {
+      bookingId: "booking-original",
+      paymentMethod: "stripe_card_hold",
+      hireLineItems,
+      securityDepositAmount: "100",
+      gstInclusive: true,
+    }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.customerRetrieve).toHaveBeenCalledWith("cus_missing");
+    expect(mocks.customerCreate).toHaveBeenCalledWith(expect.objectContaining({
+      email: "alex@example.com",
+      metadata: { bookingId: "booking-original", invoiceNumber: "PA-BOOKINGORIGI" },
+    }));
+    expect(update.update).toHaveBeenCalledWith(expect.objectContaining({ stripe_customer_id: "cus_replacement" }));
+  });
+
   it("rejects changes after the hire has been paid", async () => {
     const read = {
       select: vi.fn().mockReturnThis(),

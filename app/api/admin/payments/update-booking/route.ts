@@ -22,6 +22,34 @@ type UpdateRequest = {
   billToEmail?: unknown;
 };
 
+function isMissingStripeCustomerError(error: unknown) {
+  const maybeStripeError = error as { code?: unknown; message?: unknown };
+  return maybeStripeError.code === "resource_missing"
+    && typeof maybeStripeError.message === "string"
+    && /no such customer/i.test(maybeStripeError.message);
+}
+
+async function ensureStripeCustomerId(
+  stripe: ReturnType<typeof getStripe>,
+  booking: { stripe_customer_id: string | null; email: string; first_name: string; last_name: string },
+  bookingId: string,
+) {
+  const existingCustomerId = booking.stripe_customer_id?.trim();
+  if (existingCustomerId) {
+    try {
+      const customer = await stripe.customers.retrieve(existingCustomerId);
+      if (!("deleted" in customer && customer.deleted)) return existingCustomerId;
+    } catch (error) {
+      if (!isMissingStripeCustomerError(error)) throw error;
+    }
+  }
+  return (await stripe.customers.create({
+    email: booking.email,
+    name: `${booking.first_name} ${booking.last_name}`,
+    metadata: { bookingId, invoiceNumber: invoiceNumberForBooking(bookingId) },
+  })).id;
+}
+
 function siteUrl(request: Request) {
   return (process.env.NEXT_PUBLIC_SITE_URL ?? new URL(request.url).origin).replace(/\/$/, "");
 }
@@ -149,11 +177,7 @@ export async function POST(request: Request) {
         await cancelPendingIntent(stripe, existing.data.stripe_hire_payment_intent_id);
         await cancelPendingIntent(stripe, existing.data.stripe_deposit_payment_intent_id);
       }
-      const customerId = existing.data.stripe_customer_id ?? (await stripe.customers.create({
-        email: existing.data.email,
-        name: `${existing.data.first_name} ${existing.data.last_name}`,
-        metadata: { bookingId, invoiceNumber: invoiceNumberForBooking(bookingId) },
-      })).id;
+      const customerId = await ensureStripeCustomerId(stripe, existing.data, bookingId);
       const hirePaymentIntent = await stripe.paymentIntents.create({
         amount: hireAmountCents,
         currency: "aud",
