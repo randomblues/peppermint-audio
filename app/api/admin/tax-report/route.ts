@@ -43,7 +43,7 @@ function csv(value: string | number | null) {
 
 export async function GET(request: Request) {
   const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const query = new URL(request.url).searchParams;
   const from = query.get("from");

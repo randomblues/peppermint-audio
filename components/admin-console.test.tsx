@@ -2,6 +2,14 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminConsole } from "./admin-console";
 
+const { replace } = vi.hoisted(() => ({
+  replace: vi.fn(),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace }),
+}));
+
 const booking = {
   id: "one",
   first_name: "Alex",
@@ -41,6 +49,7 @@ afterEach(async () => {
 });
 
 beforeEach(async () => {
+  replace.mockReset();
   window.history.replaceState(null, "", "#bookings");
   await new Promise((resolve) => setTimeout(resolve, 10));
 });
@@ -193,7 +202,8 @@ describe("AdminConsole", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send email" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/send-custom-email", expect.objectContaining({ method: "POST", body: expect.any(FormData) })));
-    const body = fetchMock.mock.calls.at(-1)?.[1]?.body as FormData;
+    const sendEmailCall = fetchMock.mock.calls.find(([request]) => request === "/api/admin/send-custom-email");
+    const body = sendEmailCall?.[1]?.body as FormData;
     expect(body.get("subject")).toBe("Invoice for your event");
     expect(body.get("message")).toBe("Hello, your invoice is attached.");
     expect(body.get("attachment")).toBe(file);
@@ -231,6 +241,21 @@ describe("AdminConsole", () => {
     expect(screen.getByRole("heading", { name: "Bookings overview" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/logout", { method: "POST" }));
+    expect(replace).toHaveBeenCalledWith("/admin/login");
+  });
+
+  it("redirects to admin login when bookings request is unauthorized", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: "Unauthorized" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AdminConsole />);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(replace).toHaveBeenCalledWith("/admin/login");
   });
 
   it("combines full-time salary with business profit in the tax estimate", async () => {

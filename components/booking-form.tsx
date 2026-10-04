@@ -201,8 +201,10 @@ export function BookingForm() {
         setIdFilesTouched(false);
         setTermsTouched(false);
         setErrors((current) => {
-          const { idFiles: _idFiles, termsAccepted: _termsAccepted, ...rest } = current;
-          return rest;
+          const next = { ...current };
+          delete next.idFiles;
+          delete next.termsAccepted;
+          return next;
         });
       }
       return nextStep;

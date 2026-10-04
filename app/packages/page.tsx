@@ -29,6 +29,7 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
     <Section
       eyebrow="Pricing"
       title="Choose your complete PA package"
+      headingAs="h1"
       description="Melbourne PA hire packages from $65. Every package is ready to plug in and use. Weekend dates can fill quickly — send your event date and we&apos;ll check availability."
     >
       <Tabs defaultValue={selectedPackage} className="w-full">

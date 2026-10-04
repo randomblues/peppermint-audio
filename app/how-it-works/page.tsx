@@ -18,6 +18,7 @@ export default function HowItWorksPage() {
     <Section
       eyebrow="Booking Flow"
       title="How It Works"
+      headingAs="h1"
       description="Choose your equipment, send a booking request, and let us confirm availability before you collect from Abbotsford."
     >
       <div className="grid gap-4">

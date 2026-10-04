@@ -114,6 +114,10 @@ describe("Footer", () => {
 });
 
 describe("PackageCard", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   it("renders package data and cart actions", () => {
     const pkg = packageTiers[0];
     render(<PackageCard pkg={pkg} />);
@@ -195,7 +199,7 @@ describe("PackageCard", () => {
     );
   });
 
-  it("shows a checkout prompt immediately after adding a package to the cart", () => {
+  it("shows the upsell modal immediately after adding a package to the cart", () => {
     const pkg = packageTiers[0];
 
     render(
@@ -206,18 +210,108 @@ describe("PackageCard", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Add to cart" }));
 
-    expect(screen.getByRole("dialog", { name: "Added to your cart" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Check out" })).toHaveAttribute("href", "/cart");
-    expect(screen.getByRole("button", { name: "Continue shopping" })).toBeInTheDocument();
-    expect(JSON.parse(localStorage.getItem("peppermint-audio-cart") ?? "[]")).toEqual([
-      {
-        id: `package:${pkg.slug}`,
-        name: pkg.name,
-        kind: "package",
-        price: pkg.price,
-        quantity: 1,
-      },
-    ]);
+    expect(
+      screen.getByRole("dialog", {
+        name: `Recommended add-ons for ${pkg.name}`,
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue to checkout" })).toHaveAttribute("href", "/cart");
+    expect(screen.getByText("Party Light PAR Can")).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem("peppermint-audio-cart") ?? "[]")).toEqual(
+      expect.arrayContaining([
+        {
+          id: `package:${pkg.slug}`,
+          name: pkg.name,
+          kind: "package",
+          price: pkg.price,
+          quantity: 1,
+        },
+      ]),
+    );
+  });
+
+  it("suggests wireless mics and party lights only for packages where those add-ons apply", () => {
+    const pkg = packageTiers.find((packageTier) => packageTier.slug === "standard-party-events");
+    if (!pkg) throw new Error("Standard Party & Events package is missing");
+
+    render(
+      <CartProvider>
+        <PackageCard pkg={pkg} />
+      </CartProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add to cart" }));
+
+    expect(screen.getByText("Wireless Microphone")).toBeInTheDocument();
+    expect(screen.getByText("CR Lite MagikBar Hub Party Bar")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Add this to my cart" })).toHaveLength(2);
+  });
+
+  it("adds recommended add-ons from the upsell modal as individual equipment cart items", () => {
+    const pkg = packageTiers[0];
+
+    render(
+      <CartProvider>
+        <PackageCard pkg={pkg} />
+      </CartProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add to cart" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add this to my cart" }));
+
+    expect(screen.getByRole("button", { name: "Added to cart" })).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem("peppermint-audio-cart") ?? "[]")).toEqual(
+      expect.arrayContaining([
+        {
+          id: "package:speech-presentation-wireless",
+          name: "Speech & Presentation Package",
+          kind: "package",
+          price: 65,
+          quantity: 1,
+        },
+        {
+          id: "equipment:hire-party-light-par-can:Single item",
+          name: "Party Light PAR Can",
+          kind: "equipment",
+          option: "Single item",
+          price: 10,
+          quantity: 1,
+        },
+      ]),
+    );
+  });
+
+  it("links each recommended add-on to its item details page", () => {
+    const standardPackage = packageTiers.find((packageTier) => packageTier.slug === "standard-party-events");
+    if (!standardPackage) throw new Error("Standard Party & Events package is missing");
+
+    const speechPackage = packageTiers.find((packageTier) => packageTier.slug === "speech-presentation-wireless");
+    if (!speechPackage) throw new Error("Speech & Presentation package is missing");
+
+    const { unmount } = render(
+      <CartProvider>
+        <PackageCard pkg={standardPackage} />
+      </CartProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add to cart" }));
+    const standardDetailLinks = screen.getAllByRole("button", { name: "View details" });
+    expect(standardDetailLinks[0]).toHaveAttribute("href", "/equipment/k60-wireless");
+    expect(standardDetailLinks[1]).toHaveAttribute("href", "/equipment/hire-party-lights-bar");
+
+    unmount();
+
+    render(
+      <CartProvider>
+        <PackageCard pkg={speechPackage} />
+      </CartProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add to cart" }));
+    expect(screen.getByRole("button", { name: "View details" })).toHaveAttribute(
+      "href",
+      "/equipment/hire-party-light-par-can",
+    );
   });
 
   it("gives the boom package artwork extra space around the subwoofer", () => {
@@ -347,7 +441,7 @@ describe("Section", () => {
     );
 
     expect(screen.getByText("Packages")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Choose a package" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Choose a package" })).toBeInTheDocument();
     expect(screen.getByText("Ready-to-use systems.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument();
   });
@@ -359,8 +453,18 @@ describe("Section", () => {
       </Section>,
     );
 
-    expect(screen.getByRole("heading", { name: "A title" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "A title" })).toBeInTheDocument();
     expect(screen.queryByText("Packages")).not.toBeInTheDocument();
     expect(screen.queryByText("Ready-to-use systems.")).not.toBeInTheDocument();
+  });
+
+  it("supports rendering an h1 when requested", () => {
+    render(
+      <Section title="Page heading" headingAs="h1">
+        <p>Body</p>
+      </Section>,
+    );
+
+    expect(screen.getByRole("heading", { level: 1, name: "Page heading" })).toBeInTheDocument();
   });
 });

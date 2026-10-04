@@ -10,7 +10,7 @@ import { parseAmountCents, rentalDays } from "@/lib/payment-flow";
 
 export async function POST(request: Request) {
   const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: { bookingId?: string; paymentMethod?: unknown; securityDepositAmount?: unknown; bankTransferOption?: unknown; gstInclusive?: unknown; billToName?: unknown; billToEmail?: unknown };
   try {

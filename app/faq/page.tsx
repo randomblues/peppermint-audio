@@ -36,7 +36,7 @@ export default function FaqPage() {
           __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c"),
         }}
       />
-      <Section eyebrow="FAQ" title="Frequently Asked Questions" description="Common questions before booking.">
+      <Section eyebrow="FAQ" title="Frequently Asked Questions" headingAs="h1" description="Common questions before booking.">
         <Accordion defaultValue={faqs[0] ? [faqs[0].question] : []}>
           {faqs.map((faq) => (
             <AccordionItem

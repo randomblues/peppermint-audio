@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import {
   Archive, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Clock3, CreditCard, Download, FileSpreadsheet,
   ExternalLink, FileText, LayoutDashboard, LogOut, Mail, Menu, RefreshCw,
@@ -136,6 +137,7 @@ type SummaryCard = { key: string; label: string; icon: ComponentType<{ className
 type AdminSection = "bookings" | "email-history" | "tax-report" | "archive";
 
 export function AdminConsole() {
+  const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [selected, setSelected] = useState<Booking | null>(null);
   const [search, setSearch] = useState("");
@@ -163,13 +165,16 @@ export function AdminConsole() {
     try {
       const query = new URLSearchParams({ ...(search ? { search } : {}), ...(status ? { status } : {}) });
       const response = await fetch(`/api/admin/bookings?${query}`, { cache: "no-store" });
-      if (response.status === 401) { window.location.href = "/admin/login"; return; }
+      if (response.status === 401) {
+        router.replace("/admin/login");
+        return;
+      }
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Could not load bookings.");
       setBookings(data.bookings ?? []); setLastUpdated(new Date());
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not load bookings."); }
     finally { setLoading(false); }
-  }, [search, status]);
+  }, [router, search, status]);
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
@@ -251,7 +256,10 @@ export function AdminConsole() {
     setBookings((current) => current.map((booking) => booking.id === id ? { ...booking, ...values } : booking));
     setSelected((current) => current?.id === id ? { ...current, ...values } : current);
   }
-  async function signOut() { await fetch("/api/admin/logout", { method: "POST" }); window.location.href = "/admin/login"; }
+  async function signOut() {
+    await fetch("/api/admin/logout", { method: "POST" });
+    router.replace("/admin/login");
+  }
   function navigateSection(nextSection: AdminSection, event: React.MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
     setSection(nextSection);

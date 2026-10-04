@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: { email?: string; bookingId?: string };
   try {

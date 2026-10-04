@@ -11,7 +11,7 @@ function escapePostgrestSearch(value: string) {
 
 export async function GET(request: Request) {
   const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const url = new URL(request.url);
   const search = url.searchParams.get("search")?.trim();
   const status = url.searchParams.get("status");
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   let body: { id?: string; status?: string; internal_notes?: string; hire_line_items?: unknown };
   try {
     body = await request.json() as { id?: string; status?: string; internal_notes?: string };
@@ -131,7 +131,7 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   let body: { id?: string; confirm?: boolean };
   try {
     body = await request.json() as { id?: string; confirm?: boolean };

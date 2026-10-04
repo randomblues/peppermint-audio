@@ -6,7 +6,7 @@ import { recordCustomerEmail } from "@/lib/email-log";
 
 export async function POST(request: Request) {
   const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: { bookingId?: string };
   try {

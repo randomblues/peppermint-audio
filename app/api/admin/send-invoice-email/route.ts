@@ -10,7 +10,7 @@ const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 
 export async function POST(request: Request) {
   const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let formData: FormData;
   try {

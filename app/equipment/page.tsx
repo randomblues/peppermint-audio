@@ -16,6 +16,7 @@ export default function EquipmentPage() {
     <Section
       eyebrow="Individual equipments"
       title="Hire exactly what you need"
+      headingAs="h1"
       description="You do not need to hire a full package. Choose a single item or a pair, select the setup that suits you, and send an enquiry for availability."
     >
       <Card className="mb-8 border-primary/30 bg-primary/5">

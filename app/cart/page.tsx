@@ -14,7 +14,12 @@ export const metadata = createPageMetadata({
 
 export default function CartPage() {
   return (
-    <Section eyebrow="Your selection" title="Review your hire cart" description="Combine packages and individual equipment, then submit one booking request.">
+    <Section
+      eyebrow="Your selection"
+      title="Review your hire cart"
+      headingAs="h1"
+      description="Combine packages and individual equipment, then submit one booking request."
+    >
       <CartView />
     </Section>
   );

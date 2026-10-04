@@ -4,10 +4,13 @@ type SectionProps = {
   eyebrow?: string;
   title: string;
   description?: string;
+  headingAs?: "h1" | "h2";
   children: ReactNode;
 };
 
-export function Section({ eyebrow, title, description, children }: SectionProps) {
+export function Section({ eyebrow, title, description, headingAs = "h2", children }: SectionProps) {
+  const HeadingTag = headingAs;
+
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6 lg:px-8">
       <div className="site-section-heading mb-7 max-w-3xl">
@@ -17,9 +20,9 @@ export function Section({ eyebrow, title, description, children }: SectionProps)
             <p className="text-xs font-semibold tracking-[0.2em] text-primary uppercase">{eyebrow}</p>
           </div>
         ) : null}
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+        <HeadingTag className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
           {title}
-        </h2>
+        </HeadingTag>
         {description ? <p className="mt-3 text-muted-foreground">{description}</p> : null}
       </div>
       {children}

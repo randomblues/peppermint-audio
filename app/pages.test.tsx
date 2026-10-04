@@ -39,7 +39,7 @@ describe("static site pages", () => {
   it("packages page selects a valid requested package and offers custom enquiries", async () => {
     render(await PackagesPage({ searchParams: Promise.resolve({ package: "big-celebration" }) }));
 
-    expect(screen.getByRole("heading", { name: "Choose your complete PA package" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Choose your complete PA package" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /Big Celebration Package.*up to 300 people.*\$240/i })).toHaveAttribute(
       "aria-selected",
       "true",
@@ -63,7 +63,7 @@ describe("static site pages", () => {
   it("contact page passes a selected package to the enquiry form", async () => {
     render(await ContactPage({ searchParams: Promise.resolve({ package: "standard-party-events" }) }));
 
-    expect(screen.getByRole("heading", { name: "Get in touch" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Get in touch" })).toBeInTheDocument();
     expect(screen.getByLabelText("Enquiry form")).toHaveTextContent("Selected: Standard Party & Events Package");
     expect(screen.getByText("Pickup from Abbotsford 3067. We confirm the exact window after booking.")).toBeInTheDocument();
   });
@@ -81,7 +81,7 @@ describe("static site pages", () => {
   it("FAQ page renders questions and the first answer by default", () => {
     render(<FaqPage />);
 
-    expect(screen.getByRole("heading", { name: "Frequently Asked Questions" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Frequently Asked Questions" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: faqs[0].question })).toBeInTheDocument();
     expect(screen.getByText(faqs[0].answer)).toBeInTheDocument();
     expect(JSON.parse(document.querySelector('script[type="application/ld+json"]')?.textContent ?? "")).toMatchObject({
@@ -98,6 +98,7 @@ describe("static site pages", () => {
   it("how-it-works page explains the request lifecycle and links to catalogues", () => {
     render(<HowItWorksPage />);
 
+    expect(screen.getByRole("heading", { level: 1, name: "How It Works" })).toBeInTheDocument();
     for (const [index, step] of howItWorks.entries()) {
       expect(screen.getByText(`Step ${index + 1}`)).toBeInTheDocument();
       expect(screen.getByText(step.title)).toBeInTheDocument();

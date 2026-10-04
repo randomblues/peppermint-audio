@@ -1,9 +1,11 @@
 "use client";
 import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export function AdminLogin() {
   const [error, setError] = useState("");
+  const router = useRouter();
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError("");
     const form = new FormData(event.currentTarget);
@@ -23,10 +25,10 @@ export function AdminLogin() {
         setError(message);
         return;
       }
-      window.location.href = "/admin";
+      router.replace("/admin");
     } catch {
       setError("The admin login service is unavailable.");
     }
   }
-  return <main className="mx-auto flex min-h-[70vh] max-w-md items-center px-6"><Card className="w-full"><CardHeader><CardTitle>Admin login</CardTitle></CardHeader><CardContent><form onSubmit={submit} className="space-y-4"><label className="block text-sm">Email<input name="email" type="email" required className="mt-1 w-full rounded border bg-background p-2" /></label><label className="block text-sm">Password<input name="password" type="password" required className="mt-1 w-full rounded border bg-background p-2" /></label>{error && <p className="text-sm text-destructive">{error}</p>}<Button type="submit">Sign in</Button></form></CardContent></Card></main>;
+  return <main className="mx-auto flex min-h-[70vh] max-w-md items-center px-6"><h1 className="sr-only">Admin login</h1><Card className="w-full"><CardHeader><CardTitle>Admin login</CardTitle></CardHeader><CardContent><form onSubmit={submit} className="space-y-4"><label className="block text-sm">Email<input name="email" type="email" required className="mt-1 w-full rounded border bg-background p-2" /></label><label className="block text-sm">Password<input name="password" type="password" required className="mt-1 w-full rounded border bg-background p-2" /></label>{error && <p className="text-sm text-destructive">{error}</p>}<Button type="submit">Sign in</Button></form></CardContent></Card></main>;
 }

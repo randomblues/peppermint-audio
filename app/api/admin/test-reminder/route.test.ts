@@ -60,7 +60,7 @@ describe("POST /api/admin/test-reminder", () => {
     const response = await POST(request({ email: "test@example.com" }));
 
     expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({ error: "Unauthorised" });
+    expect(await response.json()).toEqual({ error: "Unauthorized" });
   });
 
   it("rejects invalid JSON and invalid recipient input", async () => {

@@ -36,6 +36,7 @@ const navLinks = [
 export function Navbar() {
   const pathname = usePathname();
   const [productsMenu, setProductsMenu] = useState<string | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <header className="site-navbar sticky top-0 z-50 border-b bg-background bg-background/90 backdrop-blur-xl">
@@ -47,7 +48,7 @@ export function Navbar() {
             width={266}
             height={51}
             className="h-auto w-44"
-            priority
+            loading="eager"
           />
         </Link>
         <NavigationMenu
@@ -103,7 +104,7 @@ export function Navbar() {
             <CartButton />
           </div>
 
-          <Sheet>
+          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger
               render={
                 <Button
@@ -157,6 +158,7 @@ export function Navbar() {
                   className="group h-auto justify-start rounded-xl border border-border/60 bg-background/35 px-3 py-2.5 hover:border-primary/35 hover:bg-primary/10"
                   nativeButton={false}
                   render={<Link href="/packages" />}
+                  onClick={() => setMobileMenuOpen(false)}
                 >
                   <span className="inline-flex items-center gap-2.5">
                     <span className="inline-flex size-7 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary">
@@ -174,6 +176,7 @@ export function Navbar() {
                   className="group h-auto justify-start rounded-xl border border-border/60 bg-background/35 px-3 py-2.5 hover:border-primary/35 hover:bg-primary/10"
                   nativeButton={false}
                   render={<Link href="/equipment" />}
+                  onClick={() => setMobileMenuOpen(false)}
                 >
                   <span className="inline-flex items-center gap-2.5">
                     <span className="inline-flex size-7 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary">
@@ -195,6 +198,7 @@ export function Navbar() {
                     className={`justify-start rounded-lg px-2.5 ${pathname === link.href ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
                     nativeButton={false}
                     render={<Link href={link.href} />}
+                    onClick={() => setMobileMenuOpen(false)}
                   >
                     {link.label}
                   </Button>

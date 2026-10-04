@@ -14,6 +14,7 @@ export default function BookingPage() {
     <Section
       eyebrow="Booking request"
       title="Tell us about your hire"
+      headingAs="h1"
       description="Complete the form below and we will review availability before confirming your booking."
     >
       <BookingForm />

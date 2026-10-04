@@ -262,6 +262,13 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Prevention:** Use clearly disposable test data, clear the booking draft after browser checks, reload the page, and verify the form is clean before handing control back.
 - **Next action:** Never leave test customer data in the active browser tab or local storage.
 
+### 2026-10-05 — QA execution and reporting discipline
+
+- **Symptom:** Exploratory QA occasionally lost time due to tool-level race noise and large command outputs, and useful process lessons risked being dropped after the report.
+- **Root cause:** Parallel field-entry actions in one page interaction can conflict, large test output was not always summarized with targeted extraction first, and lesson capture was not consistently codified after each run.
+- **Prevention:** Prefer sequential or scripted single-flow interactions for form-heavy checks; when command output is large, inspect saved output files with targeted `rg`/bounded reads; include a concise "Quick lessons learned" section in reports when meaningful.
+- **Next action:** After each substantial run, provide "Quick lessons learned" and explicitly ask the user whether to persist the lessons into this log; update this log only with explicit user approval.
+
 # Agent working rules
 
 These rules are mandatory. Safety, preservation of existing work, bounded execution, and truthful verification take priority over speed.
@@ -328,3 +335,6 @@ Report:
 - validations or commands run and their actual outcomes;
 - anything incomplete and the exact reason; and
 - any manual authentication or approval still required.
+- a brief "Quick lessons learned" section (what worked, what failed, delay cause, better approach) when meaningful.
+
+After providing any "Quick lessons learned" section, ask the user whether they want those lessons added to the "Self-improvement and technical issue log" in this file. Do not update this file with new lessons unless the user explicitly approves.

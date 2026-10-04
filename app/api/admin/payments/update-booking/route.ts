@@ -79,7 +79,7 @@ function paymentIsSettled(booking: Record<string, unknown>) {
 
 export async function POST(request: Request) {
   const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: UpdateRequest;
   try {

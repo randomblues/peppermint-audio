@@ -48,11 +48,12 @@ test.describe("navigation", () => {
     await page.goto("/");
 
     await page.getByRole("button", { name: "Open menu" }).click();
-    await expect(page.getByRole("dialog")).toBeVisible();
-    await page.getByRole("button", { name: "FAQ" }).last().click();
+    const mobileMenu = page.getByRole("dialog", { name: "Peppermint Audio" });
+    await expect(mobileMenu).toBeVisible();
+    await mobileMenu.locator('a[href="/faq"]').click();
     await expect(page).toHaveURL(/\/faq$/);
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByText("Frequently Asked Questions", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Frequently Asked Questions" })).toBeVisible();
   });
 });
 

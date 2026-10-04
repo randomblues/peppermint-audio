@@ -1,8 +1,26 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminLogin } from "./admin-login";
 
+const { replace } = vi.hoisted(() => ({
+  replace: vi.fn(),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace }),
+}));
+
 describe("AdminLogin", () => {
+  beforeEach(() => {
+    replace.mockReset();
+  });
+
+  it("includes a hidden page-level heading for accessibility", () => {
+    render(<AdminLogin />);
+
+    expect(screen.getByRole("heading", { level: 1, name: "Admin login" })).toHaveClass("sr-only");
+  });
+
   it("shows the API error", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
       ok: false,
@@ -22,7 +40,6 @@ describe("AdminLogin", () => {
 
   it("redirects after a successful login", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     render(<AdminLogin />);
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "admin@example.com" } });
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "correct-password" } });
@@ -31,7 +48,7 @@ describe("AdminLogin", () => {
     await waitFor(() => expect(fetch).toHaveBeenCalledWith("/api/admin/login", expect.objectContaining({
       method: "POST",
     })));
-    consoleError.mockRestore();
+    expect(replace).toHaveBeenCalledWith("/admin");
   });
 
   it("shows a useful message when the login response is empty", async () => {

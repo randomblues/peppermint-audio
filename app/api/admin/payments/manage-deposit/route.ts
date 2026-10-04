@@ -7,7 +7,7 @@ import { getStripe } from "@/lib/stripe";
 
 export async function POST(request: Request) {
   const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: { bookingId?: string; action?: "release" | "capture" | "bank_transfer_received" | "bank_transfer_deposit_refunded"; amount?: unknown };
   try {

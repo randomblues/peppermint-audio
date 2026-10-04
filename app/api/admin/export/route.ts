@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { PHOTO_ID_BUCKET } from "@/lib/supabase";
 export async function POST(request: Request) {
   const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await request.json() as { from?: string; to?: string; confirm?: boolean };
   if (!body.confirm || !body.from || !body.to || body.from > body.to) return NextResponse.json({ error: "A valid date range and explicit confirmation are required." }, { status: 400 });
   const { data, error } = await session.admin.from("bookings").select("*").gte("pickup_date", body.from).lte("pickup_date", body.to).order("pickup_date");

@@ -27,6 +27,7 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
     <Section
       eyebrow="Contact"
       title="Get in touch"
+      headingAs="h1"
       description="Have a question, want to enquire about a package, or need help planning your event? Send us a message and we will get back to you."
     >
       <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
