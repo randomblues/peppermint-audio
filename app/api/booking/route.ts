@@ -93,7 +93,7 @@ export async function POST(request: Request) {
       }
       await updateBooking({ calendar_event_link: calendarEventLink, calendar_error: calendarError });
       const text = [
-      "New audio equipment booking", `Booking reference: ${bookingReference}`, `Name: ${data.firstName} ${data.lastName}`, `Email: ${data.email}`, `Mobile: ${data.mobile}`,
+      "New audio equipment booking", `Booking Reference: ${bookingReference}`, `Name: ${data.firstName} ${data.lastName}`, `Email: ${data.email}`, `Mobile: ${data.mobile}`,
       `Event type: ${data.eventType}`, `Event address: ${data.eventAddress}`,
       `Pickup: ${data.pickupDate} at ${data.pickupTime}`, `Drop-off: ${data.dropoffDate} at ${data.dropoffTime}`, "",
       `Hire items: ${hireItemsSummary || "None specified"}`, "",
@@ -112,7 +112,7 @@ export async function POST(request: Request) {
         title: "A new request needs review",
         intro: "A customer has submitted a booking request with photo ID. Review availability before confirming it.",
         content: emailPanel(emailDetailsTable([
-          { label: "Reference", value: bookingReference },
+          { label: "Booking Reference:", value: bookingReference },
           { label: "Customer", value: `${data.firstName} ${data.lastName}` },
           { label: "Email", value: data.email },
           { label: "Mobile", value: data.mobile },
@@ -129,7 +129,7 @@ export async function POST(request: Request) {
         title: "Thanks for your request",
         intro: "We have received your booking request and photo ID. Your request is not confirmed yet; our team will review availability and be in touch shortly.",
         content: emailPanel(emailDetailsTable([
-          { label: "Booking reference", value: bookingReference },
+          { label: "Booking Reference:", value: bookingReference },
           { label: "Event", value: data.eventType },
           { label: "Address", value: data.eventAddress },
           { label: "Pickup", value: `${formatEmailDate(data.pickupDate)} at ${data.pickupTime}` },
@@ -140,7 +140,7 @@ export async function POST(request: Request) {
       const customerEmail = resend.emails.send({
       from: fromEmail, to: [data.email], replyTo: toEmail, subject: "Your booking request has been received",
       text: [
-        `Hi ${data.firstName},`, "", "Thanks for submitting your booking request to Peppermint Audio.", "", `Booking reference: ${bookingReference}`, "",
+        `Hi ${data.firstName},`, "", "Thanks for submitting your booking request to Peppermint Audio.", "", `Booking Reference: ${bookingReference}`, "",
         `Event: ${data.eventType}`, `Event address: ${data.eventAddress}`, `Pickup: ${formatEmailDate(data.pickupDate)} at ${data.pickupTime}`,
         `Drop-off: ${formatEmailDate(data.dropoffDate)} at ${data.dropoffTime}`,
         `Hire items: ${hireItemsSummary || "None specified"}`,

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminConsole } from "./admin-console";
 
@@ -99,7 +99,12 @@ describe("AdminConsole", () => {
     fireEvent.click(await screen.findByText("Alex Smith"));
     expect(screen.getAllByText("Booking reference: PA-ONE").length).toBeGreaterThan(0);
     expect(screen.getByText("PA-ONE")).toBeInTheDocument();
+    expect(screen.getByLabelText("Update booking status")).toHaveClass("appearance-none", "pr-9");
     expect(screen.getAllByRole("heading", { name: "Hire items" })).toHaveLength(1);
+    const savedHireItems = screen.getByRole("heading", { name: "Hire items" }).closest("section")!;
+    const savedHireItem = within(savedHireItems).getByText("Wireless microphone");
+    const savedHireItemsTotal = within(savedHireItems).getByLabelText("Hire items total");
+    expect(savedHireItem.compareDocumentPosition(savedHireItemsTotal) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const additionalDetails = screen.getByRole("heading", { name: "Additional details" });
     const internalNotes = screen.getByRole("heading", { name: "Internal notes" });
     const paymentCollection = screen.getByRole("button", { name: "Open payment collection" });

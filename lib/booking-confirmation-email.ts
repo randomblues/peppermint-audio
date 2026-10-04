@@ -50,7 +50,7 @@ export function buildBookingConfirmationEmail(details: BookingConfirmationDetail
     "",
     "Your booking with Peppermint Audio has been confirmed.",
     "",
-    ...(details.bookingReference ? [`Booking reference: ${details.bookingReference}`, ""] : []),
+    ...(details.bookingReference ? [`Booking Reference: ${details.bookingReference}`, ""] : []),
     `Event: ${details.eventType}`,
     `Pickup: ${pickup}`,
     `Drop-off: ${dropoff}`,
@@ -67,7 +67,7 @@ export function buildBookingConfirmationEmail(details: BookingConfirmationDetail
     intro: `Thank you${details.firstName.trim() ? `, ${escapeEmailHtml(details.firstName.trim())}` : ""}. Your request has been reviewed and confirmed by our team.`,
     content: `
       ${emailPanel(emailDetailsTable([
-        ...(details.bookingReference ? [{ label: "Reference", value: details.bookingReference }] : []),
+        ...(details.bookingReference ? [{ label: "Booking Reference:", value: details.bookingReference }] : []),
         { label: "Event", value: details.eventType },
         { label: "Pickup", value: pickup },
         { label: "Drop-off", value: dropoff },

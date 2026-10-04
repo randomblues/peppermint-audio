@@ -136,7 +136,7 @@ export default function RootLayout({
           <MarketingAttribution />
           <CartProvider>
             <Navbar />
-            <main className="flex-1 bg-background pb-20 md:pb-0">{children}</main>
+            <main className="site-shell flex-1 bg-background pb-20 md:pb-0">{children}</main>
             <Footer />
             <MobileContactBar />
           </CartProvider>

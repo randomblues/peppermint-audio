@@ -66,6 +66,8 @@ describe("invoice PDF generation", () => {
     const pdfText = extractCompressedPdfText(pdfBytes);
     expect(pdfBytes.toString("latin1")).toContain("/Subtype /Image");
     expect(pdfText).toContain("Tax Invoice");
+    expect(pdfText).toContain("Booking Reference:");
+    expect(pdfText).toContain("PA-ABC12345");
     expect(pdfText).toContain("FROM");
     expect(pdfText).toContain("Peppermint Audio");
     expect(pdfText).toContain("ABN 44 506 480 694");

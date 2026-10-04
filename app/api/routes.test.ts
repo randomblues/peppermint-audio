@@ -426,6 +426,7 @@ describe("admin export, authentication, and photo routes", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("set-cookie")).toContain("supabase-access-token=access");
     expect(response.headers.get("set-cookie")).toContain("supabase-refresh-token=refresh");
+    expect(response.headers.get("set-cookie")).toContain("Max-Age=2592000");
     expect((await login(jsonRequest("/api/admin/login", { email: "", password: "secret" }))).status).toBe(400);
     mocks.createAuthClient.mockReturnValue({ auth: { signInWithPassword: vi.fn().mockResolvedValue({ data: { session: null }, error: { message: "bad" } }) } });
     expect((await login(jsonRequest("/api/admin/login", { email: "admin@example.com", password: "bad" }))).status).toBe(401);

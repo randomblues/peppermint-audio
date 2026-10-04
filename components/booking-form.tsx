@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { FileImage, Upload, X } from "lucide-react";
 
 import { useCart } from "@/components/cart-provider";
 import { DatePicker } from "@/components/date-picker";
@@ -36,6 +37,32 @@ const initialValues: BookingInputValues = {
   additionalDetails: "",
   termsAccepted: "",
 };
+
+const bookingSteps = [
+  {
+    title: "Your details",
+    description: "Share your contact details so we can confirm availability with you.",
+  },
+  {
+    title: "Event details",
+    description: "Tell us where and when your hire is happening.",
+  },
+  {
+    title: "Review your hire",
+    description: "Check your selected items and add any extra setup notes.",
+  },
+  {
+    title: "Photo ID and terms",
+    description: "Upload your ID and accept the hire terms to submit your request.",
+  },
+] as const;
+
+const stepFields: Array<Array<keyof BookingInputValues | "idFiles">> = [
+  ["firstName", "lastName", "email", "mobile"],
+  ["eventType", "eventAddress", "pickupDate", "dropoffDate", "pickupTime", "dropoffTime"],
+  ["hireLineItems", "additionalDetails"],
+  ["idFiles", "termsAccepted"],
+];
 
 type FormState = BookingInputValues & { idFiles: File[] };
 
@@ -77,6 +104,11 @@ export function BookingForm() {
   const [serverError, setServerError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState<string | null>(null);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [step4SubmitAttempted, setStep4SubmitAttempted] = useState(false);
+  const [idFilesTouched, setIdFilesTouched] = useState(false);
+  const [termsTouched, setTermsTouched] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const cartJson = JSON.stringify(items);
   const lineItems: BookingLineItem[] = lineItemsFromCart(cartJson);
@@ -99,11 +131,20 @@ export function BookingForm() {
   }, [values]);
 
   function update(name: keyof BookingInputValues, value: string) {
-    setValues((current) => ({ ...current, [name]: value }));
+    setValues((current) => {
+      if (name === "pickupDate" && current.dropoffDate && value && current.dropoffDate < value) {
+        return { ...current, pickupDate: value, dropoffDate: "", dropoffTime: "" };
+      }
+      return { ...current, [name]: value };
+    });
+    if (name === "termsAccepted") {
+      setTermsTouched(true);
+    }
     setErrors((current) => ({ ...current, [name]: "" }));
+    if (serverError) setServerError("");
   }
 
-  function validate(requestValues: BookingInputValues) {
+  function collectValidationErrors(requestValues: BookingInputValues) {
     const result = bookingSchema.safeParse(requestValues);
     const nextErrors: Record<string, string> = {};
     if (!result.success) {
@@ -114,12 +155,64 @@ export function BookingForm() {
     }
     if (!lineItems.length) nextErrors.hireLineItems = "Please select at least one hire item before submitting.";
     if (values.idFiles.length !== 2) nextErrors.idFiles = "Please upload the front and back of your photo ID.";
+    return nextErrors;
+  }
+
+  function validate(requestValues: BookingInputValues) {
+    const nextErrors = collectValidationErrors(requestValues);
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   }
 
+  function validateCurrentStep() {
+    const requestValues = { ...values, hireLineItems: JSON.stringify(lineItems) };
+    const allErrors = collectValidationErrors(requestValues);
+    const activeStepFields = stepFields[currentStep] ?? [];
+    const stepErrors: Record<string, string> = {};
+    for (const field of activeStepFields) {
+      if (allErrors[field]) stepErrors[field] = allErrors[field];
+    }
+    setErrors(stepErrors);
+    return Object.keys(stepErrors).length === 0;
+  }
+
+  function updateIdFiles(incomingFiles: File[]) {
+    const selected = incomingFiles.slice(0, 2);
+    setValues((current) => ({ ...current, idFiles: selected }));
+    setIdFilesTouched(true);
+    setErrors((current) => ({ ...current, idFiles: "" }));
+  }
+
+  function removeIdFile(indexToRemove: number) {
+    setValues((current) => ({
+      ...current,
+      idFiles: current.idFiles.filter((_, index) => index !== indexToRemove),
+    }));
+    setIdFilesTouched(true);
+    setErrors((current) => ({ ...current, idFiles: "" }));
+  }
+
+  function goToNextStep() {
+    if (!validateCurrentStep()) return;
+    setCurrentStep((step) => {
+      const nextStep = Math.min(step + 1, bookingSteps.length - 1);
+      if (nextStep === 3) {
+        setStep4SubmitAttempted(false);
+        setIdFilesTouched(false);
+        setTermsTouched(false);
+        setErrors((current) => {
+          const { idFiles: _idFiles, termsAccepted: _termsAccepted, ...rest } = current;
+          return rest;
+        });
+      }
+      return nextStep;
+    });
+  }
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (currentStep !== bookingSteps.length - 1) return;
+    setStep4SubmitAttempted(true);
     const requestValues = { ...values, hireLineItems: JSON.stringify(lineItems) };
     if (!validate(requestValues)) return;
     setIsSubmitting(true);
@@ -161,86 +254,200 @@ export function BookingForm() {
   }
 
   return (
-    <Card className="mx-auto max-w-4xl">
+    <Card className="mx-auto max-w-4xl overflow-visible">
       <CardHeader>
         <CardTitle>Booking details</CardTitle>
-        <p className="text-sm text-muted-foreground">Tell us about your event and preferred hire times. We will confirm availability before your booking is accepted.</p>
+        <p className="text-sm text-muted-foreground">Complete each step below. We will review availability before confirming your booking.</p>
       </CardHeader>
       <CardContent>
         <form onSubmit={submit} className="space-y-8">
-          <section className="space-y-4">
-            <h2 className="text-lg font-semibold">Your details</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="First name" name="firstName" value={values.firstName} onChange={(value) => update("firstName", value)} error={errors.firstName} />
-              <Field label="Last name" name="lastName" value={values.lastName} onChange={(value) => update("lastName", value)} error={errors.lastName} />
-              <Field label="Email" name="email" type="email" value={values.email} onChange={(value) => update("email", value)} error={errors.email} />
-              <Field label="Mobile number" name="mobile" value={values.mobile} onChange={(value) => update("mobile", value)} error={errors.mobile} />
-            </div>
-          </section>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-foreground">Step {currentStep + 1} of {bookingSteps.length}</p>
+            <ol className="grid gap-2 sm:grid-cols-4">
+              {bookingSteps.map((step, index) => (
+                <li key={step.title} className={`rounded-md border px-3 py-2 text-xs ${index === currentStep ? "border-primary/50 bg-primary/10 text-foreground" : "border-border text-muted-foreground"}`}>
+                  <p className="font-medium">{index + 1}. {step.title}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
 
-          <section className="space-y-4">
-            <h2 className="text-lg font-semibold">Event and hire times</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Event type" name="eventType" value={values.eventType} onChange={(value) => update("eventType", value)} error={errors.eventType} placeholder="Wedding, party, presentation..." />
-              <Field label="Event address" name="eventAddress" value={values.eventAddress} onChange={(value) => update("eventAddress", value)} error={errors.eventAddress} />
-              <div className="space-y-1.5">
-                <Label>Pickup date</Label>
-                <DatePicker id="pickup-date" value={values.pickupDate} onChange={(value) => update("pickupDate", value)} onBlur={() => undefined} minDate={getMelbourneToday()} invalid={Boolean(errors.pickupDate)} />
-                {errors.pickupDate ? <p className="text-xs text-destructive">{errors.pickupDate}</p> : null}
+          <section className="space-y-4 rounded-xl border border-border/80 bg-background/35 p-4 sm:p-5">
+            <h2 className="text-lg font-semibold">{bookingSteps[currentStep].title}</h2>
+            <p className="text-sm text-muted-foreground">{bookingSteps[currentStep].description}</p>
+
+            {currentStep === 0 ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="First name" name="firstName" value={values.firstName} onChange={(value) => update("firstName", value)} error={errors.firstName} />
+                <Field label="Last name" name="lastName" value={values.lastName} onChange={(value) => update("lastName", value)} error={errors.lastName} />
+                <Field label="Email" name="email" type="email" value={values.email} onChange={(value) => update("email", value)} error={errors.email} />
+                <Field label="Mobile number" name="mobile" value={values.mobile} onChange={(value) => update("mobile", value)} error={errors.mobile} />
               </div>
-              <div className="space-y-1.5">
-                <Label>Drop-off date</Label>
-                <DatePicker id="dropoff-date" value={values.dropoffDate} onChange={(value) => update("dropoffDate", value)} onBlur={() => undefined} minDate={values.pickupDate || getMelbourneToday()} invalid={Boolean(errors.dropoffDate)} />
-                {errors.dropoffDate ? <p className="text-xs text-destructive">{errors.dropoffDate}</p> : null}
+            ) : null}
+
+            {currentStep === 1 ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Event type" name="eventType" value={values.eventType} onChange={(value) => update("eventType", value)} error={errors.eventType} placeholder="Wedding, party, presentation..." />
+                <Field label="Event address" name="eventAddress" value={values.eventAddress} onChange={(value) => update("eventAddress", value)} error={errors.eventAddress} />
+                <div className="space-y-1.5">
+                  <Label>Pickup date</Label>
+                  <DatePicker id="pickup-date" value={values.pickupDate} onChange={(value) => update("pickupDate", value)} onBlur={() => undefined} minDate={getMelbourneToday()} invalid={Boolean(errors.pickupDate)} />
+                  {errors.pickupDate ? <p className="text-xs text-destructive">{errors.pickupDate}</p> : null}
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Drop-off date</Label>
+                  <DatePicker
+                    id="dropoff-date"
+                    value={values.dropoffDate}
+                    onChange={(value) => update("dropoffDate", value)}
+                    onBlur={() => undefined}
+                    minDate={values.pickupDate || getMelbourneToday()}
+                    invalid={Boolean(errors.dropoffDate)}
+                    rangeStart={values.pickupDate}
+                    rangeEnd={values.dropoffDate}
+                  />
+                  {errors.dropoffDate ? <p className="text-xs text-destructive">{errors.dropoffDate}</p> : null}
+                </div>
+                <TimePicker id="pickup-time" label="Pickup time" value={values.pickupTime} onChange={(value) => update("pickupTime", value)} error={errors.pickupTime} />
+                <TimePicker id="dropoff-time" label="Drop-off time" value={values.dropoffTime} onChange={(value) => update("dropoffTime", value)} error={errors.dropoffTime} />
               </div>
-              <TimePicker id="pickup-time" label="Pickup time" value={values.pickupTime} onChange={(value) => update("pickupTime", value)} error={errors.pickupTime} />
-              <TimePicker id="dropoff-time" label="Drop-off time" value={values.dropoffTime} onChange={(value) => update("dropoffTime", value)} error={errors.dropoffTime} />
-            </div>
-          </section>
+            ) : null}
 
-          <section className="space-y-3">
-            <h2 className="text-lg font-semibold">Selected hire items</h2>
-            {lineItems.length ? (
-              <ul className="divide-y rounded-lg border">
-                {lineItems.map((item) => <li key={item.id} className="flex justify-between gap-4 px-4 py-3 text-sm"><span>{item.quantity} × {item.name}{item.option ? <span className="block text-muted-foreground">{item.option}</span> : null}</span><span className="shrink-0 font-medium">${((item.unitPriceCents * item.quantity) / 100).toFixed(2)}</span></li>)}
-              </ul>
-            ) : (
-              <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">Your cart is empty. <Link href="/equipment" className="font-medium underline">Browse equipment</Link> before submitting.</p>
-            )}
-            {errors.hireLineItems ? <p className="text-xs text-destructive">{errors.hireLineItems}</p> : null}
-          </section>
+            {currentStep === 2 ? (
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  <h3 className="text-base font-semibold">Selected hire items</h3>
+                  {lineItems.length ? (
+                    <ul className="divide-y rounded-lg border">
+                      {lineItems.map((item) => <li key={item.id} className="flex justify-between gap-4 px-4 py-3 text-sm"><span>{item.quantity} × {item.name}{item.option ? <span className="block text-muted-foreground">{item.option}</span> : null}</span><span className="shrink-0 font-medium">${((item.unitPriceCents * item.quantity) / 100).toFixed(2)}</span></li>)}
+                    </ul>
+                  ) : (
+                    <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">Your cart is empty. <Link href="/equipment" className="font-medium underline">Browse equipment</Link> before submitting.</p>
+                  )}
+                  {errors.hireLineItems ? <p className="text-xs text-destructive">{errors.hireLineItems}</p> : null}
+                </div>
 
-          <section className="space-y-3">
-            <h2 className="text-lg font-semibold">Anything else?</h2>
-            <Label htmlFor="additionalDetails">Additional details or access requirements <span className="font-normal text-muted-foreground">(optional)</span></Label>
-            <Textarea id="additionalDetails" value={values.additionalDetails} onChange={(event) => update("additionalDetails", event.target.value)} placeholder="Venue access, setup notes, or special requirements..." className="min-h-28" />
-            {errors.additionalDetails ? <p className="text-xs text-destructive">{errors.additionalDetails}</p> : null}
-          </section>
+                <div className="space-y-3">
+                  <h3 className="text-base font-semibold">Anything else?</h3>
+                  <Label htmlFor="additionalDetails">Additional details or access requirements <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                  <Textarea id="additionalDetails" value={values.additionalDetails} onChange={(event) => update("additionalDetails", event.target.value)} placeholder="Venue access, setup notes, or special requirements..." className="min-h-28" />
+                  {errors.additionalDetails ? <p className="text-xs text-destructive">{errors.additionalDetails}</p> : null}
+                </div>
+              </div>
+            ) : null}
 
-          <section className="space-y-3">
-            <h2 className="text-lg font-semibold">Photo ID and terms</h2>
-            <p className="text-sm text-muted-foreground">Upload clear images of the front and back of your valid photo ID. Each file must be 1.5 MB or smaller.</p>
-            <Input type="file" accept="image/*,.pdf" multiple onChange={(event) => {
-              const selected = Array.from(event.target.files ?? []).slice(0, 2);
-              setValues((current) => ({ ...current, idFiles: selected }));
-              setErrors((current) => ({ ...current, idFiles: "" }));
-              event.currentTarget.value = "";
-            }} />
-            {values.idFiles.length ? <p className="text-sm text-muted-foreground">{values.idFiles.map((file) => file.name).join(", ")}</p> : null}
-            {errors.idFiles ? <p className="text-xs text-destructive">{errors.idFiles}</p> : null}
-            <details className="rounded-lg border px-4 py-3">
-              <summary className="cursor-pointer font-medium">Read the PA Equipment Hire Terms & Conditions</summary>
-              <div className="space-y-3 pt-4 text-sm text-muted-foreground">{hireTerms.map((term) => <div key={term.title}><p className="font-medium text-foreground">{term.title}</p><p>{term.body}</p></div>)}</div>
-            </details>
-            <label className="flex items-start gap-3 text-sm">
-              <input type="checkbox" className="mt-1 size-4 accent-primary" checked={values.termsAccepted === "accepted"} onChange={(event) => update("termsAccepted", event.target.checked ? "accepted" : "")} />
-              <span>I have read and agree to the PA Equipment Hire Terms & Conditions.</span>
-            </label>
-            {errors.termsAccepted ? <p className="text-xs text-destructive">{errors.termsAccepted}</p> : null}
+            {currentStep === 3 ? (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">Upload clear images of the front and back of your valid photo ID. Each file must be 1.5 MB or smaller.</p>
+                <div
+                  data-testid="photo-id-dropzone"
+                  className={`rounded-xl border border-dashed p-5 transition-all duration-200 ${isDragOver ? "border-primary bg-primary/8 ring-4 ring-primary/20 shadow-[0_0_0_1px_color-mix(in_oklab,var(--primary)_45%,transparent),0_16px_40px_rgb(0_0_0/0.25)]" : "border-input bg-muted/30 hover:border-primary/35 hover:bg-primary/5"}`}
+                  onDragEnter={(event) => {
+                    event.preventDefault();
+                    setIsDragOver(true);
+                  }}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setIsDragOver(true);
+                  }}
+                  onDragLeave={(event) => {
+                    event.preventDefault();
+                    setIsDragOver(false);
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setIsDragOver(false);
+                    updateIdFiles(Array.from(event.dataTransfer.files ?? []));
+                  }}
+                >
+                  <div className="flex flex-col items-center gap-2 text-center">
+                    <div className={`rounded-full border bg-background p-2 text-primary transition-all duration-200 ${isDragOver ? "border-primary/55 shadow-[0_0_24px_color-mix(in_oklab,var(--primary)_35%,transparent)]" : "border-border"}`}>
+                      <Upload className="size-5" aria-hidden="true" />
+                    </div>
+                    <p className="text-sm font-medium text-foreground">{isDragOver ? "Drop files to upload" : "Drag and drop your photo ID files here"}</p>
+                    <p className="text-xs text-muted-foreground">Front and back images or PDF, up to 2 files total.</p>
+                    <Input
+                      id="photo-id-files"
+                      type="file"
+                      accept="image/*,.pdf"
+                      multiple
+                      className="sr-only"
+                      onChange={(event) => {
+                        updateIdFiles(Array.from(event.target.files ?? []));
+                        event.currentTarget.value = "";
+                      }}
+                    />
+                    <Label htmlFor="photo-id-files" className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-input bg-background px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:border-primary hover:text-primary">
+                      <FileImage className="size-4" aria-hidden="true" />
+                      Choose files
+                    </Label>
+                  </div>
+                </div>
+                {values.idFiles.length ? (
+                  <ul className="flex flex-wrap gap-2">
+                    {values.idFiles.map((file, index) => (
+                      <li key={`${file.name}-${index}`}>
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/8 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary/45 hover:bg-primary/14"
+                          onClick={() => removeIdFile(index)}
+                          aria-label={`Remove ${file.name}`}
+                        >
+                          <FileImage className="size-3.5 text-primary" aria-hidden="true" />
+                          <span className="max-w-44 truncate">{file.name}</span>
+                          <X className="size-3 text-muted-foreground" aria-hidden="true" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No files selected yet.</p>
+                )}
+                {(step4SubmitAttempted || idFilesTouched) && errors.idFiles ? <p className="text-xs text-destructive">{errors.idFiles}</p> : null}
+                <details className="rounded-lg border px-4 py-3">
+                  <summary className="cursor-pointer font-medium">Read the PA Equipment Hire Terms & Conditions</summary>
+                  <div className="space-y-3 pt-4 text-sm text-muted-foreground">{hireTerms.map((term) => <div key={term.title}><p className="font-medium text-foreground">{term.title}</p><p>{term.body}</p></div>)}</div>
+                </details>
+                <label className="flex items-start gap-3 text-sm">
+                  <input type="checkbox" className="mt-1 size-4 accent-primary" checked={values.termsAccepted === "accepted"} onChange={(event) => update("termsAccepted", event.target.checked ? "accepted" : "")} />
+                  <span>I have read and agree to the PA Equipment Hire Terms & Conditions.</span>
+                </label>
+                {(step4SubmitAttempted || termsTouched) && errors.termsAccepted ? <p className="text-xs text-destructive">{errors.termsAccepted}</p> : null}
+              </div>
+            ) : null}
           </section>
 
           {serverError ? <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{serverError}</p> : null}
-          <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>{isSubmitting ? "Submitting..." : "Submit a Booking Request"}</Button>
+
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={(event) => {
+                event.preventDefault();
+                setCurrentStep((step) => Math.max(step - 1, 0));
+              }}
+              className={currentStep === 0 ? "invisible" : ""}
+            >
+              Back
+            </Button>
+            {currentStep < bookingSteps.length - 1 ? (
+              <Button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  goToNextStep();
+                }}
+                className="w-full sm:w-auto"
+              >
+                Next
+              </Button>
+            ) : (
+              <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>
+                {isSubmitting ? "Submitting..." : "Submit a Booking Request"}
+              </Button>
+            )}
+          </div>
         </form>
       </CardContent>
     </Card>

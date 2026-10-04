@@ -17,7 +17,7 @@ describe("buildBookingConfirmationEmail", () => {
 
     expect(email.subject).toBe("Your booking with Peppermint Audio has been confirmed.");
     expect(email.text).toContain("Your booking with Peppermint Audio has been confirmed.");
-    expect(email.text).toContain("Booking reference: PA-1234567890AB");
+    expect(email.text).toContain("Booking Reference: PA-1234567890AB");
     expect(email.text).toContain("Wireless Microphone Upgrade");
     expect(email.text).toContain("Pickup: 9 October 2026 at 10:00");
     expect(email.html).toContain("Drop-off");

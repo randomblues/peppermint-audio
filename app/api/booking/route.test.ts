@@ -170,7 +170,7 @@ describe("POST /api/booking", () => {
     }));
     expect(send).toHaveBeenCalledWith(expect.objectContaining({
       to: ["alex@example.com"],
-      text: expect.stringContaining(`Booking reference: ${body.bookingReference}`),
+      text: expect.stringContaining(`Booking Reference: ${body.bookingReference}`),
     }));
   });
 

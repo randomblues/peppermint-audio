@@ -12,6 +12,8 @@ type DatePickerProps = {
   onBlur: () => void;
   invalid?: boolean;
   minDate?: string;
+  rangeStart?: string;
+  rangeEnd?: string;
 };
 
 const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -44,9 +46,19 @@ function formatDisplayDate(date: Date | null) {
   }).format(date);
 }
 
-export function DatePicker({ id, value, onChange, onBlur, invalid = false, minDate }: DatePickerProps) {
+export function DatePicker({
+  id,
+  value,
+  onChange,
+  onBlur,
+  invalid = false,
+  minDate,
+  rangeStart = "",
+  rangeEnd = "",
+}: DatePickerProps) {
   const selectedDate = parseDate(value);
   const [open, setOpen] = useState(false);
+  const [hoveredDate, setHoveredDate] = useState("");
   const [visibleMonth, setVisibleMonth] = useState(
     () => selectedDate ?? new Date(),
   );
@@ -55,6 +67,7 @@ export function DatePicker({ id, value, onChange, onBlur, invalid = false, minDa
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
       if (!pickerRef.current?.contains(event.target as Node)) {
+        setHoveredDate("");
         setOpen(false);
         onBlur();
       }
@@ -66,6 +79,9 @@ export function DatePicker({ id, value, onChange, onBlur, invalid = false, minDa
 
   const year = visibleMonth.getFullYear();
   const month = visibleMonth.getMonth();
+  const activeRangeEnd = rangeEnd || value;
+  const visualRangeEnd = hoveredDate || activeRangeEnd;
+  const hasRange = Boolean(rangeStart && visualRangeEnd && rangeStart <= visualRangeEnd);
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const days = Array.from({ length: firstDay + daysInMonth }, (_, index) =>
@@ -79,6 +95,7 @@ export function DatePicker({ id, value, onChange, onBlur, invalid = false, minDa
   function selectDay(day: number) {
     const date = new Date(year, month, day);
     onChange(formatDateValue(date));
+    setHoveredDate("");
     setOpen(false);
     onBlur();
   }
@@ -96,7 +113,11 @@ export function DatePicker({ id, value, onChange, onBlur, invalid = false, minDa
           value ? "text-foreground" : "text-muted-foreground",
           invalid && "border-destructive ring-3 ring-destructive/20",
         )}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => {
+          setHoveredDate("");
+          setOpen((current) => !current);
+        }}
+        onMouseLeave={() => setHoveredDate("")}
       >
         <span>{formatDisplayDate(selectedDate)}</span>
         <CalendarDays className="size-4 text-muted-foreground" />
@@ -143,20 +164,41 @@ export function DatePicker({ id, value, onChange, onBlur, invalid = false, minDa
               const date = day ? new Date(year, month, day) : null;
               const dateValue = date ? formatDateValue(date) : "";
               const isBeforeMinDate = Boolean(minDate && dateValue < minDate);
-
+              const isRangeStart = Boolean(rangeStart && dateValue === rangeStart);
+              const isRangeEnd = Boolean(hasRange && visualRangeEnd && dateValue === visualRangeEnd);
+              const isWithinRange = Boolean(hasRange && dateValue > rangeStart && dateValue < visualRangeEnd);
+              const isStandaloneSelected = !rangeStart && dateValue === value;
               return (
-                <span key={`${dateValue}-${index}`} className="p-0.5">
+                <span
+                  key={`${dateValue}-${index}`}
+                  data-range-start={isRangeStart ? "true" : undefined}
+                  data-range-end={isRangeEnd ? "true" : undefined}
+                  data-range-middle={isWithinRange ? "true" : undefined}
+                  className={cn(
+                    "rounded-md p-0.5",
+                    isWithinRange && "bg-primary/18",
+                    isRangeStart && "bg-gradient-to-r from-primary/22 to-primary/10",
+                    isRangeEnd && "bg-gradient-to-l from-primary/22 to-primary/10",
+                  )}
+                >
                   {day ? (
                     <button
                       type="button"
                       aria-label={date?.toLocaleDateString("en-AU")}
-                      aria-pressed={dateValue === value}
+                      aria-pressed={isRangeStart || isRangeEnd || isStandaloneSelected}
                       className={cn(
                         "flex aspect-square w-full items-center justify-center rounded-md text-sm hover:bg-muted",
-                        dateValue === value && "bg-primary text-primary-foreground hover:bg-primary/90",
+                        (isRangeStart || isRangeEnd || isStandaloneSelected) && "bg-primary text-primary-foreground hover:bg-primary/90",
+                        isWithinRange && "rounded-sm bg-primary/25 text-foreground hover:bg-primary/30",
                         isBeforeMinDate && "cursor-not-allowed text-muted-foreground/40 hover:bg-transparent",
                       )}
                       disabled={isBeforeMinDate}
+                      onMouseEnter={() => {
+                        if (rangeStart && !isBeforeMinDate) setHoveredDate(dateValue);
+                      }}
+                      onFocus={() => {
+                        if (rangeStart && !isBeforeMinDate) setHoveredDate(dateValue);
+                      }}
                       onClick={() => selectDay(day)}
                     >
                       {day}

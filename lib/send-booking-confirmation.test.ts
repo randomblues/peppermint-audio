@@ -40,7 +40,7 @@ describe("sendBookingConfirmationEmail", () => {
       text: expect.not.stringContaining("Same-day pickup details:"),
     }));
     expect(send).toHaveBeenCalledWith(expect.objectContaining({
-      text: expect.stringContaining("Booking reference: PA-1234567890AB"),
+      text: expect.stringContaining("Booking Reference: PA-1234567890AB"),
     }));
   });
 

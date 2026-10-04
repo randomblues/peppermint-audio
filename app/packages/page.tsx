@@ -33,7 +33,7 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
     >
       <Tabs defaultValue={selectedPackage} className="w-full">
         <TabsList
-          className="!h-auto mx-auto grid w-full max-w-4xl grid-cols-1 gap-3 bg-transparent p-0 sm:grid-cols-3 sm:gap-2"
+          className="site-package-tabs !h-auto mx-auto grid w-full max-w-4xl grid-cols-1 gap-3 rounded-2xl border border-primary/10 bg-primary/[0.03] p-2 sm:grid-cols-3 sm:gap-2"
           variant="default"
         >
           {packageTiers.map((pkg, index) => (

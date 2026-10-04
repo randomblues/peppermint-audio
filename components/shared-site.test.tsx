@@ -38,6 +38,14 @@ describe("Navbar", () => {
     expect(screen.getByRole("button", { name: "Open menu" })).toBeInTheDocument();
   });
 
+  it("shows the brand logo in the opened mobile menu sheet", () => {
+    render(<Navbar />);
+    fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Peppermint Audio" });
+    expect(within(dialog).getByRole("img", { name: "Peppermint Audio" })).toBeInTheDocument();
+  });
+
   describe("EquipmentCard", () => {
     it("defaults to the pair option and carries a changed selection into the enquiry", () => {
       const item = {
@@ -70,10 +78,12 @@ describe("Navbar", () => {
         "true",
       );
       expect(screen.getByRole("button", { name: "Add to cart" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Add to cart" })).toHaveClass("rounded-xl");
       expect(screen.getByRole("button", { name: "View details" })).toHaveAttribute(
         "href",
         "/equipment/test-speaker",
       );
+      expect(screen.getByRole("button", { name: "View details" })).toHaveClass("rounded-xl");
       fireEvent.click(screen.getByRole("button", { name: "Add to cart" }));
 
       expect(JSON.parse(localStorage.getItem("peppermint-audio-cart") ?? "[]")).toEqual([
@@ -177,9 +187,10 @@ describe("PackageCard", () => {
     );
     expect(screen.queryByText("Optional add-ons")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add to cart" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add to cart" })).toHaveClass("h-11", "w-full");
+    expect(screen.getByRole("button", { name: "Add to cart" })).toHaveClass("h-11", "w-full", "rounded-xl");
     expect(screen.getByRole("button", { name: "View package details" })).toHaveClass(
       "w-full",
+      "rounded-xl",
       "text-muted-foreground",
     );
   });

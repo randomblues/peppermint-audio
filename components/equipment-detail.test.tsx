@@ -35,5 +35,6 @@ describe("EquipmentDetail", () => {
       "true",
     );
     expect(screen.getByRole("button", { name: "Add to cart" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add to cart" })).toHaveClass("rounded-xl");
   });
 });

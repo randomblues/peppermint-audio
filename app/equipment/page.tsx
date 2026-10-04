@@ -14,7 +14,7 @@ export const metadata = createPageMetadata({
 export default function EquipmentPage() {
   return (
     <Section
-      eyebrow="Individual equipment"
+      eyebrow="Individual equipments"
       title="Hire exactly what you need"
       description="You do not need to hire a full package. Choose a single item or a pair, select the setup that suits you, and send an enquiry for availability."
     >

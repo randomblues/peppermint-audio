@@ -13,7 +13,7 @@ import { business, howItWorks } from "@/lib/site-content";
 export default function Home() {
   return (
     <>
-      <section className="relative isolate overflow-hidden border-b">
+      <section className="site-hero relative isolate overflow-hidden border-b">
         <div className="pointer-events-none absolute inset-0 -z-20">
           <Image
             src={business.heroImage}
@@ -24,14 +24,16 @@ export default function Home() {
             className="scale-105 object-cover object-[75%_center] opacity-55"
           />
         </div>
-        <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-r from-background/90 via-background/65 to-background/25" />
-        <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-18 sm:px-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center lg:px-8">
-          <div className="max-w-2xl">
-            <Badge variant="secondary">Pickup from Abbotsford 3067</Badge>
+        <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-r from-background/75 via-background/40 to-background/15" />
+        <div className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-18 sm:px-6 lg:grid-cols-[1.12fr_0.88fr] lg:items-center lg:gap-8 lg:px-8">
+          <div className="site-hero-copy-panel max-w-2xl rounded-3xl border border-white/20 bg-background/45 p-6 backdrop-blur-md sm:p-8">
+            <Badge variant="secondary" className="site-hero-badge">
+              Pickup from Abbotsford 3067
+            </Badge>
             <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">
               {business.heroHeading}
             </h1>
-            <p className="mt-4 text-lg text-muted-foreground">{business.heroSubheading}</p>
+            <p className="mt-4 text-lg text-foreground/80">{business.heroSubheading}</p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Button
                 variant="outline"
@@ -59,31 +61,47 @@ export default function Home() {
               <span>Live gigs</span>
             </div>
           </div>
-          <Card className="border bg-background/85 backdrop-blur-md">
-            <CardHeader>
-              <p className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
-                Why Peppermint Audio?
-              </p>
+          <Card className="site-hero-panel hidden border border-white/20 bg-background/62 backdrop-blur-md md:block">
+            <CardHeader className="pb-4">
+              <div>
+                <div>
+                  <p className="text-lg font-medium tracking-tight text-foreground">
+                    Why Peppermint Audio?
+                  </p>
+                  <p className="mt-1 text-sm text-foreground/70">
+                    Everything considered for a smoother event.
+                  </p>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-5 text-sm">
-              <div className="divide-y rounded-lg border">
-                <div className="p-3">
-                  <p className="font-medium text-foreground">Complete from the start</p>
-                  <p className="mt-1 text-muted-foreground">
-                    Speakers, stands, microphones, mixer, and cables all included.
-                  </p>
+            <CardContent className="space-y-5 pt-0 text-sm">
+              <div className="site-benefit-list">
+                <div className="site-benefit-row">
+                  <span className="site-benefit-index">A</span>
+                  <div>
+                    <p className="font-medium text-foreground">Complete from the start</p>
+                    <p className="mt-1 text-muted-foreground">
+                      Speakers, stands, microphones, mixer, and cables all included.
+                    </p>
+                  </div>
                 </div>
-                <div className="p-3">
-                  <p className="font-medium text-foreground">Easy to run</p>
-                  <p className="mt-1 text-muted-foreground">
-                    Everything you need to get started with a straightforward plug-and-play setup.
-                  </p>
+                <div className="site-benefit-row">
+                  <span className="site-benefit-index">B</span>
+                  <div>
+                    <p className="font-medium text-foreground">Easy to run</p>
+                    <p className="mt-1 text-muted-foreground">
+                      Everything you need to get started with a straightforward plug-and-play setup.
+                    </p>
+                  </div>
                 </div>
-                <div className="p-3">
-                  <p className="font-medium text-foreground">Built around your event</p>
-                  <p className="mt-1 text-muted-foreground">
-                    Clear package options from $65, plus custom options when you need them.
-                  </p>
+                <div className="site-benefit-row">
+                  <span className="site-benefit-index">C</span>
+                  <div>
+                    <p className="font-medium text-foreground">Built around your event</p>
+                    <p className="mt-1 text-muted-foreground">
+                      Clear package options from $65, plus custom options when you need them.
+                    </p>
+                  </div>
                 </div>
               </div>
             </CardContent>

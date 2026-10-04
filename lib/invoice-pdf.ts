@@ -48,7 +48,7 @@ function aud(cents: number) {
   return `AUD $${(cents / 100).toFixed(2)}`;
 }
 
-function drawWrapped(page: ReturnType<PDFDocument["addPage"]>, text: string, x: number, y: number, width: number, size: number, font: Awaited<ReturnType<PDFDocument["embedFont"]>>, color = rgb(0.18, 0.2, 0.19)) {
+function wrappedLines(text: string, width: number, size: number, font: Awaited<ReturnType<PDFDocument["embedFont"]>>) {
   const words = pdfText(text).split(/\s+/);
   const lines: string[] = [];
   let line = "";
@@ -62,13 +62,18 @@ function drawWrapped(page: ReturnType<PDFDocument["addPage"]>, text: string, x: 
     }
   }
   if (line) lines.push(line);
+  return lines;
+}
+
+function drawWrapped(page: ReturnType<PDFDocument["addPage"]>, text: string, x: number, y: number, width: number, size: number, font: Awaited<ReturnType<PDFDocument["embedFont"]>>, color = rgb(0.18, 0.2, 0.19)) {
+  const lines = wrappedLines(text, width, size, font);
   lines.forEach((current, index) => page.drawText(current, { x, y: y - index * (size + 4), size, font, color }));
   return y - lines.length * (size + 4);
 }
 
 export async function buildInvoicePdf(details: InvoicePdfDetails) {
   const document = await PDFDocument.create();
-  const page = document.addPage([pageWidth, pageHeight]);
+  let page = document.addPage([pageWidth, pageHeight]);
   const regular = await document.embedFont(StandardFonts.Helvetica);
   const bold = await document.embedFont(StandardFonts.HelveticaBold);
   const logoBytes = new Uint8Array(await readFile(join(process.cwd(), "public", "logo-white.png")));
@@ -81,14 +86,48 @@ export async function buildInvoicePdf(details: InvoicePdfDetails) {
   const logoWidth = 182;
   const logoHeight = logoWidth * (101 / 532);
   let y = pageHeight - margin;
+  const drawFooter = (targetPage: ReturnType<PDFDocument["addPage"]>) => {
+    targetPage.drawRectangle({ x: 0, y: 0, width: pageWidth, height: 88, color: dark });
+    const footerLogoWidth = 142;
+    const footerLogoHeight = footerLogoWidth * (101 / 532);
+    targetPage.drawImage(logo, { x: margin - 8, y: 49, width: footerLogoWidth, height: footerLogoHeight });
+    targetPage.drawText(pdfText(business.email), { x: margin, y: 34, size: 8, font: regular, color: rgb(0.73, 0.83, 0.77) });
+    targetPage.drawText(pdfText(business.phone), { x: margin, y: 21, size: 8, font: regular, color: rgb(0.73, 0.83, 0.77) });
+    const footerRightEdge = pageWidth - margin;
+    const drawFooterRight = (text: string, yPosition: number, size: number, font: typeof regular, color: ReturnType<typeof rgb>) => {
+      const value = pdfText(text);
+      targetPage.drawText(value, {
+        x: footerRightEdge - font.widthOfTextAtSize(value, size),
+        y: yPosition,
+        size,
+        font,
+        color,
+      });
+    };
+    drawFooterRight(`ABN ${business.abn}`, 58, 10, bold, rgb(0.9, 0.96, 0.92));
+    drawFooterRight(`Pickup and return: ${business.pickupSuburb} ${business.pickupPostcode}`, 34, 8, regular, rgb(0.73, 0.83, 0.77));
+    drawFooterRight(`Servicing ${business.serviceArea}`, 21, 8, regular, rgb(0.73, 0.83, 0.77));
+  };
 
   page.drawRectangle({ x: 0, y: pageHeight - 112, width: pageWidth, height: 112, color: dark });
-  page.drawImage(logo, { x: margin, y: pageHeight - 75, width: logoWidth, height: logoHeight });
-  page.drawText(pdfText(details.title), { x: margin + 12, y: pageHeight - 86, size: 12, font: regular, color: rgb(0.78, 0.9, 0.83) });
-  page.drawText(pdfText(`ABN ${business.abn}`), { x: margin + 12, y: pageHeight - 101, size: 8, font: regular, color: rgb(0.72, 0.84, 0.77) });
-  page.drawText(pdfText(details.documentNumber), { x: pageWidth - margin - 150, y: pageHeight - 58, size: 10, font: regular, color: rgb(1, 1, 1) });
-  page.drawText(pdfText(details.issuedAt), { x: pageWidth - margin - 150, y: pageHeight - 76, size: 9, font: regular, color: rgb(0.82, 0.84, 0.83) });
-  y = pageHeight - 148;
+  page.drawImage(logo, { x: margin - 9, y: pageHeight - 65, width: logoWidth, height: logoHeight });
+  page.drawText(pdfText(details.title), { x: margin, y: pageHeight - 72, size: 12, font: regular, color: rgb(0.78, 0.9, 0.83) });
+  page.drawText(pdfText(`ABN ${business.abn}`), { x: margin, y: pageHeight - 87, size: 8, font: regular, color: rgb(0.72, 0.84, 0.77) });
+  const headerRightColumnX = 390;
+  const drawHeaderRight = (text: string, yPosition: number, size: number, font: typeof regular, color: ReturnType<typeof rgb>) => {
+    const value = pdfText(text);
+    page.drawText(value, {
+      x: headerRightColumnX,
+      y: yPosition,
+      size,
+      font,
+      color,
+    });
+  };
+  drawHeaderRight("Booking Reference:", pageHeight - 43, 8, bold, rgb(0.78, 0.9, 0.83));
+  drawHeaderRight(details.documentNumber, pageHeight - 57, 10, regular, rgb(1, 1, 1));
+  drawHeaderRight(details.issuedAt, pageHeight - 73, 9, regular, rgb(0.82, 0.84, 0.83));
+  y = pageHeight - 140;
 
   page.drawText("FROM", { x: margin, y, size: 8, font: bold, color: green });
   page.drawText(pdfText(business.name), { x: margin, y: y - 19, size: 11, font: bold, color: dark });
@@ -160,14 +199,41 @@ export async function buildInvoicePdf(details: InvoicePdfDetails) {
     y = drawWrapped(page, details.paymentMethod, margin + 12, y - 43, pageWidth - margin * 2 - 24, 9, regular, muted);
     y -= 16;
   }
-  for (const note of details.notes) {
-    y = drawWrapped(page, note, margin + 12, y, pageWidth - margin * 2 - 24, 9, regular, muted);
-    y -= 7;
+  const paymentNote = details.notes.find((note) => note.startsWith("Pay securely online:"));
+  const otherNotes = details.notes.filter((note) => note !== paymentNote);
+  const paymentLines = paymentNote ? wrappedLines(paymentNote.replace("Pay securely online: ", ""), pageWidth - margin * 2 - 32, 8, regular) : [];
+  const paymentHeight = paymentNote ? 58 + Math.max(0, paymentLines.length - 1) * 12 : 0;
+  const noteWidth = pageWidth - margin * 2 - 28;
+  const noteLineCount = otherNotes.reduce((count, note) => count + wrappedLines(note, noteWidth - 12, 8, regular).length, 0);
+  const notesHeight = otherNotes.length ? 34 + noteLineCount * 12 + Math.max(0, otherNotes.length - 1) * 5 : 0;
+  if (paymentNote || otherNotes.length) {
+    const notesBlockHeight = (paymentNote ? paymentHeight + 12 : 0) + notesHeight;
+    if (y - notesBlockHeight < 104) {
+      drawFooter(page);
+      page = document.addPage([pageWidth, pageHeight]);
+      y = pageHeight - margin;
+    }
+  }
+  if (paymentNote) {
+    const paymentUrl = paymentNote.replace("Pay securely online: ", "");
+    const paymentTop = y;
+    page.drawRectangle({ x: margin, y: paymentTop - paymentHeight, width: pageWidth - margin * 2, height: paymentHeight, color: paleGreen });
+    page.drawText("ONLINE PAYMENT", { x: margin + 14, y: paymentTop - 17, size: 8, font: bold, color: green });
+    page.drawText("Pay securely online", { x: margin + 14, y: paymentTop - 34, size: 9, font: bold, color: dark });
+    drawWrapped(page, paymentUrl, margin + 14, paymentTop - 48, pageWidth - margin * 2 - 28, 8, regular, muted);
+    y = paymentTop - paymentHeight - 12;
+  }
+  if (otherNotes.length) {
+    const notesTop = y;
+    page.drawRectangle({ x: margin, y: notesTop - notesHeight, width: pageWidth - margin * 2, height: notesHeight, color: rgb(0.98, 0.99, 0.98) });
+    page.drawText("NOTES", { x: margin + 14, y: notesTop - 17, size: 8, font: bold, color: green });
+    let noteY = notesTop - 32;
+    for (const note of otherNotes) {
+      page.drawText("-", { x: margin + 14, y: noteY, size: 8, font: regular, color: green });
+      noteY = drawWrapped(page, note, margin + 26, noteY, noteWidth - 12, 8, regular, muted) - 5;
+    }
   }
 
-  page.drawRectangle({ x: 0, y: 0, width: pageWidth, height: 78, color: dark });
-  page.drawText(pdfText(`${business.name}  ·  ABN ${business.abn}`), { x: margin, y: 47, size: 9, font: bold, color: rgb(0.9, 0.96, 0.92) });
-  page.drawText(pdfText(`${business.email}  ·  ${business.phone}`), { x: margin, y: 32, size: 8, font: regular, color: rgb(0.73, 0.83, 0.77) });
-  page.drawText(pdfText(`Pickup and return: ${business.pickupSuburb} ${business.pickupPostcode}  ·  ${business.serviceArea}`), { x: margin, y: 19, size: 8, font: regular, color: rgb(0.73, 0.83, 0.77) });
+  drawFooter(page);
   return Buffer.from(await document.save());
 }

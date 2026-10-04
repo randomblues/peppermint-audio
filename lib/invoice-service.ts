@@ -122,6 +122,7 @@ export async function ensureInvoice(admin: AdminClient, booking: InvoiceBooking,
     if (paymentUrl !== undefined && existing.data.payment_url !== paymentUrl) {
       const update = await admin.from("invoices").update({ payment_url: paymentUrl, updated_at: new Date().toISOString() }).eq("id", existing.data.id);
       if (update.error) throw new Error(`Invoice payment link update failed: ${update.error.message}`);
+      existing.data.payment_url = paymentUrl;
     }
     return existing.data as InvoiceRecord;
   }
@@ -164,7 +165,10 @@ function documentSubject(documentType: BillingDocumentType, number: string, gstI
   return `${documentTitle(documentType, gstInclusive)} ${number} · Peppermint Audio`;
 }
 
-export function billingDocumentIntro(documentType: BillingDocumentType, customerName: string, gstInclusive = true) {
+export function billingDocumentIntro(documentType: BillingDocumentType, customerName: string, gstInclusive = true, updated = false) {
+  if (documentType === "invoice" && updated) {
+    return `Here is your updated ${documentTitle(documentType, gstInclusive)} for ${customerName}.`;
+  }
   return `Please find the attached ${documentTitle(documentType, gstInclusive).toLowerCase()} for ${customerName}.`;
 }
 
@@ -279,13 +283,16 @@ export async function sendBillingDocument(admin: AdminClient, bookingId: string,
   const emailRecipients = invoiceEmailRecipients(booking.email, recipient?.billToEmail);
   const customerName = recipient?.billToName || `${booking.first_name} ${booking.last_name}`;
   const gstInclusive = booking.gst_inclusive !== false;
-  const emailIntro = billingDocumentIntro(documentType, customerName, gstInclusive);
+  const emailIntro = billingDocumentIntro(documentType, customerName, gstInclusive, force && claim.record.status === "sent");
   const pdf = await buildInvoicePdf(details);
   const bodyText = [
     "Hello,",
     "",
     emailIntro,
-    `Booking reference: ${invoice.invoice_number}`,
+    `Booking Reference: ${invoice.invoice_number}`,
+    invoice.payment_url ? "Having trouble opening the payment page? No worries — copy and paste the link below into your browser." : "",
+    invoice.payment_url ? `Pay securely online: ${invoice.payment_url}` : "",
+    invoice.payment_url ? "Powered by Stripe." : "",
     `Event: ${booking.event_type}`,
     `Pickup: ${formatDate(booking.pickup_date)} · Return: ${formatDate(booking.dropoff_date)}`,
     booking.event_address ? `Event address: ${booking.event_address}` : "",
@@ -298,7 +305,7 @@ export async function sendBillingDocument(admin: AdminClient, bookingId: string,
     intro: escapeEmailHtml(emailIntro),
     content: `
       ${emailPanel(`
-        <p style="margin:0 0 6px;color:#668074;font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase">Booking reference</p>
+        <p style="margin:0 0 6px;color:#668074;font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase">Booking Reference:</p>
         <p style="margin:0;color:#1d2823;font-size:22px;font-weight:700;letter-spacing:.3px">${escapeEmailHtml(invoice.invoice_number)}</p>
       `, "accent")}
       ${emailPanel(emailDetailsTable([
@@ -308,6 +315,15 @@ export async function sendBillingDocument(admin: AdminClient, bookingId: string,
         { label: "Return", value: formatDate(booking.dropoff_date) },
         ...(booking.event_address ? [{ label: "Address", value: booking.event_address }] : []),
       ]))}
+      ${invoice.payment_url ? emailPanel(`
+        <p style="margin:0 0 10px;color:#1d2823;font-size:14px;line-height:1.6"><strong>Pay securely online</strong></p>
+        <a href="${escapeEmailHtml(invoice.payment_url)}" style="display:inline-block;padding:11px 18px;border-radius:7px;background:#2f7056;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none">Continue to secure payment</a>
+        <p style="margin:12px 0 0;color:#718078;font-size:12px;line-height:1.5">Having trouble opening the payment page? No worries &mdash; copy and paste the link below into your browser.</p>
+        <p style="margin:12px 0 0;color:#718078;font-size:12px;line-height:1.5;word-break:break-all">${escapeEmailHtml(invoice.payment_url)}</p>
+        <div style="margin-top:18px;padding-top:14px;border-top:1px solid #cfe5d6">
+          <p style="margin:0;color:#1d2823;font-size:13px;font-weight:700">Powered by Stripe</p>
+        </div>
+      `, "accent") : ""}
       ${invoice.payment_method === "cash_on_pickup" ? emailPanel("<p style=\"margin:0;color:#1d2823;font-size:14px;line-height:1.6\"><strong>Payment due in cash on pickup.</strong><br />Please bring the hire amount and refundable security deposit on the day of collection.</p>", "accent") : ""}
       <p style="margin:26px 0 0;color:#718078;font-size:13px;line-height:1.6">The detailed ${escapeEmailHtml(documentTitle(documentType, gstInclusive).toLowerCase())} is attached as a PDF for your records.</p>
     `,

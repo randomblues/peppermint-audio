@@ -48,4 +48,53 @@ describe("DatePicker", () => {
     expect(dateButtons.length).toBeGreaterThan(0);
     expect(dateButtons.every((button) => button.hasAttribute("disabled"))).toBe(true);
   });
+
+  it("shows a connected pickup-to-dropoff range when range props are provided", () => {
+    render(
+      <DatePicker
+        id="dropoff-date"
+        value="2026-10-18"
+        rangeStart="2026-10-15"
+        rangeEnd="2026-10-18"
+        onChange={vi.fn()}
+        onBlur={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "18 October 2026" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Choose event date" });
+    const startCell = within(dialog).getByRole("button", { name: "15/10/2026" }).parentElement;
+    const middleCell = within(dialog).getByRole("button", { name: "16/10/2026" }).parentElement;
+    const endCell = within(dialog).getByRole("button", { name: "18/10/2026" }).parentElement;
+
+    expect(startCell).toHaveAttribute("data-range-start", "true");
+    expect(middleCell).toHaveAttribute("data-range-middle", "true");
+    expect(endCell).toHaveAttribute("data-range-end", "true");
+  });
+
+  it("previews the range continuously while hovering drop-off dates", () => {
+    render(
+      <DatePicker
+        id="dropoff-date"
+        value=""
+        rangeStart="2026-10-18"
+        onChange={vi.fn()}
+        onBlur={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Select a date" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Choose event date" });
+    fireEvent.mouseEnter(within(dialog).getByRole("button", { name: "23/10/2026" }));
+
+    const rangeStartCell = within(dialog).getByRole("button", { name: "18/10/2026" }).parentElement;
+    const rangeMiddleCell = within(dialog).getByRole("button", { name: "21/10/2026" }).parentElement;
+    const rangeEndCell = within(dialog).getByRole("button", { name: "23/10/2026" }).parentElement;
+
+    expect(rangeStartCell).toHaveAttribute("data-range-start", "true");
+    expect(rangeMiddleCell).toHaveAttribute("data-range-middle", "true");
+    expect(rangeEndCell).toHaveAttribute("data-range-end", "true");
+  });
 });

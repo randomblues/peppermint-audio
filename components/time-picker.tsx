@@ -89,10 +89,11 @@ export function TimePicker({ id, label, value, onChange, error }: TimePickerProp
         aria-haspopup="dialog"
         aria-expanded={open}
         className={cn(
-          "flex h-12 w-full items-center justify-between rounded-lg border bg-background px-3 text-left text-base outline-none transition-colors sm:text-sm",
+          "group flex h-12 w-full items-center justify-between rounded-xl border border-border/80 bg-background/70 px-3 text-left text-base outline-none transition-[border-color,background-color,box-shadow] sm:text-sm",
           "[@media(pointer:coarse)]:hidden",
-          "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+          "hover:border-primary/35 hover:bg-background focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
           value ? "text-foreground" : "text-muted-foreground",
+          open && "border-primary/45 bg-background shadow-[0_0_0_1px_color-mix(in_oklab,var(--primary)_25%,transparent)]",
           error && "border-destructive ring-3 ring-destructive/20",
         )}
         onClick={() => {
@@ -103,10 +104,12 @@ export function TimePicker({ id, label, value, onChange, error }: TimePickerProp
         }}
       >
         <span className="flex items-center gap-2">
-          <Clock3 className="size-4 text-muted-foreground" />
+          <span className="inline-flex size-7 items-center justify-center rounded-md border border-border/80 bg-background/70">
+            <Clock3 className="size-3.5 text-muted-foreground" />
+          </span>
           {formatTime(value)}
         </span>
-        <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", open && "rotate-180")} />
+        <ChevronDown className={cn("size-4 text-muted-foreground transition-transform group-hover:text-foreground", open && "rotate-180")} />
       </button>
       <input
         id={id}
@@ -124,17 +127,22 @@ export function TimePicker({ id, label, value, onChange, error }: TimePickerProp
         <div
           role="dialog"
           aria-label={`Choose ${label.toLowerCase()}`}
-          className="absolute right-0 z-30 mt-2 w-[min(22rem,100%)] rounded-xl border bg-popover p-4 text-popover-foreground shadow-xl [@media(pointer:coarse)]:hidden"
+          className="absolute right-0 z-30 mt-2 w-[min(26rem,calc(100vw-1rem))] rounded-2xl border border-primary/20 bg-popover/96 p-4 text-popover-foreground shadow-[0_24px_48px_rgb(0_0_0/0.4)] backdrop-blur-xl [@media(pointer:coarse)]:hidden"
         >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold">{label}</p>
-              <p className="text-xs text-muted-foreground">Choose a preferred time</p>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <span className="mt-0.5 inline-flex size-8 items-center justify-center rounded-lg border border-primary/30 bg-primary/10">
+                <Clock3 className="size-4 text-primary" />
+              </span>
+              <div>
+                <p className="text-base font-semibold leading-tight">{label}</p>
+                <p className="mt-1 text-xs text-muted-foreground">Choose a preferred time</p>
+              </div>
             </div>
             <button
               type="button"
               aria-label={`Clear ${label.toLowerCase()}`}
-              className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="inline-flex size-8 items-center justify-center rounded-lg border border-border/80 text-muted-foreground hover:border-primary/30 hover:bg-muted hover:text-foreground"
               onClick={() => {
                 onChange("");
                 setDraft(parseTime(""));
@@ -145,39 +153,46 @@ export function TimePicker({ id, label, value, onChange, error }: TimePickerProp
             </button>
           </div>
 
-          <div className="mt-4 grid grid-cols-[1fr_auto_1fr_auto] items-end gap-2">
+          <div className="mt-4 rounded-xl border border-border/80 bg-background/55 p-3">
+            <div className="grid grid-cols-[1fr_auto_1fr_auto] items-end gap-2">
             <label className="space-y-1 text-xs font-medium text-muted-foreground">
               Hour
-              <select
-                aria-label={`${label} hour`}
-                value={draft.hour}
-                className="h-11 w-full rounded-lg border bg-background px-2 text-center text-lg font-semibold text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                onChange={(event) => updateDraft({ hour: event.target.value })}
-              >
-                {hours.map((hour) => <option key={hour}>{hour}</option>)}
-              </select>
+                <span className="relative block">
+                  <select
+                    aria-label={`${label} hour`}
+                    value={draft.hour}
+                    className="h-12 w-full appearance-none rounded-xl border border-primary/25 bg-background px-3 pr-10 text-center text-[2rem] leading-none font-semibold tracking-tight text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                    onChange={(event) => updateDraft({ hour: event.target.value })}
+                  >
+                    {hours.map((hour) => <option key={hour}>{hour}</option>)}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                </span>
             </label>
-            <span className="pb-2 text-xl font-semibold">:</span>
+            <span className="pb-3 text-3xl font-semibold text-primary/80">:</span>
             <label className="space-y-1 text-xs font-medium text-muted-foreground">
               Minute
-              <select
-                aria-label={`${label} minute`}
-                value={draft.minute}
-                className="h-11 w-full rounded-lg border bg-background px-2 text-center text-lg font-semibold text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                onChange={(event) => updateDraft({ minute: event.target.value })}
-              >
-                {minutes.map((minute) => <option key={minute}>{minute}</option>)}
-              </select>
+                <span className="relative block">
+                  <select
+                    aria-label={`${label} minute`}
+                    value={draft.minute}
+                    className="h-12 w-full appearance-none rounded-xl border border-primary/25 bg-background px-3 pr-10 text-center text-[2rem] leading-none font-semibold tracking-tight text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                    onChange={(event) => updateDraft({ minute: event.target.value })}
+                  >
+                    {minutes.map((minute) => <option key={minute}>{minute}</option>)}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                </span>
             </label>
-            <div className="flex h-11 overflow-hidden rounded-lg border">
+            <div className="flex h-12 overflow-hidden rounded-xl border border-border/90 bg-background/60 p-0.5">
               {(["AM", "PM"] as const).map((meridiem) => (
                 <button
                   key={meridiem}
                   type="button"
                   aria-pressed={draft.meridiem === meridiem}
                   className={cn(
-                    "w-12 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted",
-                    draft.meridiem === meridiem && "bg-primary text-primary-foreground hover:bg-primary/90",
+                    "w-14 rounded-[0.625rem] text-sm font-semibold tracking-wide text-muted-foreground transition-colors hover:bg-muted",
+                    draft.meridiem === meridiem && "bg-primary text-primary-foreground shadow-[0_8px_20px_color-mix(in_oklab,var(--primary)_35%,transparent)] hover:bg-primary/90",
                   )}
                   onClick={() => updateDraft({ meridiem })}
                 >
@@ -186,18 +201,28 @@ export function TimePicker({ id, label, value, onChange, error }: TimePickerProp
               ))}
             </div>
           </div>
+          </div>
 
-          <button
-            type="button"
-            className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-            onClick={() => {
-              onChange(toTimeValue(draft.hour, draft.minute, draft.meridiem));
-              setOpen(false);
-            }}
-          >
-            <Check className="size-4" />
-            Done
-          </button>
+          <div className="mt-4 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              className="inline-flex h-10 items-center justify-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              onClick={() => setOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-10 min-w-28 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              onClick={() => {
+                onChange(toTimeValue(draft.hour, draft.minute, draft.meridiem));
+                setOpen(false);
+              }}
+            >
+              <Check className="size-4" />
+              Done
+            </button>
+          </div>
         </div>
       ) : null}
       {error ? <p className="text-xs text-destructive">{error}</p> : null}

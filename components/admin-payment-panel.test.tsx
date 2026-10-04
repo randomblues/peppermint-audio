@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AdminPaymentPanel } from "./admin-payment-panel";
@@ -23,10 +23,38 @@ function booking(overrides: Record<string, unknown> = {}) {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
 describe("AdminPaymentPanel", () => {
+  it("shows that a fresh booking has not received a payment request", () => {
+    render(<AdminPaymentPanel booking={booking({ status: "submitted", hire_payment_status: "unpaid" })} onChanged={vi.fn()} />);
+
+    expect(screen.getByText("Payment request yet to be sent")).toBeInTheDocument();
+    expect(screen.queryByText("Security deposit")).not.toBeInTheDocument();
+  });
+
+  it("shows the requested payment method in the payment status", () => {
+    render(<AdminPaymentPanel booking={booking({ hire_payment_status: "bank_transfer_pending", payment_method: "bank_transfer" })} onChanged={vi.fn()} />);
+
+    expect(screen.getByText("Bank transfer requested")).toBeInTheDocument();
+  });
+
+  it("hides a payment link while switching to a different payment method", () => {
+    render(<AdminPaymentPanel booking={booking({ hire_payment_status: "pending", payment_method: "stripe_card_hold", payment_token: "token-123" })} onChanged={vi.fn()} />);
+
+    expect(screen.getByText("Customer payment link")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: /Bank transfer/ }));
+    expect(screen.queryByText("Customer payment link")).not.toBeInTheDocument();
+  });
+
+  it("allows Stripe selection while an unpaid cash request is still pending", () => {
+    render(<AdminPaymentPanel booking={booking({ hire_payment_status: "cash_due", payment_method: "cash_on_pickup" })} onChanged={vi.fn()} />);
+
+    expect(screen.getByRole("radio", { name: /^Stripe Available/ })).toBeEnabled();
+  });
+
   it("collapses and reopens payment collection", () => {
     render(<AdminPaymentPanel booking={booking()} onChanged={vi.fn()} />);
 
@@ -123,7 +151,7 @@ describe("AdminPaymentPanel", () => {
       deposit_payment_status: "bank_transfer_pending",
     })} onChanged={vi.fn()} />);
 
-    const stripeOption = screen.getByRole("radio", { name: /Stripe card hold/i });
+    const stripeOption = screen.getByRole("radio", { name: /^Stripe Available/i });
     expect(stripeOption).toBeEnabled();
     fireEvent.click(stripeOption);
     expect(stripeOption).toBeChecked();
@@ -218,7 +246,31 @@ describe("AdminPaymentPanel", () => {
         saveOnly: true,
       }),
     }));
-    expect(await screen.findByText("Hire items saved to this booking. Send the invoice when you are ready.")).toBeInTheDocument();
+    expect(await screen.findByRole("status")).toHaveTextContent("Hire items saved to this booking. Send the invoice when you are ready.");
+    expect(screen.getByRole("status")).toHaveClass("animate-toast-enter");
+  });
+
+  it("slides the save confirmation out after the progress period", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({ ok: true, hireAmountCents: 20000 }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AdminPaymentPanel booking={booking()} onChanged={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Increase Audio hire quantity" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(3500));
+    expect(screen.getByRole("status")).toHaveClass("animate-toast-exit");
+    act(() => vi.advanceTimersByTime(400));
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("adds a catalogue item and recalculates the hire total", () => {
@@ -230,8 +282,14 @@ describe("AdminPaymentPanel", () => {
     ]);
     fireEvent.change(screen.getByLabelText("Add catalogue item"), { target: { value: "package:standard-party-events" } });
     fireEvent.click(screen.getByRole("button", { name: "Add item" }));
+    fireEvent.change(screen.getByLabelText("Security deposit amount"), { target: { value: "300" } });
 
     expect(screen.getByText(/Hire total is calculated from these items/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+    expect(screen.getByText("Total with deposit")).toBeInTheDocument();
+    expect(screen.getByText("$460.00")).toBeInTheDocument();
+    const hireTotal = screen.getByText("Calculated hire total");
+    const saveButton = screen.getByRole("button", { name: "Save" });
+    expect(saveButton).toBeInTheDocument();
+    expect(hireTotal.compareDocumentPosition(saveButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

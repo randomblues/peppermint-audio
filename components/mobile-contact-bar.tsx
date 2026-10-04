@@ -28,30 +28,30 @@ export function MobileContactBar() {
 
   if (pathname.startsWith("/admin") || pathname.startsWith("/pay/") || pathname === "/booking") return null;
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/90 p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgb(0_0_0/0.16)] backdrop-blur-xl md:inset-x-auto md:right-5 md:bottom-5 md:w-[min(calc(100%-2.5rem),22rem)] md:rounded-2xl md:border md:border-border/70 md:bg-background/95 md:p-2 md:pb-2 md:shadow-[0_12px_36px_rgb(0_0_0/0.24)]">
+    <div className="fixed inset-x-3 bottom-3 z-40 pb-[env(safe-area-inset-bottom)] md:inset-x-auto md:right-5 md:bottom-5 md:w-[min(calc(100%-2.5rem),22rem)]">
       <Sheet>
         <SheetTrigger
           render={
             <button
               type="button"
               aria-label="Check availability"
-              className="group flex min-h-14 w-full items-center gap-3 rounded-xl border border-primary/40 bg-gradient-to-r from-primary via-primary to-primary/85 px-4 text-left text-primary-foreground shadow-[0_8px_24px_color-mix(in_oklab,var(--primary)_28%,transparent)] transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99] md:min-h-16"
+              className="group flex min-h-11 w-full items-center gap-2.5 rounded-full border border-primary/35 bg-background/95 px-3 text-left text-foreground shadow-[0_8px_24px_rgb(0_0_0/0.2)] backdrop-blur-xl transition hover:border-primary/60 hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99] md:min-h-14 md:gap-3 md:rounded-xl md:px-4"
             />
           }
         >
-          <span className="availability-cta-icon-shell flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-foreground/15 ring-1 ring-primary-foreground/20 motion-safe:animate-availability-cta-glow">
+          <span className="availability-cta-icon-shell flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary ring-1 ring-primary/25 motion-safe:animate-availability-cta-glow md:size-9">
             <CalendarCheck
-              className="availability-cta-icon motion-safe:animate-availability-cta size-4.5"
+              className="availability-cta-icon motion-safe:animate-availability-cta size-4"
               aria-hidden="true"
             />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-sm leading-tight font-bold">Check availability</span>
-            <span className="mt-0.5 block text-[0.68rem] leading-tight text-primary-foreground/75">
+            <span className="block text-xs leading-tight font-semibold md:text-sm">Check availability</span>
+            <span className="mt-0.5 hidden text-[0.68rem] leading-tight text-muted-foreground md:block">
               We&apos;ll help you find the right setup
             </span>
           </span>
-          <ChevronUp className="size-5 shrink-0 transition-transform group-data-open:-rotate-180" aria-hidden="true" />
+          <ChevronUp className="size-4 shrink-0 text-muted-foreground transition-transform group-data-open:-rotate-180 md:size-5" aria-hidden="true" />
         </SheetTrigger>
         <SheetContent
           side="bottom"
