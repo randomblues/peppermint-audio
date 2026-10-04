@@ -138,6 +138,7 @@ export function TimePicker({ id, label, value, onChange, error }: TimePickerProp
               onClick={() => {
                 onChange("");
                 setDraft(parseTime(""));
+                setOpen(false);
               }}
             >
               <X className="size-4" />
@@ -189,7 +190,10 @@ export function TimePicker({ id, label, value, onChange, error }: TimePickerProp
           <button
             type="button"
             className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-            onClick={() => setOpen(false)}
+            onClick={() => {
+              onChange(toTimeValue(draft.hour, draft.minute, draft.meridiem));
+              setOpen(false);
+            }}
           >
             <Check className="size-4" />
             Done

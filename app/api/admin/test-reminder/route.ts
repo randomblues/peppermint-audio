@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { buildPickupReminderEmail, getMelbourneTomorrow } from "@/lib/pickup-reminders";
 import { requireAdmin } from "@/lib/admin-auth";
+import type { BookingLineItem } from "@/lib/booking-line-items";
 
 export const runtime = "nodejs";
 
@@ -22,13 +23,13 @@ export async function POST(request: Request) {
     last_name: string;
     event_type: string;
     pickup_date: string;
-    package_interest: string;
-    add_ons: string[] | null;
+    pickup_time?: string | null;
+    hire_line_items: BookingLineItem[] | null;
     additional_details: string | null;
   } | null = null;
   if (body.bookingId) {
     const result = await session.admin.from("bookings")
-      .select("email,first_name,last_name,event_type,pickup_date,pickup_time,package_interest,add_ons,additional_details")
+      .select("email,first_name,last_name,event_type,pickup_date,pickup_time,hire_line_items,additional_details")
       .eq("id", body.bookingId)
       .single();
     if (result.error) {
@@ -53,8 +54,7 @@ export async function POST(request: Request) {
     last_name: "Recipient",
     event_type: "Test reminder email",
     pickup_date: getMelbourneTomorrow(),
-    package_interest: "speech-presentation",
-    add_ons: [],
+    hire_line_items: [],
     additional_details: "This is a test email. No booking has been created.",
   });
   const response = await new Resend(apiKey).emails.send({

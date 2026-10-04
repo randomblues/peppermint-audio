@@ -17,6 +17,7 @@ import {
   createBookingCalendarEvent,
   exchangeGoogleCalendarCode,
   getGoogleCalendarAuthorizationUrl,
+  isGoogleCalendarEnabled,
 } from "./google-calendar";
 
 const details = {
@@ -30,8 +31,11 @@ const details = {
   dropoffDate: "2027-01-01",
   pickupTime: "10:00",
   dropoffTime: "17:00",
-  packageInterest: "Big Events",
-  addOns: ["Wireless Microphone", "Subwoofer"],
+  hireLineItems: [
+    { id: "package:big-events", kind: "package", name: "Big Events", quantity: 1, unitPriceCents: 20000 },
+    { id: "equipment:mic", kind: "equipment", name: "Wireless Microphone", quantity: 1, unitPriceCents: 2000 },
+    { id: "equipment:subwoofer", kind: "equipment", name: "Subwoofer", quantity: 1, unitPriceCents: 5000 },
+  ],
   additionalDetails: "Please include setup guidance.",
 };
 
@@ -41,6 +45,7 @@ describe("Google Calendar integration", () => {
     process.env.GOOGLE_CLIENT_ID = "client-id";
     process.env.GOOGLE_CLIENT_SECRET = "client-secret";
     process.env.GOOGLE_CALENDAR_REDIRECT_URI = "https://example.com/callback";
+    vi.stubEnv("GOOGLE_CALENDAR_ENABLED", "true");
     delete process.env.GOOGLE_CALENDAR_REFRESH_TOKEN;
     delete process.env.GOOGLE_CALENDAR_ID;
     OAuth2.mockImplementation(() => ({ generateAuthUrl, getToken, setCredentials }));
@@ -71,6 +76,18 @@ describe("Google Calendar integration", () => {
     expect(eventsInsert).not.toHaveBeenCalled();
   });
 
+  it("disables calendar creation by default outside production", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("GOOGLE_CALENDAR_ENABLED", "");
+    expect(isGoogleCalendarEnabled()).toBe(false);
+  });
+
+  it("allows production calendar creation to be disabled explicitly", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("GOOGLE_CALENDAR_ENABLED", "false");
+    expect(isGoogleCalendarEnabled()).toBe(false);
+  });
+
   it("builds a timed event when pickup and drop-off times are provided", async () => {
     process.env.GOOGLE_CALENDAR_REFRESH_TOKEN = "refresh-token";
     process.env.GOOGLE_CALENDAR_ID = "work-calendar";
@@ -84,7 +101,7 @@ describe("Google Calendar integration", () => {
         start: { dateTime: "2026-12-31T10:00:00", timeZone: "Australia/Melbourne" },
         end: { dateTime: "2027-01-01T17:00:00", timeZone: "Australia/Melbourne" },
         reminders: { useDefault: true },
-        description: expect.stringContaining("Add-ons: Wireless Microphone, Subwoofer"),
+        description: expect.stringContaining("Hire items: Big Events, Wireless Microphone, Subwoofer"),
       }),
     });
 
@@ -100,8 +117,8 @@ describe("Google Calendar integration", () => {
   it("returns null when Google does not provide an event link", async () => {
     process.env.GOOGLE_CALENDAR_REFRESH_TOKEN = "refresh-token";
     eventsInsert.mockResolvedValue({ data: {} });
-    await expect(createBookingCalendarEvent({ ...details, addOns: [], additionalDetails: "" })).resolves.toBeNull();
-    expect(eventsInsert.mock.calls[0][0].requestBody.description).toContain("Add-ons: None selected");
+    await expect(createBookingCalendarEvent({ ...details, hireLineItems: [], additionalDetails: "" })).resolves.toBeNull();
+    expect(eventsInsert.mock.calls[0][0].requestBody.description).toContain("Hire items: None specified");
     expect(eventsInsert.mock.calls[0][0].requestBody.description).toContain("None provided");
   });
 });

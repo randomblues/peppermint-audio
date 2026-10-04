@@ -51,6 +51,14 @@ describe("invoice PDF generation", () => {
       totalCents: 20000,
       gstIncludedCents: 909,
       notes: ["Please use reference PA-ABC12345."],
+      bankTransfer: {
+        amountCents: 20000,
+        reference: "PA-ABC12345",
+        accountName: "Shane Dsouza",
+        bsb: "670864",
+        accountNumber: "33933371",
+        payId: "0452316823",
+      },
     });
 
     expect(Buffer.from(pdf).subarray(0, 5).toString()).toBe("%PDF-");
@@ -58,9 +66,18 @@ describe("invoice PDF generation", () => {
     const pdfText = extractCompressedPdfText(pdfBytes);
     expect(pdfBytes.toString("latin1")).toContain("/Subtype /Image");
     expect(pdfText).toContain("Tax Invoice");
+    expect(pdfText).toContain("FROM");
+    expect(pdfText).toContain("Peppermint Audio");
     expect(pdfText).toContain("ABN 44 506 480 694");
     expect(pdfText).toContain("GST INCLUDED (10%)");
     expect(pdfText).toContain("AUD $9.09");
+    expect(pdfText).toContain("PAYMENT");
+    expect(pdfText).toContain("BANK TRANSFER DETAILS");
+    expect(pdfText).toContain("Shane Dsouza");
+    expect(pdfText).toContain("670864");
+    expect(pdfText).toContain("33933371");
+    expect(pdfText).toContain("0452316823");
+    expect(pdfText).toContain("Pickup and return");
     expect(pdf.byteLength).toBeGreaterThan(500);
   });
 });

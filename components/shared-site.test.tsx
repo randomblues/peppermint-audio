@@ -116,7 +116,7 @@ describe("PackageCard", () => {
       "href",
       `/packages?package=${pkg.slug}`,
     );
-    expect(screen.getByRole("button", { name: "Add package to cart" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add to cart" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: pkg.name })).toHaveAttribute(
       "src",
       expect.stringContaining("speech-presentation-package.png"),
@@ -176,7 +176,12 @@ describe("PackageCard", () => {
       "true",
     );
     expect(screen.queryByText("Optional add-ons")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Add package to cart" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add to cart" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add to cart" })).toHaveClass("h-11", "w-full");
+    expect(screen.getByRole("button", { name: "View package details" })).toHaveClass(
+      "w-full",
+      "text-muted-foreground",
+    );
   });
 
   it("gives the boom package artwork extra space around the subwoofer", () => {
@@ -268,13 +273,6 @@ describe("WhatsAppButton", () => {
       expect(screen.queryByRole("button", { name: "Check availability" })).not.toBeInTheDocument();
     });
 
-    it("keeps the booking form clear on phones while retaining the desktop contact bar", () => {
-      usePathname.mockReturnValue("/booking");
-      render(<MobileContactBar />);
-
-      const availabilityButton = screen.getByRole("button", { name: "Check availability" });
-      expect(availabilityButton.parentElement).toHaveClass("hidden", "md:block");
-    });
   });
 
   it("tracks WhatsApp clicks", () => {

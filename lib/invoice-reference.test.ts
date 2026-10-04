@@ -11,4 +11,5 @@ describe("invoiceNumberForBooking", () => {
   it("rejects an empty booking ID", () => {
     expect(() => invoiceNumberForBooking("---")).toThrow("booking ID");
   });
+
 });

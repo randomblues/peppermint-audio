@@ -24,9 +24,7 @@ export const bookingSchema = z.object({
   dropoffTime: z
     .string()
     .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Please select a valid drop-off time"),
-  packageInterest: z.string().min(2, "Please select a package"),
-  selectedEquipment: z.string().max(3000, "Please keep the selected equipment under 3000 characters").default(""),
-  addOns: z.string().default(""),
+  hireLineItems: z.string().min(2, "Please select at least one hire item").max(12000, "Please keep the hire item list under 12000 characters"),
   additionalDetails: z.string().max(3000, "Please keep additional details under 3000 characters"),
   termsAccepted: z.string().refine(
     (value) => value === "accepted",
@@ -49,5 +47,5 @@ export const bookingSchema = z.object({
   }
 });
 
-export type BookingFormInputValues = z.input<typeof bookingSchema>;
-export type BookingFormValues = z.output<typeof bookingSchema>;
+export type BookingInputValues = z.input<typeof bookingSchema>;
+export type BookingValues = z.output<typeof bookingSchema>;

@@ -12,9 +12,14 @@ const booking = {
   dropoff_date: "2026-10-02",
   pickup_time: "10:00",
   dropoff_time: "16:00",
-  package_interest: "essential",
-  add_ons: ["Wireless microphone"],
   additional_details: "Please call on arrival.",
+  hire_line_items: [{
+    id: "equipment:wireless-microphone",
+    kind: "custom",
+    name: "Wireless microphone",
+    quantity: 1,
+    unitPriceCents: 2500,
+  }],
   status: "submitted",
   internal_notes: "Call about access",
   photo_id_paths: ["private/alex-id.jpg"],
@@ -92,6 +97,23 @@ describe("AdminConsole", () => {
     const open = vi.spyOn(window, "open").mockImplementation(() => null);
     render(<AdminConsole />);
     fireEvent.click(await screen.findByText("Alex Smith"));
+    expect(screen.getAllByText("Booking reference: PA-ONE").length).toBeGreaterThan(0);
+    expect(screen.getByText("PA-ONE")).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: "Hire items" })).toHaveLength(1);
+    const additionalDetails = screen.getByRole("heading", { name: "Additional details" });
+    const internalNotes = screen.getByRole("heading", { name: "Internal notes" });
+    const paymentCollection = screen.getByRole("button", { name: "Open payment collection" });
+    expect(additionalDetails.compareDocumentPosition(paymentCollection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(internalNotes.compareDocumentPosition(paymentCollection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(paymentCollection);
+    expect(screen.getByRole("dialog", { name: "Payment collection" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Payment collection" }).querySelector('button[aria-expanded]')).toBeNull();
+    expect(screen.getAllByRole("heading", { name: "Hire items" })).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "Close payment collection" }));
+    expect(screen.queryByRole("dialog", { name: "Payment collection" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Add-ons")).not.toBeInTheDocument();
+    expect(screen.queryByText("Package", { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByText("Guests", { exact: true })).not.toBeInTheDocument();
     expect(screen.queryByText("Customer email delivery records are kept for 30 days.")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Send Email" })).toBeInTheDocument();
     expect(screen.queryByText("Actions & outcomes")).not.toBeInTheDocument();

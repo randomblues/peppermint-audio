@@ -1,12 +1,14 @@
 import { Resend } from "resend";
 
-import { emailFooterHtml, emailFooterText } from "@/lib/email-footer";
+import { emailFooterText } from "@/lib/email-footer";
+import { lineItemsForBooking, lineItemsTotalCents, type BookingLineItem } from "@/lib/booking-line-items";
+import { emailDetailsTable, emailLayout, emailPanel, escapeEmailHtml } from "@/lib/email-template";
 import { recordCustomerEmail, type CustomerEmailType } from "@/lib/email-log";
 import { buildInvoicePdf, type InvoicePdfDetails, type InvoicePdfLineItem } from "@/lib/invoice-pdf";
 import { invoiceNumberForBooking } from "@/lib/invoice-reference";
-import { formatBankTransferInstructions, type BankTransferDetails, type BankTransferOption } from "@/lib/bank-transfer";
-import { GST_HIRE_ONLY_NOTE, gstIncludedCents } from "@/lib/gst";
-import { business } from "@/lib/site-content";
+import { invoiceEmailRecipients, type InvoiceRecipientOverrides } from "@/lib/invoice-recipient";
+import { type BankTransferDetails, type BankTransferOption } from "@/lib/bank-transfer";
+import { gstIncludedCents } from "@/lib/gst";
 import { createAdminClient } from "@/lib/supabase";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -21,8 +23,7 @@ type InvoiceBooking = {
   event_address?: string | null;
   pickup_date: string;
   dropoff_date: string;
-  package_interest?: string | null;
-  add_ons?: string[] | null;
+  hire_line_items?: unknown;
   hire_amount_cents: number | null;
   security_deposit_cents: number | null;
   gst_inclusive?: boolean | null;
@@ -47,17 +48,7 @@ type InvoiceRecord = {
   status: string;
 };
 
-const bookingSelect = "id,email,first_name,last_name,event_type,event_address,pickup_date,dropoff_date,package_interest,add_ons,hire_amount_cents,security_deposit_cents,gst_inclusive,payment_method,bank_transfer_reference,bank_transfer_option,deposit_payment_status,deposit_captured_cents";
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  })[character] ?? character);
-}
+const bookingSelect = "id,email,first_name,last_name,event_type,event_address,pickup_date,dropoff_date,hire_line_items,hire_amount_cents,security_deposit_cents,gst_inclusive,payment_method,bank_transfer_reference,bank_transfer_option,deposit_payment_status,deposit_captured_cents";
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-AU", { day: "numeric", month: "long", year: "numeric", timeZone: "Australia/Melbourne" }).format(new Date(`${value}T00:00:00`));
@@ -86,8 +77,10 @@ async function readBooking(admin: AdminClient, bookingId: string) {
   return result.data as InvoiceBooking;
 }
 
-export async function ensureInvoice(admin: AdminClient, booking: InvoiceBooking, paymentUrl?: string | null, bankTransferOption?: BankTransferOption, allowTransferOptionChange = false) {
-  const hireAmountCents = amount(booking.hire_amount_cents);
+export async function ensureInvoice(admin: AdminClient, booking: InvoiceBooking, paymentUrl?: string | null, bankTransferOption?: BankTransferOption, allowTransferOptionChange = false, allowPaymentMethodChange = false, allowInvoiceAmountChange = false) {
+  const lineItems = lineItemsForBooking(booking);
+  const hireAmountCents = lineItemsTotalCents(lineItems);
+  if (!hireAmountCents) throw new Error("Add at least one priced hire item before creating an invoice.");
   const securityDepositCents = amount(booking.security_deposit_cents);
   const gstInclusive = booking.gst_inclusive ?? true;
   if (!booking.payment_method) throw new Error("Payment method is not configured for this booking.");
@@ -103,7 +96,10 @@ export async function ensureInvoice(admin: AdminClient, booking: InvoiceBooking,
     if (amountsChanged || transferOptionChanged) {
       const documents = await admin.from("billing_documents").select("id").eq("invoice_id", existing.data.id).limit(1);
       if (documents.error) throw new Error(`Invoice document lookup failed: ${documents.error.message}`);
-      if (documents.data?.length && !(transferOptionChanged && !amountsChanged && allowTransferOptionChange)) {
+      const paymentMethodChanged = existing.data.payment_method !== booking.payment_method;
+      const canReplaceExistingDocument = (transferOptionChanged && !amountsChanged && allowTransferOptionChange)
+        || (paymentMethodChanged && allowPaymentMethodChange);
+      if (documents.data?.length && !canReplaceExistingDocument && !allowInvoiceAmountChange) {
         throw new Error("An invoice has already been issued with different payment details. Create a new booking invoice instead of replacing the existing document.");
       }
       const update = await admin.from("invoices").update({
@@ -123,7 +119,7 @@ export async function ensureInvoice(admin: AdminClient, booking: InvoiceBooking,
       existing.data.payment_method = booking.payment_method;
       existing.data.bank_transfer_option = selectedBankTransferOption;
     }
-    if (paymentUrl && existing.data.payment_url !== paymentUrl) {
+    if (paymentUrl !== undefined && existing.data.payment_url !== paymentUrl) {
       const update = await admin.from("invoices").update({ payment_url: paymentUrl, updated_at: new Date().toISOString() }).eq("id", existing.data.id);
       if (update.error) throw new Error(`Invoice payment link update failed: ${update.error.message}`);
     }
@@ -154,9 +150,9 @@ function documentEmailType(documentType: BillingDocumentType): CustomerEmailType
   return documentType;
 }
 
-function documentTitle(documentType: BillingDocumentType) {
+function documentTitle(documentType: BillingDocumentType, gstInclusive = true) {
   return {
-    invoice: "Tax Invoice",
+    invoice: gstInclusive ? "Tax Invoice" : "Invoice",
     payment_receipt: "Payment receipt",
     deposit_authorisation: "Security deposit authorisation",
     deposit_release: "Security deposit release",
@@ -164,16 +160,30 @@ function documentTitle(documentType: BillingDocumentType) {
   }[documentType];
 }
 
-function documentSubject(documentType: BillingDocumentType, number: string) {
-  return `${documentTitle(documentType)} ${number} · Peppermint Audio`;
+function documentSubject(documentType: BillingDocumentType, number: string, gstInclusive = true) {
+  return `${documentTitle(documentType, gstInclusive)} ${number} · Peppermint Audio`;
 }
 
-function pdfDetails(documentType: BillingDocumentType, booking: InvoiceBooking, invoice: InvoiceRecord): InvoicePdfDetails {
+export function billingDocumentIntro(documentType: BillingDocumentType, customerName: string, gstInclusive = true) {
+  return `Please find the attached ${documentTitle(documentType, gstInclusive).toLowerCase()} for ${customerName}.`;
+}
+
+function pdfDetails(documentType: BillingDocumentType, booking: InvoiceBooking, invoice: InvoiceRecord, recipient?: InvoiceRecipientOverrides): InvoicePdfDetails {
   const hire = invoice.hire_amount_cents;
   const deposit = invoice.security_deposit_cents;
-  const method = invoice.payment_method === "bank_transfer" ? "Bank transfer" : "Stripe card payment and security-deposit authorisation";
+  const method = invoice.payment_method === "bank_transfer"
+    ? "Bank transfer"
+    : invoice.payment_method === "cash_on_pickup"
+      ? "Cash on pickup"
+      : "Stripe card payment and security-deposit authorisation";
+  const hireLineItems = lineItemsForBooking(booking);
+  const formatLineItem = (item: BookingLineItem, status?: string): InvoicePdfLineItem => ({
+    description: `${item.quantity > 1 ? `${item.quantity} × ` : ""}${item.name}${item.option ? ` · ${item.option}` : ""}`,
+    amountCents: item.unitPriceCents * item.quantity,
+    status,
+  });
   let lineItems: InvoicePdfLineItem[] = [
-    { description: `Audio equipment hire · ${booking.package_interest || booking.event_type}`, amountCents: hire },
+    ...hireLineItems.map((item) => formatLineItem(item)),
     { description: "Refundable security deposit", amountCents: deposit },
   ];
   let totalCents = invoice.total_amount_cents;
@@ -181,13 +191,22 @@ function pdfDetails(documentType: BillingDocumentType, booking: InvoiceBooking, 
   const notes = [
     "The security deposit is refundable when all equipment is returned on time and in the agreed condition.",
   ];
+  const bank = invoice.payment_method === "bank_transfer" ? bankTransferDetails() : undefined;
+  const bankTransfer = bank
+    ? {
+      ...bank,
+      amountCents: invoice.total_amount_cents,
+      reference: booking.bank_transfer_reference || invoice.invoice_number,
+    }
+    : undefined;
   if (documentType === "payment_receipt") {
     if (invoice.payment_method === "stripe_card_hold") {
-      lineItems = [{ description: "Audio equipment hire payment", amountCents: hire, status: "Paid and captured" }, { description: "Refundable security deposit", amountCents: deposit, status: booking.deposit_payment_status === "authorized" ? "Authorised, not captured" : "Pending authorisation" }];
+      lineItems = [...hireLineItems.map((item) => formatLineItem(item, "Paid and captured")), { description: "Refundable security deposit", amountCents: deposit, status: booking.deposit_payment_status === "authorized" ? "Authorised, not captured" : "Pending authorisation" }];
       notes.unshift("This receipt confirms the hire payment was captured and the security deposit was authorised as a temporary card hold.");
     } else {
-      lineItems = [{ description: "Audio equipment hire", amountCents: hire, status: "Received by bank transfer" }, { description: "Refundable security deposit", amountCents: deposit, status: "Received by bank transfer" }];
-      notes.unshift("This receipt confirms Peppermint Audio recorded the bank transfer as received.");
+      const receivedBy = invoice.payment_method === "cash_on_pickup" ? "Received in cash" : "Received by bank transfer";
+      lineItems = [...hireLineItems.map((item) => formatLineItem(item, receivedBy)), { description: "Refundable security deposit", amountCents: deposit, status: receivedBy }];
+      notes.unshift(`This receipt confirms Peppermint Audio recorded the payment as ${invoice.payment_method === "cash_on_pickup" ? "cash received" : "bank transfer received"}.`);
     }
   } else if (documentType === "deposit_authorisation") {
     lineItems = [{ description: "Refundable security deposit", amountCents: deposit, status: "Authorised, not captured" }];
@@ -205,21 +224,17 @@ function pdfDetails(documentType: BillingDocumentType, booking: InvoiceBooking, 
     totalCents = captured;
     gstCents = 0;
     notes.unshift("This document records the amount captured from the security deposit.");
-  } else if (invoice.payment_method === "bank_transfer") {
-    const bank = bankTransferDetails();
-    notes.unshift(formatBankTransferInstructions(formatAud(invoice.total_amount_cents), booking.bank_transfer_reference || invoice.invoice_number, bank, invoice.bank_transfer_option));
   } else if (invoice.payment_url) {
     notes.unshift(`Pay securely online: ${invoice.payment_url}`);
-  }
-  if (gstCents > 0) {
-    notes.push(GST_HIRE_ONLY_NOTE);
+  } else if (invoice.payment_method === "cash_on_pickup") {
+    notes.unshift("Payment is due in cash on the day of pickup. Please bring the hire amount and refundable security deposit.");
   }
   return {
-    title: documentTitle(documentType),
+    title: documentTitle(documentType, invoice.gst_inclusive !== false),
     documentNumber: invoice.invoice_number,
     issuedAt: new Intl.DateTimeFormat("en-AU", { dateStyle: "long", timeZone: "Australia/Melbourne" }).format(new Date()),
-    customerName: `${booking.first_name} ${booking.last_name}`,
-    customerEmail: booking.email,
+    customerName: recipient?.billToName || `${booking.first_name} ${booking.last_name}`,
+    customerEmail: recipient?.billToEmail || booking.email,
     eventType: booking.event_type,
     pickupDate: formatDate(booking.pickup_date),
     dropoffDate: formatDate(booking.dropoff_date),
@@ -228,11 +243,8 @@ function pdfDetails(documentType: BillingDocumentType, booking: InvoiceBooking, 
     totalCents,
     gstIncludedCents: gstCents,
     notes,
+    bankTransfer,
   };
-}
-
-function formatAud(cents: number) {
-  return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" }).format(cents / 100);
 }
 
 async function claimDocument(admin: AdminClient, invoice: InvoiceRecord, bookingId: string, documentType: BillingDocumentType, force = false) {
@@ -254,50 +266,58 @@ async function claimDocument(admin: AdminClient, invoice: InvoiceRecord, booking
   return { record: result.data, claimed: true };
 }
 
-export async function sendBillingDocument(admin: AdminClient, bookingId: string, documentType: BillingDocumentType, paymentUrl?: string | null, force = false, bankTransferOption?: BankTransferOption) {
+export async function sendBillingDocument(admin: AdminClient, bookingId: string, documentType: BillingDocumentType, paymentUrl?: string | null, force = false, bankTransferOption?: BankTransferOption, recipient?: InvoiceRecipientOverrides, allowPaymentMethodChange = false, allowInvoiceAmountChange = false) {
   const booking = await readBooking(admin, bookingId);
-  const invoice = await ensureInvoice(admin, booking, paymentUrl, bankTransferOption, force);
+  const invoice = await ensureInvoice(admin, booking, paymentUrl, bankTransferOption, force, allowPaymentMethodChange, allowInvoiceAmountChange);
   const claim = await claimDocument(admin, invoice, bookingId, documentType, force);
   if (!claim.claimed) return claim.record.provider_message_id as string | null;
 
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.ENQUIRY_FROM_EMAIL;
   if (!apiKey || !from) throw new Error("Email service is not configured.");
-  const details = pdfDetails(documentType, booking, invoice);
+  const details = pdfDetails(documentType, booking, invoice, recipient);
+  const emailRecipients = invoiceEmailRecipients(booking.email, recipient?.billToEmail);
+  const customerName = recipient?.billToName || `${booking.first_name} ${booking.last_name}`;
+  const gstInclusive = booking.gst_inclusive !== false;
+  const emailIntro = billingDocumentIntro(documentType, customerName, gstInclusive);
   const pdf = await buildInvoicePdf(details);
   const bodyText = [
-    `Hi ${booking.first_name},`,
+    "Hello,",
     "",
-    `${documentTitle(documentType)} ${invoice.invoice_number} is attached.`,
+    emailIntro,
+    `Booking reference: ${invoice.invoice_number}`,
     `Event: ${booking.event_type}`,
     `Pickup: ${formatDate(booking.pickup_date)} · Return: ${formatDate(booking.dropoff_date)}`,
     booking.event_address ? `Event address: ${booking.event_address}` : "",
-    ...details.notes,
+    invoice.payment_method === "cash_on_pickup" ? "Payment: cash due on the day of pickup, including the refundable security deposit." : "",
     "",
     emailFooterText,
   ].join("\n");
+  const emailHtml = emailLayout({
+    eyebrow: documentTitle(documentType, gstInclusive),
+    intro: escapeEmailHtml(emailIntro),
+    content: `
+      ${emailPanel(`
+        <p style="margin:0 0 6px;color:#668074;font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase">Booking reference</p>
+        <p style="margin:0;color:#1d2823;font-size:22px;font-weight:700;letter-spacing:.3px">${escapeEmailHtml(invoice.invoice_number)}</p>
+      `, "accent")}
+      ${emailPanel(emailDetailsTable([
+        { label: "Invoice", value: invoice.invoice_number },
+        { label: "Event", value: booking.event_type },
+        { label: "Pickup", value: formatDate(booking.pickup_date) },
+        { label: "Return", value: formatDate(booking.dropoff_date) },
+        ...(booking.event_address ? [{ label: "Address", value: booking.event_address }] : []),
+      ]))}
+      ${invoice.payment_method === "cash_on_pickup" ? emailPanel("<p style=\"margin:0;color:#1d2823;font-size:14px;line-height:1.6\"><strong>Payment due in cash on pickup.</strong><br />Please bring the hire amount and refundable security deposit on the day of collection.</p>", "accent") : ""}
+      <p style="margin:26px 0 0;color:#718078;font-size:13px;line-height:1.6">The detailed ${escapeEmailHtml(documentTitle(documentType, gstInclusive).toLowerCase())} is attached as a PDF for your records.</p>
+    `,
+  });
   const response = await new Resend(apiKey).emails.send({
     from,
-    to: [booking.email],
-    subject: documentSubject(documentType, invoice.invoice_number),
+    ...emailRecipients,
+    subject: documentSubject(documentType, invoice.invoice_number, gstInclusive),
     text: bodyText,
-    html: `
-      <div style="margin:0;background:#f4f1ed;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;color:#20211f">
-        <div style="margin:0 auto;max-width:600px;overflow:hidden;border:1px solid #e4ddd5;border-radius:16px;background:#fff">
-          <div style="background:#1c2925;padding:28px 32px;text-align:center">
-            <img src="${process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.peppermintaudio.com.au"}/logo-white.png" alt="${escapeHtml(business.name)}" width="170" style="display:block;width:170px;height:auto;margin:0 auto" />
-          </div>
-          <div style="padding:34px 32px">
-            <p style="margin:0 0 8px;color:#5c806f;font-size:13px;font-weight:bold;letter-spacing:1px;text-transform:uppercase">${escapeHtml(documentTitle(documentType))}</p>
-            <h1 style="margin:0 0 16px;font-size:26px;line-height:1.2;color:#20211f">Hi ${escapeHtml(booking.first_name)}.</h1>
-            <p style="margin:0;font-size:16px;line-height:1.6;color:#565955">${escapeHtml(`${documentTitle(documentType)} ${invoice.invoice_number} is attached.`)}</p>
-            <p style="margin:20px 0 0;font-size:14px;line-height:1.6;color:#565955">${escapeHtml(`Event: ${booking.event_type}`)}<br />${escapeHtml(`Pickup: ${formatDate(booking.pickup_date)} · Return: ${formatDate(booking.dropoff_date)}`)}${booking.event_address ? `<br />${escapeHtml(`Address: ${booking.event_address}`)}` : ""}</p>
-            ${details.notes.map((note) => `<p style="margin:12px 0 0;font-size:14px;line-height:1.6;color:#565955">${escapeHtml(note)}</p>`).join("")}
-          </div>
-          ${emailFooterHtml}
-        </div>
-      </div>
-    `,
+    html: emailHtml,
     attachments: [{ filename: `${documentType}-${invoice.invoice_number}.pdf`, content: pdf.toString("base64") }],
   });
   if (response.error) {
@@ -313,7 +333,7 @@ export async function sendBillingDocument(admin: AdminClient, bookingId: string,
   try {
     await recordCustomerEmail(admin, {
       bookingId,
-      recipientEmail: booking.email,
+      recipientEmail: recipient?.billToEmail || booking.email,
       emailType: documentEmailType(documentType),
       providerMessageId: response.data?.id,
     });
@@ -323,8 +343,8 @@ export async function sendBillingDocument(admin: AdminClient, bookingId: string,
   return response.data?.id ?? null;
 }
 
-export async function sendInvoiceEmail(admin: AdminClient, bookingId: string, paymentUrl?: string | null, force = false, bankTransferOption?: BankTransferOption) {
-  return sendBillingDocument(admin, bookingId, "invoice", paymentUrl, force, bankTransferOption);
+export async function sendInvoiceEmail(admin: AdminClient, bookingId: string, paymentUrl?: string | null, force = false, bankTransferOption?: BankTransferOption, recipient?: InvoiceRecipientOverrides, allowPaymentMethodChange = false, allowInvoiceAmountChange = false) {
+  return sendBillingDocument(admin, bookingId, "invoice", paymentUrl, force, bankTransferOption, recipient, allowPaymentMethodChange, allowInvoiceAmountChange);
 }
 
 export async function markInvoiceStatus(admin: AdminClient, bookingId: string, status: string, paidAt?: string) {

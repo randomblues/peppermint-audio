@@ -20,7 +20,6 @@ const validPayload = {
   phone: "0412345678",
   eventDate: "2026-10-10",
   eventType: "Wedding",
-  packageInterest: "Party Package",
   message: "We are planning a wedding and need sound for the reception.",
 };
 
@@ -76,6 +75,7 @@ describe("POST /api/enquiry", () => {
       replyTo: "alex@example.com",
       subject: "New enquiry: Wedding on 2026-10-10",
       text: expect.not.stringContaining("Estimated guests"),
+      html: expect.stringContaining("A new enquiry needs a reply"),
     });
   });
 

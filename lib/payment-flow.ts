@@ -1,6 +1,13 @@
 export const MAX_STRIPE_HIRE_DAYS = 7;
 
-export type PaymentMethod = "stripe_card_hold" | "bank_transfer";
+export type PaymentMethod = "stripe_card_hold" | "bank_transfer" | "cash_on_pickup";
+
+export function canSwitchPendingBankTransfer(paymentMethod: string | null | undefined, hirePaymentStatus: string | null | undefined, depositPaymentStatus: string | null | undefined) {
+  return paymentMethod === "bank_transfer"
+    && hirePaymentStatus === "bank_transfer_pending"
+    && depositPaymentStatus !== "bank_transfer_received"
+    && depositPaymentStatus !== "bank_transfer_refunded";
+}
 
 function dateValue(value: string) {
   const [year, month, day] = value.split("-").map(Number);

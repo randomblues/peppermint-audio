@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatAudCents, parseAmountCents, paymentMethodForRental, rentalDays } from "./payment-flow";
+import { canSwitchPendingBankTransfer, formatAudCents, parseAmountCents, paymentMethodForRental, rentalDays } from "./payment-flow";
 
 describe("payment flow helpers", () => {
   it("calculates rental days from date-only values without timezone drift", () => {
@@ -26,4 +26,12 @@ describe("payment flow helpers", () => {
   it("formats Australian dollar amounts", () => {
     expect(formatAudCents(10000)).toBe("$100.00");
   });
+
+  it("allows switching a pending bank transfer to Stripe only before payment activity", () => {
+    expect(canSwitchPendingBankTransfer("bank_transfer", "bank_transfer_pending", "bank_transfer_pending")).toBe(true);
+    expect(canSwitchPendingBankTransfer("bank_transfer", "bank_transfer_received", "bank_transfer_received")).toBe(false);
+    expect(canSwitchPendingBankTransfer("bank_transfer", "bank_transfer_pending", "bank_transfer_refunded")).toBe(false);
+    expect(canSwitchPendingBankTransfer("stripe_card_hold", "bank_transfer_pending", "bank_transfer_pending")).toBe(false);
+  });
+
 });

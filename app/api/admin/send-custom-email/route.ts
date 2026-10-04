@@ -1,21 +1,12 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 
-import { emailFooterHtml, emailFooterText } from "@/lib/email-footer";
+import { emailFooterText } from "@/lib/email-footer";
 import { recordCustomerEmail } from "@/lib/email-log";
+import { emailLayout, emailPanel, escapeEmailHtml } from "@/lib/email-template";
 import { requireAdmin } from "@/lib/admin-auth";
 
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  })[character] ?? character);
-}
 
 export async function POST(request: Request) {
   const session = await requireAdmin();
@@ -67,19 +58,11 @@ export async function POST(request: Request) {
     to: [booking.data.email],
     subject,
     text: `${message}\n\n${emailFooterText}`,
-    html: `
-      <div style="margin:0;background:#f4f1ed;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;color:#20211f">
-        <div style="margin:0 auto;max-width:600px;overflow:hidden;border:1px solid #e4ddd5;border-radius:16px;background:#fff">
-          <div style="background:#1c2925;padding:28px 32px;text-align:center">
-            <img src="${process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.peppermintaudio.com.au"}/logo-white.png" alt="Peppermint Audio" width="170" style="display:block;width:170px;height:auto;margin:0 auto" />
-          </div>
-          <div style="padding:34px 32px">
-            <div style="font-size:16px;line-height:1.7;white-space:pre-line">${escapeHtml(message)}</div>
-          </div>
-          ${emailFooterHtml}
-        </div>
-      </div>
-    `,
+    html: emailLayout({
+      eyebrow: "Peppermint Audio",
+      title: subject,
+      content: emailPanel(`<div style="color:#405148;font-size:16px;line-height:1.7;white-space:pre-line">${escapeEmailHtml(message)}</div>`, "soft"),
+    }),
     ...(attachment ? {
       attachments: [{
         filename: attachment.name,

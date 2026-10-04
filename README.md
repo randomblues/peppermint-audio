@@ -20,7 +20,8 @@ Marketing website for a Melbourne PA equipment hire business, built with:
 
 1. Install dependencies.
 2. Copy `.env.example` to `.env.local`.
-3. Fill in your Resend API key and destination email.
+3. Fill in a real Resend API key and destination email. Placeholder values do not send mail.
+4. For local confirmation-email testing, use a verified sender domain in `ENQUIRY_FROM_EMAIL`. Resend's `onboarding@resend.dev` sender is restricted to the Resend account email until a domain is verified.
 
 ## Environment Variables
 
@@ -31,10 +32,11 @@ Marketing website for a Melbourne PA equipment hire business, built with:
 - `SUPABASE_ANON_KEY`: Supabase publishable/anon key
 - `SUPABASE_SERVICE_ROLE_KEY`: server-only Supabase service role key
 - `CRON_SECRET`: server-only random secret used to authorize the pickup reminder cron route
+- `GOOGLE_CALENDAR_ENABLED`: optional calendar feature flag; local development is disabled by default, while production remains enabled unless this is set to `false`
 
 ## Booking management
 
-Run `supabase/001_booking_management.sql` in the Supabase SQL editor, then create administrator users under Supabase Authentication > Users. Rerun the migration after schema changes so existing databases receive the pickup/drop-off time columns and email-history table. Bookings are submitted at `/booking` with `submitted` status and managed at `/admin`; change a request to `confirmed` only after availability is reviewed. The customer automatically receives a confirmation email when the request is confirmed. Customer-facing email delivery metadata appears in each admin booking's **Email history** card and is automatically deleted after 30 days by the Supabase `pg_cron` job. Photo IDs remain in the private `booking-photo-ids` bucket and are only available through short-lived signed links.
+Run `supabase/001_booking_management.sql` in the Supabase SQL editor, then create administrator users under Supabase Authentication > Users. Rerun the migration after schema changes so existing databases receive the pickup/drop-off time columns and email-history table. Customer hire selections are built in the cart and submitted through the configured enquiry/payment workflow; requests are managed at `/admin` and changed to `confirmed` only after availability is reviewed. The customer automatically receives a confirmation email when the request is confirmed. Customer-facing email delivery metadata appears in each admin booking's **Email history** card and is automatically deleted after 30 days by the Supabase `pg_cron` job. Photo IDs remain in the private `booking-photo-ids` bucket and are only available through short-lived signed links.
 
 The admin bookings view includes a **Send Email** menu with booking confirmation, pickup reminder, and custom email options. The confirmation option is available for confirmed bookings and can be used to resend the confirmation email.
 

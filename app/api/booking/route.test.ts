@@ -27,6 +27,7 @@ vi.mock("@/lib/supabase", () => ({
 }));
 
 import { POST } from "./route";
+import { bookingReferenceForId } from "@/lib/booking-reference";
 
 const validFields = {
   email: "alex@example.com",
@@ -39,8 +40,22 @@ const validFields = {
   dropoffDate: "2026-10-11",
   pickupTime: "10:00",
   dropoffTime: "17:00",
-  packageInterest: "Standard Party & Events Package",
-  addOns: "wireless-microphones",
+  hireLineItems: JSON.stringify([{
+    id: "package:standard-party-events",
+    kind: "package",
+    catalogKey: "package:standard-party-events",
+    name: "Standard Party & Events Package",
+    quantity: 1,
+    unitPriceCents: 16000,
+  }, {
+    id: "addon:wireless-microphones",
+    kind: "equipment",
+    catalogKey: "addon:wireless-microphones",
+    name: "Wireless Microphone",
+    option: "Single item",
+    quantity: 1,
+    unitPriceCents: 2500,
+  }]),
   additionalDetails: "Please include setup guidance.",
   termsAccepted: "accepted",
 };
@@ -111,11 +126,18 @@ describe("POST /api/booking", () => {
     expect(createAdminClient).not.toHaveBeenCalled();
   });
 
-  it("rejects add-ons that are not available for the selected package", async () => {
-    const response = await POST(bookingRequest({ ...validFields, addOns: "not-real" }));
+  it("rejects invalid canonical hire items", async () => {
+    const response = await POST(bookingRequest({ ...validFields, hireLineItems: JSON.stringify([{
+      id: "package:missing",
+      kind: "package",
+      catalogKey: "package:missing",
+      name: "Missing package",
+      quantity: 1,
+      unitPriceCents: 1,
+    }]) }));
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "Please choose add-ons from the selected package." });
+    expect(await response.json()).toEqual({ error: "A selected package or product is no longer available." });
     expect(createAdminClient).not.toHaveBeenCalled();
   });
 
@@ -124,7 +146,8 @@ describe("POST /api/booking", () => {
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body).toEqual({ ok: true, bookingId: expect.any(String) });
+    expect(body).toMatchObject({ ok: true, bookingId: expect.any(String) });
+    expect(body.bookingReference).toBe(bookingReferenceForId(body.bookingId));
     expect(afterCallback).toHaveBeenCalledOnce();
     expect(createAdminClient).toHaveBeenCalledOnce();
     expect(insertMock).toHaveBeenCalledOnce();
@@ -134,7 +157,9 @@ describe("POST /api/booking", () => {
     const insertedBooking = insertMock.mock.calls[0]?.[0];
     expect(insertedBooking?.status).toBe("submitted");
     expect(insertedBooking).toMatchObject({ pickup_time: "10:00", dropoff_time: "17:00" });
-    expect(calendar).toHaveBeenCalledWith(expect.objectContaining({ addOns: ["Wireless Microphone Upgrade"] }));
+    expect(calendar).toHaveBeenCalledWith(expect.objectContaining({
+      hireLineItems: expect.arrayContaining([expect.objectContaining({ name: "Wireless Microphone" })]),
+    }));
     expect(send).toHaveBeenCalledTimes(2);
     expect(send).toHaveBeenCalledWith(expect.objectContaining({ to: ["to@example.com"], attachments: expect.any(Array) }));
     expect(send).toHaveBeenCalledWith(expect.objectContaining({
@@ -142,24 +167,47 @@ describe("POST /api/booking", () => {
       subject: "Your booking request has been received",
       text: expect.stringContaining("Your request is not confirmed yet"),
     }));
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({
+      to: ["alex@example.com"],
+      text: expect.stringContaining(`Booking reference: ${body.bookingReference}`),
+    }));
   });
 
   it("persists cart equipment alongside a custom selection", async () => {
     const response = await POST(bookingRequest({
       ...validFields,
-      packageInterest: "Custom equipment selection",
-      addOns: "",
-      selectedEquipment: "2 × Shure SM58 (Single microphone), Yamaha DXR15 PA Speaker (Pair)",
+      hireLineItems: JSON.stringify([{
+        id: "equipment:shure-sm58:Single microphone",
+        kind: "equipment",
+        catalogKey: "equipment:shure-sm58:Single microphone",
+        name: "Shure SM58",
+        option: "Single microphone",
+        quantity: 2,
+        unitPriceCents: 1500,
+      }, {
+        id: "equipment:yamaha-dxr15:Pair (2 speakers)",
+        kind: "equipment",
+        catalogKey: "equipment:yamaha-dxr15:Pair (2 speakers)",
+        name: "Yamaha DXR15 PA Speaker",
+        option: "Pair (2 speakers)",
+        quantity: 1,
+        unitPriceCents: 13500,
+      }]),
     }));
 
     expect(response.status).toBe(200);
     const insertedBooking = insertMock.mock.calls[0]?.[0];
-    expect(insertedBooking?.package_interest).toBe("Custom equipment selection");
-    expect(insertedBooking?.additional_details).toContain("Selected hire items: 2 × Shure SM58");
+    expect(insertedBooking?.hire_line_items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: expect.stringContaining("Shure SM58") }),
+    ]));
+    expect(insertedBooking?.hire_line_items).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: expect.stringContaining("legacy text") }),
+    ]));
+    expect(insertedBooking?.additional_details).not.toContain("Selected hire items:");
     await afterCallback.mock.calls[0][0]();
     expect(send).toHaveBeenCalledWith(expect.objectContaining({
       to: ["alex@example.com"],
-      text: expect.stringContaining("Selected hire items: 2 × Shure SM58"),
+      text: expect.stringContaining("Hire items: 2 × Shure SM58"),
     }));
   });
 

@@ -12,16 +12,15 @@ const validBooking = {
   dropoffDate: "2099-10-02",
   pickupTime: "10:00",
   dropoffTime: "17:00",
-  packageInterest: "standard-party-events",
+  hireLineItems: '[{"id":"package:standard-party-events","kind":"package","catalogKey":"package:standard-party-events","name":"Standard Party & Events Package","quantity":1,"unitPriceCents":16000}]',
   additionalDetails: "",
   termsAccepted: "accepted",
 };
 
 describe("bookingSchema", () => {
-  it("accepts valid values and defaults add-ons", () => {
+  it("accepts valid canonical values", () => {
     const result = bookingSchema.parse(validBooking);
-    expect(result.addOns).toBe("");
-    expect(result.selectedEquipment).toBe("");
+    expect(result.hireLineItems).toContain("package:");
   });
 
   it("enforces minimum text lengths, terms, and the details maximum", () => {

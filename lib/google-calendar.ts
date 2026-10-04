@@ -1,4 +1,5 @@
 import { google } from "googleapis";
+import type { BookingLineItem } from "@/lib/booking-line-items";
 
 type BookingCalendarDetails = {
   firstName: string;
@@ -11,10 +12,16 @@ type BookingCalendarDetails = {
   dropoffDate: string;
   pickupTime?: string | null;
   dropoffTime?: string | null;
-  packageInterest: string;
-  addOns: string[];
+  hireLineItems: BookingLineItem[];
   additionalDetails: string;
 };
+
+export function isGoogleCalendarEnabled() {
+  const configured = process.env.GOOGLE_CALENDAR_ENABLED?.trim().toLowerCase();
+  if (configured === "false") return false;
+  if (configured === "true") return true;
+  return process.env.NODE_ENV === "production";
+}
 
 function getOAuthClient() {
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -54,6 +61,8 @@ function addOneDay(dateValue: string) {
 }
 
 export async function createBookingCalendarEvent(details: BookingCalendarDetails) {
+  if (!isGoogleCalendarEnabled()) return null;
+
   const refreshToken = process.env.GOOGLE_CALENDAR_REFRESH_TOKEN;
   if (!refreshToken) {
     return null;
@@ -79,8 +88,7 @@ export async function createBookingCalendarEvent(details: BookingCalendarDetails
         `Customer: ${details.firstName} ${details.lastName}`,
         `Email: ${details.email}`,
         `Mobile: ${details.mobile}`,
-        `Package: ${details.packageInterest}`,
-        `Add-ons: ${details.addOns.length ? details.addOns.join(", ") : "None selected"}`,
+        `Hire items: ${details.hireLineItems.map((item) => `${item.quantity > 1 ? `${item.quantity} × ` : ""}${item.name}${item.option ? ` (${item.option})` : ""}`).join(", ") || "None specified"}`,
         ...(details.pickupTime ? [`Pickup: ${details.pickupDate} at ${details.pickupTime}`] : []),
         ...(details.dropoffTime ? [`Drop-off: ${details.dropoffDate} at ${details.dropoffTime}`] : []),
         "",

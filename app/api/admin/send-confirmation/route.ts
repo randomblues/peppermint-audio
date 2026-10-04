@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   if (!body.bookingId) return NextResponse.json({ error: "A booking ID is required." }, { status: 400 });
 
   const result = await session.admin.from("bookings")
-    .select("email,first_name,event_type,pickup_date,dropoff_date,pickup_time,dropoff_time,created_at,package_interest,add_ons,additional_details,status")
+    .select("id,email,first_name,event_type,pickup_date,dropoff_date,pickup_time,dropoff_time,created_at,hire_line_items,additional_details,status")
     .eq("id", body.bookingId)
     .single();
   if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 });

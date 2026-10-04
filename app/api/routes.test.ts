@@ -121,9 +121,9 @@ describe("admin booking routes", () => {
           event_type: "Wedding",
           pickup_date: "2026-10-09",
           dropoff_date: "2026-10-11",
-          package_interest: "Standard Party & Events Package",
-          add_ons: ["Wireless Microphone Upgrade"],
+          hire_line_items: [],
           confirmation_email_sent: false,
+          hire_payment_status: "paid",
         },
         error: null,
       }),
@@ -146,6 +146,59 @@ describe("admin booking routes", () => {
     }));
   });
 
+  it("blocks confirmation until the hire payment is paid", async () => {
+    const read = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({
+        data: {
+          email: "customer@example.com",
+          first_name: "Alex",
+          confirmation_email_sent: false,
+          hire_payment_status: "bank_transfer_pending",
+        },
+        error: null,
+      }),
+    };
+    mocks.requireAdmin.mockResolvedValue(adminSession({ from: vi.fn().mockReturnValue(read) }));
+
+    const response = await patchBooking(jsonRequest("/api/admin/bookings", { id: "b1", status: "confirmed" }));
+
+    expect(response.status).toBe(409);
+    expect(await responseJson(response)).toEqual({ error: "Mark the hire payment as paid before confirming this booking." });
+    expect(mocks.sendBookingConfirmationEmail).not.toHaveBeenCalled();
+  });
+
+  it("allows confirmation for cash-on-pickup bookings with payment still due", async () => {
+    const read = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({
+        data: {
+          email: "customer@example.com",
+          first_name: "Alex",
+          event_type: "Wedding",
+          pickup_date: "2026-10-09",
+          dropoff_date: "2026-10-11",
+          hire_line_items: [],
+          confirmation_email_sent: false,
+          hire_payment_status: "cash_due",
+          payment_method: "cash_on_pickup",
+        },
+        error: null,
+      }),
+    };
+    const update = { update: vi.fn().mockReturnThis(), eq: vi.fn().mockResolvedValue({ error: null }) };
+    mocks.requireAdmin.mockResolvedValue(adminSession({ from: vi.fn().mockReturnValueOnce(read).mockReturnValueOnce(update) }));
+    vi.stubEnv("RESEND_API_KEY", "key");
+    vi.stubEnv("ENQUIRY_FROM_EMAIL", "Peppermint Audio <from@example.com>");
+
+    const response = await patchBooking(jsonRequest("/api/admin/bookings", { id: "b1", status: "confirmed" }));
+
+    expect(response.status).toBe(200);
+    expect(update.update).toHaveBeenCalledWith(expect.objectContaining({ status: "confirmed" }));
+  });
+
   it("can resend confirmation email for an already confirmed booking", async () => {
     const read = {
       select: vi.fn().mockReturnThis(),
@@ -157,8 +210,7 @@ describe("admin booking routes", () => {
           event_type: "Wedding",
           pickup_date: "2026-10-09",
           dropoff_date: "2026-10-11",
-          package_interest: "Standard Party & Events Package",
-          add_ons: [],
+          hire_line_items: [],
           status: "confirmed",
         },
         error: null,
@@ -308,6 +360,26 @@ describe("admin booking routes", () => {
     const response = await deleteBooking(jsonRequest("/api/admin/bookings", { id: "b1", confirm: true }));
     expect(response.status).toBe(500);
     expect(await responseJson(response)).toEqual({ error: "delete failed" });
+  });
+
+  it("does not delete a booking when private photo ID removal fails", async () => {
+    const read = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: { photo_id_paths: ["private/front.jpg"] }, error: null }),
+    };
+    const deletion = { delete: vi.fn().mockReturnThis(), eq: vi.fn() };
+    const remove = vi.fn().mockResolvedValue({ error: { message: "storage unavailable" } });
+    mocks.requireAdmin.mockResolvedValue(adminSession({
+      from: vi.fn().mockReturnValueOnce(read).mockReturnValueOnce(deletion),
+      storage: { from: vi.fn().mockReturnValue({ remove }) },
+    }));
+
+    const response = await deleteBooking(jsonRequest("/api/admin/bookings", { id: "b1", confirm: true }));
+
+    expect(response.status).toBe(502);
+    expect(await responseJson(response)).toEqual({ error: "Private photo ID deletion failed: storage unavailable" });
+    expect(deletion.delete).not.toHaveBeenCalled();
   });
 });
 

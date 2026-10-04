@@ -139,26 +139,29 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
           </>
         )}
       </CardContent>
-      <CardFooter className={`flex-col gap-2 ${compact ? "mt-auto p-4 sm:p-5" : ""}`}>
+      <CardFooter
+        className={`flex-col gap-2 ${
+          compact ? "mt-auto border-t border-border/70 p-4 sm:p-5" : ""
+        }`}
+      >
         <Button
-          className="w-full"
-          nativeButton={false}
-          render={
-            <Link
-              href={`/packages?package=${pkg.slug}`}
-            />
+          className={compact ? "h-11 w-full" : "w-full"}
+          onClick={() => addItem({ id: `package:${pkg.slug}`, name: pkg.name, kind: "package", price: pkg.price })}
+        >
+          Add to cart
+        </Button>
+        <Button
+          variant={compact ? "ghost" : "outline"}
+          className={
+            compact
+              ? "w-full text-muted-foreground hover:text-foreground"
+              : "w-full"
           }
+          nativeButton={false}
+          render={<Link href={`/packages?package=${pkg.slug}`} />}
         >
           View package details
         </Button>
-        {!compact ? (
-          <Button
-            className="w-full"
-            onClick={() => addItem({ id: `package:${pkg.slug}`, name: pkg.name, kind: "package", price: pkg.price })}
-          >
-            Add package to cart
-          </Button>
-        ) : null}
       </CardFooter>
     </Card>
   );

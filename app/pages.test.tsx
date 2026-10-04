@@ -7,7 +7,6 @@ import ContactPage from "./contact/page";
 import FaqPage from "./faq/page";
 import HowItWorksPage from "./how-it-works/page";
 import GetStartedPage from "./get-started/page";
-import BookingPage from "./booking/page";
 import { faqs, howItWorks, packageTiers } from "@/lib/site-content";
 
 vi.mock("@/components/enquiry-form", () => ({
@@ -16,18 +15,11 @@ vi.mock("@/components/enquiry-form", () => ({
   ),
 }));
 
-vi.mock("@/components/booking-form", () => ({
-  BookingForm: ({ initialPackageSlug }: { initialPackageSlug?: string }) => (
-    <div aria-label="Booking form">Booking form{initialPackageSlug ? `: ${initialPackageSlug}` : ""}</div>
-  ),
-}));
-
 describe("static site pages", () => {
   it("home page exposes primary calls to action, package data, and process content", () => {
     render(<Home />);
 
     expect(screen.getByRole("heading", { name: "Audio Rental for Melbourne Events" })).toBeInTheDocument();
-    expect(screen.getByText("Book now").closest("a")).toHaveAttribute("href", "/booking");
     expect(screen.getByText("View Packages").closest("a")).toHaveAttribute("href", "/packages");
     expect(screen.getByText("Call 0452 316 823").closest("a")).toHaveAttribute("href", "tel:0452316823");
     for (const pkg of packageTiers) {
@@ -55,14 +47,6 @@ describe("static site pages", () => {
     );
   });
 
-  it("booking page explains that requests require confirmation", async () => {
-    render(await BookingPage({ searchParams: Promise.resolve({}) }));
-
-    expect(screen.getByRole("heading", { name: "Making a booking" })).toBeInTheDocument();
-    expect(screen.getByText("The booking is only confirmed after Peppermint Audio reviews availability and confirms it.")).toBeInTheDocument();
-    expect(screen.getByLabelText("Booking form")).toBeInTheDocument();
-  });
-
   it("falls back to the first package for an unknown request", async () => {
     render(await PackagesPage({ searchParams: Promise.resolve({ package: "does-not-exist" }) }));
 
@@ -70,12 +54,6 @@ describe("static site pages", () => {
       "aria-selected",
       "true",
     );
-  });
-
-  it("passes a valid package selection through to the booking form", async () => {
-    render(await BookingPage({ searchParams: Promise.resolve({ package: "big-celebration" }) }));
-
-    expect(screen.getByLabelText("Booking form")).toHaveTextContent("big-celebration");
   });
 
   it("contact page passes a selected package to the enquiry form", async () => {
@@ -110,7 +88,7 @@ describe("static site pages", () => {
       expect(screen.getByText(`Step ${index + 1}`)).toBeInTheDocument();
       expect(screen.getByText(step.title)).toBeInTheDocument();
     }
-    expect(screen.getByText(/does not confirm the booking/i)).toBeInTheDocument();
+    expect(screen.getByText(/send one enquiry for your complete selection/i)).toBeInTheDocument();
     expect(screen.getByText("Browse packages").closest("a")).toHaveAttribute("href", "/packages");
     expect(screen.getByText("Hire individual equipment").closest("a")).toHaveAttribute("href", "/equipment");
   });
@@ -128,10 +106,4 @@ describe("static site pages", () => {
     expect(screen.getByText(/contact Peppermint Audio before powering up/i)).toBeInTheDocument();
   });
 
-  it("booking page introduces the booking form", async () => {
-    render(await BookingPage({ searchParams: Promise.resolve({}) }));
-
-    expect(screen.getByRole("heading", { name: "Making a booking" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Booking form")).toBeInTheDocument();
-  });
 });

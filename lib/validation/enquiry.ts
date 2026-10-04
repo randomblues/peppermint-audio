@@ -11,7 +11,6 @@ export const enquirySchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Please select a valid event date")
     .refine((value) => value >= getMelbourneToday(), "Event date must be today or later"),
   eventType: z.string().min(2, "Please enter event type"),
-  packageInterest: z.string().min(2, "Please choose a package"),
   message: z.string().min(10, "Please share a few event details"),
   website: z.string().max(0).optional(),
   attribution: z

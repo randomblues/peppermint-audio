@@ -28,7 +28,7 @@ The production site is deployed to Vercel from the private GitHub repository `ra
 ## Source-of-truth files
 
 - `lib/site-content.ts`: business details, package tiers, package inclusions, add-on catalog, FAQs, hire terms, and process copy. Do not duplicate package prices or add-on eligibility elsewhere.
-- `lib/validation/booking.ts` and `lib/validation/enquiry.ts`: server/client validation schemas.
+- `lib/validation/booking.ts`: server-side multipart intake validation; `lib/validation/enquiry.ts`: shared enquiry validation.
 - `lib/supabase.ts`: server/admin and browser/auth Supabase clients plus the private photo-ID bucket name.
 - `lib/admin-dashboard.ts`: booking status values, filtering, counts, and upcoming-booking logic.
 - `lib/pickup-reminders.ts`: pickup reminder date logic and branded email template.
@@ -37,33 +37,34 @@ The production site is deployed to Vercel from the private GitHub repository `ra
 
 ## Public routes and website behavior
 
-- `/`: homepage, package summaries, process, and primary booking CTA.
-- `/packages`: package detail tabs and custom-package enquiry CTA.
-- `/booking`: seven-step booking-request form. This is publicly linked as **Book now** from the navbar and homepage.
-- `/contact`: general enquiry form and package-aware enquiry links.
+- `/`: homepage, package summaries, process, and catalogue CTAs.
+- `/packages`: package detail tabs with package add-to-cart and detail actions.
+- `/equipment`: individual equipment catalogue with add-to-cart and detail actions.
+- `/cart`: customer hire selection review; the cart is the only public source of package/equipment selections.
+- `/contact`: general enquiry form, with optional package context from catalogue links.
 - `/how-it-works`, `/faq`, `/get-started`: informational pages.
 - `/robots.txt`, `/sitemap.xml`, `/icon.svg`: metadata/assets.
 - `/admin/login`: Supabase-authenticated admin login.
 - `/admin`: protected booking operations console.
 
-The booking page must describe the lifecycle accurately: submitting the form creates a request; it is not confirmed until Peppermint Audio reviews availability and confirms it. The final form state must not imply that submission itself is a confirmed booking.
+The public customer flow is catalogue → cart → enquiry. There is no public `/booking` page or **Book now** entry point. The cart sends customers to `/contact`; the enquiry confirms receipt only, and availability, final pricing, payment, and hire confirmation are handled by the admin workflow.
 
 ## Booking lifecycle and data flow
 
-1. A customer submits `/booking` with customer/event details, dates, package, optional package-specific add-ons, two photo-ID files, and accepted hire terms.
-2. `POST /api/booking` validates multipart form data with Zod, validates add-ons against the selected package, uploads both IDs to the private `booking-photo-ids` bucket, and inserts a row in `public.bookings` with `status: 'submitted'`.
-3. The booking route returns after validation, uploads, and persistence. Calendar/email side effects run in Next.js `after()` so the customer response is not delayed by integrations.
-4. The initial customer email confirms receipt of the request only. It must not say the booking is confirmed.
-5. An admin reviews the request in `/admin` and changes status from `submitted` to `confirmed` only after availability is checked.
-6. The confirmed transition sends the branded confirmation email automatically and records `confirmation_email_sent`.
-7. The admin **Send Email** menu can send a confirmation email, pickup reminder, or custom email. Confirmation resend is restricted to confirmed bookings.
+1. A customer adds packages and/or individual equipment to `/cart`, then sends an enquiry through `/contact`.
+2. `POST /api/enquiry` validates the enquiry and sends the customer message to the configured business inbox.
+3. An admin creates or manages the operational booking record in `/admin`, including canonical `hire_line_items`, dates, pricing, payment method, and security-deposit state.
+4. Payment uses Stripe authorisation/payment-intent flows for eligible short hires or bank transfer for longer hires, with deposit capture/release/refund handled by the admin payment workflow.
+5. An admin reviews availability and payment state before changing the booking to `confirmed`.
+6. The confirmed transition sends the branded confirmation email and records `confirmation_email_sent`.
+7. The admin **Send Email** menu can send a confirmation email, pickup reminder, invoice, or custom email. Confirmation resend is restricted to confirmed bookings.
 8. Other statuses are `completed` and `cancelled`. Cancelled/completed bookings are excluded from upcoming-booking logic and automated pickup reminders.
 
-The initial booking flow also attempts Google Calendar creation and internal/customer request emails. Calendar failure is recorded without invalidating the persisted request; email and persistence failures must be surfaced explicitly.
+The retained `POST /api/booking` route is a server-side multipart intake for compatibility and operational use; it is not linked from the public site. It validates canonical `hire_line_items`, uploads private photo IDs when used, persists a submitted booking, and runs calendar/email side effects in Next.js `after()`. Calendar failure is recorded without invalidating persistence; email and persistence failures must be surfaced explicitly.
 
 ## API route inventory
 
-- `POST /api/booking`: public booking request submission.
+- `POST /api/booking`: server-side multipart booking intake retained for operational/compatibility use; not linked by the public site.
 - `POST /api/enquiry`: public general enquiry email.
 - `GET/PATCH/DELETE /api/admin/bookings`: authenticated list, status/notes update, and destructive deletion with private-ID cleanup.
 - `POST /api/admin/export`: authenticated ZIP archive export containing booking CSV/JSON/readme and private IDs.
@@ -82,14 +83,15 @@ Admin routes must remain server-only. Never expose `SUPABASE_SERVICE_ROLE_KEY`, 
 The `public.bookings` table includes:
 
 - Identity/contact: `id`, `email`, `first_name`, `last_name`, `mobile`.
-- Event: `event_type`, `event_address`, `pickup_date`, `dropoff_date`, `guest_count`.
-- Hire: `package_interest`, `add_ons`, `additional_details`, `terms_accepted`.
-- Private IDs: `photo_id_paths` in the non-public `booking-photo-ids` bucket.
+- Event: `event_type`, `event_address`, `pickup_date`, `dropoff_date`.
+- Hire: `hire_line_items`, `hire_amount_cents`, `additional_details`, `terms_accepted`, `gst_inclusive`.
+- Payments: `payment_method`, `hire_payment_status`, `deposit_payment_status`, Stripe payment-intent IDs, and deposit capture/release fields.
+- Private IDs: `photo_id_paths` in the non-public `booking-photo-ids` bucket, used only by the retained server-side booking intake.
 - Lifecycle: `status` (`submitted`, `confirmed`, `completed`, `cancelled`).
 - Outcomes: `calendar_event_link`, `calendar_error`, `internal_email_sent`, `customer_email_sent`, `confirmation_email_sent`, `reminder_sent_at`.
 - Operations: `internal_notes`, `created_at`, `updated_at`.
 
-Run the full migration in Supabase after schema changes, especially before using confirmation tracking or add-ons in production. Existing production databases do not update automatically just because the repository migration changed.
+Run the full migration in Supabase after schema changes, especially before using confirmation tracking, hire line items, or payment fields in production. The migration removes obsolete `package_interest`, `add_ons`, and `guest_count` columns. Existing production databases do not update automatically just because the repository migration changed.
 
 ## Environment variables
 
@@ -129,6 +131,15 @@ Never put secret values in source files, test fixtures committed with real crede
 - Google Calendar events span pickup through drop-off and do not add customers as attendees.
 - A previously observed Google OAuth `invalid_grant` issue was caused by CRLF/newline characters in the Vercel refresh-token value. Keep refresh tokens as a clean single-line value.
 
+## Customer-facing content boundary
+
+**Internal implementation changes must strictly never leak internal information into customer-facing content.** Admin-only controls, internal notes, implementation details, diagnostic messages, schema or workflow rationale, legal/tax reasoning, and developer explanations must not appear in customer emails, invoices, receipts, PDFs, payment pages, booking confirmations, public pages, or other externally visible output unless that exact wording has been deliberately approved as customer copy.
+
+- Keep internal/admin state separate from customer-facing document and email copy.
+- When behavior changes internally, review every affected customer-facing surface instead of exposing the internal explanation by default.
+- For tax and legal behavior, expose only the accurate customer-facing result required for the document (for example, the appropriate document title and applicable totals), not the internal legal rationale.
+- Test both relevant states when wording depends on configuration, such as GST-inclusive versus non-GST invoices.
+
 ## Testing and verification
 
 Every behavior change requires unit tests. The suite currently covers API routes, booking/enquiry forms, admin operations, calendar helpers, validation, email templates, shared components, metadata pages, and UI primitives.
@@ -165,6 +176,7 @@ The focused test command is preferred while iterating; the full suite and build 
 - Vercel Cron invocation may be difficult to verify from the dashboard; use the authorized route and inspect logs carefully.
 - `after()` moves calendar/email work after the booking response; do not assume those side effects have completed when the HTTP response returns.
 - Use one localhost server per task. Before browser validation, check which process owns the target port, stop stale task-owned servers by PID, start one current server, and use one browser tab/URL consistently. Do not alternate between stale `localhost:3000`, `localhost:3001`, `localhost:3002`, or `localhost:3003` tabs.
+- **Reuse an existing browser tab when the required site or tool is already open. Do not open duplicate tabs or keep piling up browser tabs.**
 - If a browser tab does not reflect an edit, reload it and verify its URL, port, process, and rendered source before changing code again. Do not assume a stale tab proves the implementation is broken.
 - After a required browser check passes, do not repeat the same validation loop unless code or viewport behavior has changed. Report the result and move on.
 - Preserve unrelated working-tree changes. In particular, inspect `git status --short` before edits and never reset or checkout files as a recovery shortcut.
@@ -176,7 +188,7 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 
 ### 2026-10-03 — Conflicting localhost development servers
 
-- **Symptom:** Browser tabs showed different versions of the booking page, making current changes appear stuck or missing.
+- **Symptom:** Browser tabs showed different versions of the public site, making current changes appear stuck or missing.
 - **Root cause:** Multiple task-owned Next.js servers were left running on ports 3000–3003, and browser checks alternated between them.
 - **Prevention:** Use one canonical localhost port for the task; inspect and stop stale task-owned processes before starting it; verify the active browser URL and port before judging the UI.
 - **Next action:** Keep browser validation on `http://localhost:3000` unless that port is unavailable, and record the replacement port explicitly.
@@ -190,7 +202,7 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 
 ### 2026-10-03 — Browser test draft left in local storage
 
-- **Symptom:** The active localhost booking page reopened with a test email, making the page look stuck or incorrectly populated.
+- **Symptom:** The active localhost site reopened with test customer data, making the page look stuck or incorrectly populated.
 - **Root cause:** Browser validation data was written to the new booking draft storage and was not cleared before the next inspection.
 - **Prevention:** Use clearly disposable test data, clear the booking draft after browser checks, reload the page, and verify the form is clean before handing control back.
 - **Next action:** Never leave test customer data in the active browser tab or local storage.

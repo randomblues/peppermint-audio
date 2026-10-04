@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const zip = new JSZip();
   const rows = data ?? [];
-  const columns = ["id", "email", "first_name", "last_name", "mobile", "event_type", "event_address", "pickup_date", "pickup_time", "dropoff_date", "dropoff_time", "package_interest", "guest_count", "additional_details", "status", "internal_notes", "calendar_event_link", "calendar_error", "created_at", "updated_at"];
+  const columns = ["id", "email", "first_name", "last_name", "mobile", "event_type", "event_address", "pickup_date", "pickup_time", "dropoff_date", "dropoff_time", "hire_line_items", "additional_details", "status", "internal_notes", "calendar_event_link", "calendar_error", "created_at", "updated_at"];
   const csv = [columns.join(","), ...rows.map((row) => columns.map((column) => `"${String(row[column] ?? "").replaceAll('"', '""')}"`).join(","))].join("\n");
   zip.file("bookings.csv", csv);
   zip.file("bookings.json", JSON.stringify(rows, null, 2));

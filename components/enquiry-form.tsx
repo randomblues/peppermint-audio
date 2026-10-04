@@ -9,17 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DatePicker } from "@/components/date-picker";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { trackGoogleAdsConversion } from "@/lib/google-ads";
 import { getMelbourneToday } from "@/lib/date-utils";
-import { packageTiers } from "@/lib/site-content";
 import {
   enquirySchema,
   type EnquiryFormInputValues,
@@ -52,7 +44,6 @@ export function EnquiryForm({
     resolver: zodResolver(enquirySchema),
     defaultValues: {
       eventDate: "",
-      packageInterest: packageName ?? packageTiers[1]?.name ?? "",
     },
   });
 
@@ -118,7 +109,11 @@ export function EnquiryForm({
     <Card className="border">
       <CardHeader>
         <CardTitle>{heading}</CardTitle>
-        {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
+        {description || packageName ? (
+          <p className="text-sm text-muted-foreground">
+            {description ?? `Tell us about your ${packageName} hire and we will help with availability and pricing.`}
+          </p>
+        ) : null}
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="space-y-4">
@@ -176,36 +171,6 @@ export function EnquiryForm({
               />
               {errors.eventType ? <p className="text-xs text-destructive">{errors.eventType.message}</p> : null}
             </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="packageInterest">Package or equipment</Label>
-            <Controller
-              control={control}
-              name="packageInterest"
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger id="packageInterest" className="h-10 w-full">
-                    <SelectValue placeholder="Select a package" />
-                  </SelectTrigger>
-                  <SelectContent align="start">
-                    {packageName && !packageTiers.some((pkg) => pkg.name === packageName) ? (
-                      <SelectItem value={packageName}>{packageName}</SelectItem>
-                    ) : null}
-                    {packageTiers.map((pkg) => (
-                      <SelectItem key={pkg.slug} value={pkg.name}>
-                        {pkg.name}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="Custom package">Custom package</SelectItem>
-                    <SelectItem value="Not sure yet">Not sure yet</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-            />
-            {errors.packageInterest ? (
-              <p className="text-xs text-destructive">{errors.packageInterest.message}</p>
-            ) : null}
           </div>
 
           <div className="space-y-1.5">

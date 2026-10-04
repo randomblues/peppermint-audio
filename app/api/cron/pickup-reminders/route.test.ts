@@ -27,8 +27,7 @@ const bookings = [
     last_name: "Customer",
     event_type: "Party",
     pickup_date: "2026-09-29",
-    package_interest: "standard-party-events",
-    add_ons: [],
+    hire_line_items: [],
     additional_details: null,
   },
   {
@@ -38,8 +37,7 @@ const bookings = [
     last_name: "Customer",
     event_type: "Wedding",
     pickup_date: "2026-09-29",
-    package_interest: "big-celebration",
-    add_ons: ["Wireless microphone"],
+    hire_line_items: [],
     additional_details: "Details",
   },
 ];
@@ -115,7 +113,7 @@ describe("GET /api/cron/pickup-reminders", () => {
     expect(response.status).toBe(200);
     expect(getMelbourneTomorrow).toHaveBeenCalledOnce();
     const query = createAdminClient.mock.results[0].value.from.mock.results[0].value;
-    expect(query.select).toHaveBeenCalledWith("id,email,first_name,last_name,event_type,pickup_date,pickup_time,package_interest,add_ons,additional_details");
+    expect(query.select).toHaveBeenCalledWith("id,email,first_name,last_name,event_type,pickup_date,pickup_time,hire_line_items,additional_details");
     expect(query.eq).toHaveBeenCalledWith("pickup_date", "2026-09-29");
     expect(query.neq).toHaveBeenCalledWith("status", "cancelled");
     expect(query.is).toHaveBeenCalledWith("reminder_sent_at", null);

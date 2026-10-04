@@ -136,16 +136,15 @@ describe("app wrappers and metadata", () => {
   it("returns public routes with the expected sitemap priorities", () => {
     const entries = sitemap();
 
-    expect(entries.slice(0, 7)).toEqual([
+    expect(entries.slice(0, 6)).toEqual([
       { url: business.website, changeFrequency: "weekly", priority: 1 },
       { url: `${business.website}/packages`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${business.website}/equipment`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${business.website}/how-it-works`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${business.website}/faq`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${business.website}/contact`, changeFrequency: "monthly", priority: 0.7 },
-      { url: `${business.website}/booking`, changeFrequency: "monthly", priority: 0.7 },
     ]);
-    expect(entries).toHaveLength(7 + equipmentCatalog.length);
+    expect(entries).toHaveLength(6 + equipmentCatalog.length);
     for (const item of equipmentCatalog) {
       expect(entries).toContainEqual({
         url: `${business.website}/equipment/${item.slug}`,

@@ -3,6 +3,7 @@ import { Resend } from "resend";
 
 import { emailFooterText } from "@/lib/email-footer";
 import { recordCustomerEmail } from "@/lib/email-log";
+import { emailDetailsTable, emailLayout, emailPanel } from "@/lib/email-template";
 import { createAdminClient } from "@/lib/supabase";
 import { enquirySchema } from "@/lib/validation/enquiry";
 
@@ -55,7 +56,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { name, email, phone, eventDate, eventType, packageInterest, message, attribution } =
+    const { name, email, phone, eventDate, eventType, message, attribution } =
       parsed.data;
     const attributionLines = [
       attribution?.gclid ? `Google click ID: ${attribution.gclid}` : null,
@@ -72,7 +73,6 @@ export async function POST(request: Request) {
       `Phone: ${phone}`,
       `Event date: ${eventDate}`,
       `Event type: ${eventType}`,
-      `Package interest: ${packageInterest}`,
       ...(attributionLines.length > 0 ? ["", "Marketing attribution:", ...attributionLines] : []),
       "",
       "Event details:",
@@ -87,6 +87,20 @@ export async function POST(request: Request) {
       replyTo: email,
       subject: `New enquiry: ${eventType} on ${eventDate}`,
       text,
+      html: emailLayout({
+        eyebrow: "New enquiry",
+        title: "A new enquiry needs a reply",
+        intro: "A customer has sent an enquiry through the Peppermint Audio website.",
+        content: emailPanel(emailDetailsTable([
+          { label: "Name", value: name },
+          { label: "Email", value: email },
+          { label: "Phone", value: phone },
+          { label: "Event date", value: eventDate },
+          { label: "Event type", value: eventType },
+          { label: "Event details", value: message },
+          ...(attributionLines.length > 0 ? [{ label: "Attribution", value: attributionLines.join(" · ") }] : []),
+        ]), "accent"),
+      }),
     });
     if (response.error) throw new Error(response.error.message);
     try {

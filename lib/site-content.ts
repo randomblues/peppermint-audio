@@ -14,6 +14,7 @@ export type PackageTier = {
 export type AddOn = {
   name: string;
   price: number;
+  category?: "DI boxes" | "Lighting" | "Microphones" | "Mixers" | "Accessories";
   image?: string;
   imageSize?: "compact";
 };
@@ -81,46 +82,55 @@ export const addOnCatalog: Record<string, AddOn> = {
   "party-lights-bar": {
     name: "CR Lite MagikBar Hub Party Bar",
     price: 30,
+    category: "Lighting",
     image: "/cr-lite-magikbar.avif",
   },
   "wireless-microphones": {
     name: "Wireless Microphone Upgrade",
     price: 20,
+    category: "Microphones",
   },
   "di-box": {
     name: "Pro DI Box",
     price: 15,
+    category: "DI boxes",
     image: "/pro-di-box.webp",
   },
   "generic-di-box": {
     name: "Generic DI Box",
     price: 10,
+    category: "DI boxes",
     image: "/generic-di-box.jpg",
   },
   "four-channel-di-box": {
     name: "4-Channel DI Box",
     price: 20,
+    category: "DI boxes",
     image: "/dbx-di4.jpg",
     imageSize: "compact",
   },
   "spirit-e12-mixer": {
     name: "Spirit E12 / 12-Channel Soundcraft Mixer Upgrade",
     price: 30,
+    category: "Mixers",
     image: "/soundcraft-spirit-e12.jpg",
   },
   "behringer-x32": {
     name: "Behringer X32 Digital Mixer Upgrade",
     price: 110,
+    category: "Mixers",
     image: "/behringer-x32.jpg",
   },
   "party-light-par-can": {
     name: "Party Light PAR Can",
     price: 10,
+    category: "Lighting",
     image: "/par-can-generic.jpg",
   },
   "extension-reel-10m": {
     name: "10m Extension Reel",
     price: 10,
+    category: "Accessories",
     image: "/10m-extension-reel.jpeg",
   },
 };
@@ -221,7 +231,7 @@ export const equipmentCatalog: EquipmentItem[] = [
     .map(([slug, addOn]) => ({
     slug: `hire-${slug}`,
     name: addOn.name.replace(" Upgrade", ""),
-    category: "Mixers, microphones & lighting",
+    category: addOn.category ?? "Accessories",
     description: `Add this item on its own when you only need ${addOn.name.toLowerCase().replace(" upgrade", "")}.`,
     image: addOn.image,
     imageSize: addOn.imageSize,
@@ -427,9 +437,9 @@ export const howItWorks = [
       "Browse complete packages or individual equipment. Add a package, specific items, or both to your cart.",
   },
   {
-    title: "Submit a booking request",
+    title: "Send an enquiry",
     detail:
-      "Open your cart, enter your event details, upload both required photo IDs, and accept the hire terms. Sending the request does not confirm the booking.",
+      "Open your cart and send one enquiry for your complete selection. This lets us check availability and discuss the hire details with you.",
   },
   {
     title: "We review availability",

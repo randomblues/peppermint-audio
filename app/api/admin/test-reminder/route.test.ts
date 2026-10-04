@@ -23,8 +23,7 @@ const booking = {
   last_name: "Customer",
   event_type: "Wedding",
   pickup_date: "2026-09-29",
-  package_interest: "big-celebration",
-  add_ons: ["Wireless microphone"],
+  hire_line_items: [],
   additional_details: "Needs a cable",
 };
 
@@ -81,7 +80,7 @@ describe("POST /api/admin/test-reminder", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, id: "email-id" });
-    expect(query.select).toHaveBeenCalledWith("email,first_name,last_name,event_type,pickup_date,pickup_time,package_interest,add_ons,additional_details");
+    expect(query.select).toHaveBeenCalledWith("email,first_name,last_name,event_type,pickup_date,pickup_time,hire_line_items,additional_details");
     expect(query.eq).toHaveBeenCalledWith("id", "booking-1");
     expect(buildPickupReminderEmail).toHaveBeenCalledWith(booking);
     expect(send).toHaveBeenCalledWith(expect.objectContaining({ to: ["booked@example.com"] }));

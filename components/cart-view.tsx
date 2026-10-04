@@ -8,14 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function CartView() {
   const { items, total, removeItem, updateQuantity, clearCart } = useCart();
-  const cartQuery = encodeURIComponent(JSON.stringify(items));
-
   if (!items.length) {
     return (
       <Card>
         <CardHeader><CardTitle>Your cart is empty</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-muted-foreground">Add a package or individual equipment to start your booking request.</p>
+          <p className="text-muted-foreground">Add a package or individual equipment to start your enquiry.</p>
           <Button nativeButton={false} render={<Link href="/equipment" />}>Browse equipment</Button>
         </CardContent>
       </Card>
@@ -45,11 +43,11 @@ export function CartView() {
         </CardContent>
       </Card>
       <Card className="h-fit">
-        <CardHeader><CardTitle>Booking request</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Hire enquiry</CardTitle></CardHeader>
         <CardContent>
           <div className="flex items-center justify-between text-lg font-semibold"><span>Estimated hire total</span><span>${total}</span></div>
           <p className="mt-2 text-sm text-muted-foreground">Availability and final pricing are confirmed before your hire is accepted.</p>
-          <Button className="mt-5 w-full" nativeButton={false} render={<Link href={`/booking?cart=${cartQuery}`} />}>Continue to booking</Button>
+          <Button className="mt-5 w-full" nativeButton={false} render={<Link href="/contact" />}>Send an enquiry</Button>
         </CardContent>
       </Card>
     </div>

@@ -1,12 +1,28 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { TimePicker } from "./time-picker";
 
+function ControlledTimePicker({ onChange }: { onChange: (value: string) => void }) {
+  const [value, setValue] = useState("");
+  return (
+    <TimePicker
+      id="pickup-time"
+      label="Pickup time"
+      value={value}
+      onChange={(nextValue) => {
+        setValue(nextValue);
+        onChange(nextValue);
+      }}
+    />
+  );
+}
+
 describe("TimePicker", () => {
   it("sets a time with the segmented controls", () => {
     const onChange = vi.fn();
-    render(<TimePicker id="pickup-time" label="Pickup time" value="" onChange={onChange} />);
+    render(<ControlledTimePicker onChange={onChange} />);
 
     expect(screen.getByRole("button", { name: /Pickup time/ })).toHaveClass(
       "[@media(pointer:coarse)]:hidden",
@@ -17,7 +33,16 @@ describe("TimePicker", () => {
     fireEvent.change(within(dialog).getByLabelText("Pickup time minute"), { target: { value: "30" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "PM" }));
     expect(onChange).toHaveBeenLastCalledWith("22:30");
+    expect(screen.getByRole("button", { name: /Pickup time/ })).toHaveTextContent("10:30 PM");
 
+  });
+
+  it("reflects controlled changes from the native time input", () => {
+    const onChange = vi.fn();
+    const view = render(<ControlledTimePicker onChange={onChange} />);
+
+    fireEvent.change(view.container.querySelector('input[type="time"]')!, { target: { value: "14:45" } });
+    expect(onChange).toHaveBeenLastCalledWith("14:45");
   });
 
   it("clears a selected time", () => {
@@ -27,5 +52,16 @@ describe("TimePicker", () => {
     fireEvent.click(screen.getByRole("button", { name: /Pickup time/ }));
     fireEvent.click(screen.getByRole("button", { name: "Clear pickup time" }));
     expect(onChange).toHaveBeenLastCalledWith("");
+  });
+
+  it("commits the default draft when Done is pressed immediately", () => {
+    const onChange = vi.fn();
+    render(<ControlledTimePicker onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Pickup time/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+
+    expect(onChange).toHaveBeenLastCalledWith("09:00");
+    expect(screen.getByRole("button", { name: /Pickup time/ })).toHaveTextContent("9:00 AM");
   });
 });

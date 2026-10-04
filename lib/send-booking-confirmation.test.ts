@@ -7,13 +7,19 @@ vi.mock("resend", () => ({ Resend: vi.fn(() => ({ emails: { send } })) }));
 import { sendBookingConfirmationEmail } from "./send-booking-confirmation";
 
 const booking = {
+  id: "12345678-90ab-cdef-1234-567890abcdef",
   email: "customer@example.com",
   first_name: "Alex",
   event_type: "Wedding",
   pickup_date: "2026-10-09",
   dropoff_date: "2026-10-11",
-  package_interest: "Standard Party & Events Package",
-  add_ons: ["Wireless Microphone Upgrade"],
+  hire_line_items: [{
+    id: "package:standard-party-events",
+    kind: "package",
+    name: "Standard Party & Events Package",
+    quantity: 1,
+    unitPriceCents: 16000,
+  }],
 };
 
 describe("sendBookingConfirmationEmail", () => {
@@ -32,6 +38,9 @@ describe("sendBookingConfirmationEmail", () => {
       to: ["customer@example.com"],
       subject: "Your booking with Peppermint Audio has been confirmed.",
       text: expect.not.stringContaining("Same-day pickup details:"),
+    }));
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({
+      text: expect.stringContaining("Booking reference: PA-1234567890AB"),
     }));
   });
 
@@ -56,6 +65,6 @@ describe("sendBookingConfirmationEmail", () => {
 
     vi.stubEnv("RESEND_API_KEY", "key");
     send.mockResolvedValue({ data: null, error: { message: "provider down" } });
-    await expect(sendBookingConfirmationEmail(booking)).rejects.toThrow("Booking confirmation email could not be sent.");
+    await expect(sendBookingConfirmationEmail(booking)).rejects.toThrow("Booking confirmation email could not be sent: provider down");
   });
 });

@@ -9,5 +9,7 @@ describe("email footer", () => {
     expect(emailFooterText).toContain("contactus@peppermintaudio.com.au · 0452 316 823");
     expect(emailFooterHtml).toContain("mailto:contactus@peppermintaudio.com.au");
     expect(emailFooterHtml).toContain("tel:+61452316823");
+    expect(emailFooterHtml).toContain("background:#16251f");
+    expect(emailFooterHtml).toContain("Pickup and return in Abbotsford 3067");
   });
 });

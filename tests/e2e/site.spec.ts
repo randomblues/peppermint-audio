@@ -11,7 +11,7 @@ const publicRoutes = [
 test.describe("public pages", () => {
   for (const route of publicRoutes) {
     test(`${route.path} renders without horizontal overflow`, async ({ page }) => {
-      const response = await page.goto(route.path);
+      const response = await page.goto(route.path, { waitUntil: "domcontentloaded" });
 
       expect(response?.status()).toBe(200);
       await expect(page.getByRole("heading", { name: route.heading })).toBeVisible();
@@ -28,18 +28,18 @@ test.describe("public pages", () => {
 test.describe("navigation", () => {
   test("desktop navigation reaches every primary page", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium");
-    await page.goto("/");
+    await page.goto("/", { waitUntil: "domcontentloaded" });
 
     for (const route of publicRoutes.slice(1)) {
       if (route.path === "/packages") {
         await page.getByRole("navigation").getByRole("button", { name: "Products" }).click();
-        await page.getByRole("navigation").locator(`a[href="${route.path}"]`).click();
+        await page.locator('a[href="/packages"]:visible').last().click();
       } else {
         await page.getByRole("navigation").locator(`a[href="${route.path}"]`).click();
       }
       await expect(page).toHaveURL(new RegExp(`${route.path.replace("/", "\\/")}$`));
       await expect(page.getByRole("heading", { name: route.heading })).toBeVisible();
-      await page.goto("/");
+      await page.goto("/", { waitUntil: "domcontentloaded" });
     }
   });
 
@@ -72,7 +72,7 @@ test.describe("contact form", () => {
   test("preselects a package from the URL", async ({ page }) => {
     await page.goto("/contact?package=big-celebration");
 
-    await expect(page.locator("#packageInterest")).toContainText("Big Celebration Package");
+    await expect(page.getByText("Tell us about your Big Celebration Package hire", { exact: false })).toBeVisible();
   });
 
   test("shows validation errors for an empty submission", async ({ page }) => {

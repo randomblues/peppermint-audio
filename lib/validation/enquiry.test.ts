@@ -7,7 +7,6 @@ const validEnquiry = {
   phone: "0412345678",
   eventDate: "2099-10-01",
   eventType: "Birthday",
-  packageInterest: "standard",
   message: "A party with music and speeches.",
 };
 

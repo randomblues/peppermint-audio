@@ -5,13 +5,14 @@ create table if not exists public.bookings (
   email text not null, first_name text not null, last_name text not null, mobile text not null,
   event_type text not null, event_address text not null, pickup_date date not null, dropoff_date date not null,
   pickup_time time, dropoff_time time,
-  package_interest text not null, add_ons text[] not null default '{}', guest_count integer, additional_details text not null default '',
+  additional_details text not null default '',
   terms_accepted boolean not null default false, photo_id_paths text[] not null default '{}',
   status text not null default 'submitted' check (status in ('submitted','confirmed','completed','cancelled')),
   calendar_event_link text, calendar_error text, internal_email_sent boolean not null default false,
   customer_email_sent boolean not null default false, confirmation_email_sent boolean not null default false,
   payment_received_at timestamptz, bank_transfer_refunded_at timestamptz,
   payment_method text, hire_amount_cents integer, security_deposit_cents integer,
+  hire_line_items jsonb not null default '[]'::jsonb,
   gst_inclusive boolean not null default true,
   hire_payment_status text not null default 'unpaid', deposit_payment_status text not null default 'not_required',
   bank_transfer_option text not null default 'both' check (bank_transfer_option in ('payid','bank_account','both')),
@@ -34,12 +35,12 @@ create index if not exists booking_email_log_sent_at_idx on public.booking_email
 alter table public.booking_email_log drop constraint if exists booking_email_log_email_type_check;
 alter table public.booking_email_log add constraint booking_email_log_email_type_check check (email_type in ('booking_request','confirmation','pickup_reminder','custom','invoice','payment_receipt','deposit_authorisation','deposit_release','deposit_capture','enquiry'));
 alter table public.bookings add column if not exists reminder_sent_at timestamptz;
-alter table public.bookings add column if not exists add_ons text[] not null default '{}';
 alter table public.bookings add column if not exists confirmation_email_sent boolean not null default false;
 alter table public.bookings add column if not exists pickup_time time;
 alter table public.bookings add column if not exists dropoff_time time;
 alter table public.bookings add column if not exists payment_method text;
 alter table public.bookings add column if not exists hire_amount_cents integer;
+alter table public.bookings add column if not exists hire_line_items jsonb not null default '[]'::jsonb;
 alter table public.bookings add column if not exists security_deposit_cents integer;
 alter table public.bookings add column if not exists gst_inclusive boolean not null default true;
 alter table public.bookings add column if not exists hire_payment_status text not null default 'unpaid';
@@ -55,6 +56,8 @@ alter table public.bookings add column if not exists bank_transfer_reference tex
 alter table public.bookings add column if not exists payment_received_at timestamptz;
 alter table public.bookings add column if not exists bank_transfer_refunded_at timestamptz;
 alter table public.bookings add column if not exists bank_transfer_option text not null default 'both';
+alter table public.bookings drop constraint if exists bookings_status_check;
+alter table public.bookings add constraint bookings_status_check check (status in ('submitted','confirmed','completed','cancelled'));
 alter table public.bookings drop constraint if exists bookings_bank_transfer_option_check;
 alter table public.bookings add constraint bookings_bank_transfer_option_check check (bank_transfer_option in ('payid','bank_account','both'));
 create unique index if not exists bookings_payment_token_idx on public.bookings(payment_token) where payment_token is not null;
@@ -108,7 +111,11 @@ returns trigger language plpgsql as $$ begin new.updated_at = now(); return new;
 drop trigger if exists invoices_updated_at on public.invoices;
 create trigger invoices_updated_at before update on public.invoices
 for each row execute function public.set_bookings_updated_at();
-alter table public.bookings alter column guest_count drop not null;
+alter table public.bookings drop column if exists package_interest;
+alter table public.bookings drop column if exists add_ons;
+alter table public.bookings drop column if exists guest_count;
+alter table public.bookings drop constraint if exists bookings_supersedes_booking_id_fkey;
+alter table public.bookings drop column if exists supersedes_booking_id;
 alter table public.bookings enable row level security;
 revoke all on public.bookings from anon, authenticated;
 drop policy if exists "service role manages bookings" on public.bookings;

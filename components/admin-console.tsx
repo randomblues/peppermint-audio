@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
 import {
-  Archive, CalendarDays, CheckCircle2, ChevronRight, Clock3, Download, FileSpreadsheet,
+  Archive, CalendarDays, CheckCircle2, ChevronRight, Clock3, CreditCard, Download, FileSpreadsheet,
   ExternalLink, FileText, LayoutDashboard, LogOut, Mail, Menu, RefreshCw,
   Search, ShieldCheck, UserRound, X, XCircle,
 } from "lucide-react";
@@ -12,18 +12,23 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { bookingStatuses, filterBookings, isUpcoming, statusCounts } from "@/lib/admin-dashboard";
 import { buildBookingConfirmationEmail } from "@/lib/booking-confirmation-email";
+import { bookingReferenceForId } from "@/lib/booking-reference";
+import { lineItemsForBooking } from "@/lib/booking-line-items";
+import { formatAudCents } from "@/lib/payment-flow";
 import { buildPickupReminderEmail } from "@/lib/pickup-reminders";
 import { calculateMedicareLevy, calculateResidentIncomeTax, type IncomeTaxYear } from "@/lib/income-tax";
 import type { BankTransferOption } from "@/lib/bank-transfer";
 import { AdminPaymentPanel } from "@/components/admin-payment-panel";
+import type { BookingLineItem } from "@/lib/booking-line-items";
 
 type Booking = Record<string, unknown> & {
   id: string; first_name: string; last_name: string; event_type: string;
   pickup_date: string; dropoff_date?: string; pickup_time?: string | null; dropoff_time?: string | null; status: string;
-  email?: string; package_interest?: string; additional_details?: string | null;
-  internal_notes?: string; photo_id_paths?: string[]; add_ons?: string[];
-  mobile?: string; event_address?: string; guest_count?: number | null; gst_inclusive?: boolean | null;
+  email?: string; additional_details?: string | null;
+  internal_notes?: string; photo_id_paths?: string[];
+  mobile?: string; event_address?: string; gst_inclusive?: boolean | null;
   hire_amount_cents?: number | null; security_deposit_cents?: number | null; payment_method?: string | null;
+  hire_line_items?: BookingLineItem[] | null;
   hire_payment_status?: string | null; deposit_payment_status?: string | null; payment_token?: string | null;
   deposit_captured_cents?: number | null;
   bank_transfer_option?: BankTransferOption | null;
@@ -71,19 +76,19 @@ const emailTemplates = [
   { value: "pickup-details", label: "Pickup details" },
 ] as const;
 function emailTemplateContent(value: string, booking: Booking) {
+  const hireItems = lineItemsForBooking(booking);
   if (value === "booking-confirmation") {
     const email = buildBookingConfirmationEmail({
+      bookingReference: bookingReferenceForId(booking.id),
       firstName: booking.first_name,
       eventType: booking.event_type,
       pickupDate: booking.pickup_date,
       dropoffDate: booking.dropoff_date ?? booking.pickup_date,
       pickupTime: booking.pickup_time,
       dropoffTime: booking.dropoff_time,
-      packageInterest: booking.package_interest ?? "Your selected package",
-      addOns: booking.add_ons ?? [],
+      hireLineItems: hireItems,
       pickupInstructions: {
-        package_interest: booking.package_interest ?? "",
-        add_ons: booking.add_ons ?? [],
+        hire_line_items: hireItems,
         additional_details: booking.additional_details ?? null,
       },
     });
@@ -97,8 +102,7 @@ function emailTemplateContent(value: string, booking: Booking) {
       event_type: booking.event_type,
       pickup_date: booking.pickup_date,
       pickup_time: booking.pickup_time,
-      package_interest: booking.package_interest ?? "",
-      add_ons: booking.add_ons ?? [],
+      hire_line_items: hireItems,
       additional_details: booking.additional_details ?? null,
     });
     return { subject: email.subject, message: email.text };
@@ -286,6 +290,20 @@ export function AdminConsole() {
   );
 }
 
+function SavedHireItems({ booking }: { booking: Booking }) {
+  const items = lineItemsForBooking(booking);
+  return <section aria-labelledby="saved-hire-items-title" className="rounded-xl border p-4">
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <h3 id="saved-hire-items-title" className="text-sm font-semibold">Hire items</h3>
+        <p className="mt-1 text-xs text-muted-foreground">Current items saved to this booking.</p>
+      </div>
+      <p className="shrink-0 text-sm font-semibold">{formatAudCents(items.reduce((total, item) => total + item.unitPriceCents * item.quantity, 0))}</p>
+    </div>
+    {items.length ? <div className="mt-3 divide-y rounded-lg border">{items.map((item) => <div key={item.id} className="flex items-start justify-between gap-3 p-3 text-sm"><div className="min-w-0"><p className="break-words font-medium">{item.name}</p>{item.option ? <p className="text-xs text-muted-foreground">{item.option}</p> : null}<p className="text-xs text-muted-foreground">Quantity: {item.quantity} · {formatAudCents(item.unitPriceCents)} each</p></div><p className="shrink-0 font-medium">{formatAudCents(item.unitPriceCents * item.quantity)}</p></div>)}</div> : <p className="mt-3 rounded-lg bg-muted p-3 text-sm text-muted-foreground">No saved hire items.</p>}
+  </section>;
+}
+
 function BookingDetail({ booking, onClose, onUpdate, onPhoto, onDelete, onSendEmail, onPaymentUpdated }: { booking: Booking; onClose: () => void; onUpdate: (id: string, values: { status?: string; internal_notes?: string }) => Promise<void>; onPhoto: (path: string) => Promise<void>; onDelete: (id: string) => Promise<void>; onSendEmail: (id: string, subject: string, message: string, attachment: File | null) => Promise<boolean>; onPaymentUpdated: (id: string, values: Partial<Booking>) => void }) {
   const [notes, setNotes] = useState(booking.internal_notes ?? "");
   const [emailOpen, setEmailOpen] = useState(false);
@@ -293,17 +311,26 @@ function BookingDetail({ booking, onClose, onUpdate, onPhoto, onDelete, onSendEm
   const [customSubject, setCustomSubject] = useState("");
   const [customMessage, setCustomMessage] = useState("");
   const [customFile, setCustomFile] = useState<File | null>(null);
+  const [paymentOpen, setPaymentOpen] = useState(false);
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
   }, [onClose]);
-  return <div className="fixed inset-0 z-40 flex justify-end bg-black/30" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+  return <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <aside role="dialog" aria-modal="true" aria-labelledby="booking-detail-title" className="flex h-full w-full max-w-xl flex-col overflow-hidden bg-background shadow-2xl">
-      <div className="flex shrink-0 items-start justify-between border-b bg-background p-4 sm:p-5"><div className="min-w-0 pr-3"><p className="text-sm text-primary">Booking details</p><h2 id="booking-detail-title" className="mt-1 break-words text-xl font-semibold sm:text-2xl">{booking.first_name} {booking.last_name}</h2><p className="truncate text-sm text-muted-foreground">{display(booking.event_type)} · {formatDate(booking.pickup_date)}</p></div><Button variant="ghost" size="icon" onClick={onClose} aria-label="Close details"><X /></Button></div>
-      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4 sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><Badge className={statusClass(booking.status)}>{statusLabel(booking.status)}</Badge><label className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><span>Status</span><select aria-label="Update booking status" value={booking.status} onChange={(e) => void onUpdate(booking.id, { status: e.target.value })} className="h-9 rounded-lg border bg-background px-3 text-sm font-normal text-foreground">{statuses.map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}</select></label></div><div className="grid grid-cols-1 gap-4 rounded-xl border p-4 text-sm sm:grid-cols-2"><Detail label="Customer" value={`${booking.first_name} ${booking.last_name}`} icon={<UserRound />} /><Detail label="Email" value={display(booking.email)} icon={<Mail />} /><Detail label="Mobile" value={display(booking.mobile)} /><Detail label="Event address" value={display(booking.event_address)} />      <Detail label="Pickup" value={`${formatDate(booking.pickup_date)} at ${formatTime(booking.pickup_time)}`} /><Detail label="Drop-off" value={`${formatDate(booking.dropoff_date)} at ${formatTime(booking.dropoff_time)}`} /><Detail label="Package" value={display(booking.package_interest)} /><Detail label="Guests" value={display(booking.guest_count)} /><Detail label="Add-ons" value={booking.add_ons?.length ? booking.add_ons.join(", ") : "None selected"} /></div><AdminPaymentPanel booking={booking} onChanged={(values) => onPaymentUpdated(booking.id, values)} /><div><h3 className="mb-2 text-sm font-semibold">Additional details</h3><p className="break-words rounded-lg bg-muted p-3 text-sm leading-relaxed">{display(booking.additional_details)}</p></div><div><h3 className="mb-2 text-sm font-semibold">Internal notes</h3><textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-24 w-full resize-y rounded-lg border bg-background p-3 text-sm" placeholder="Add a private note for the team…" /><Button size="sm" className="mt-2" onClick={() => void onUpdate(booking.id, { internal_notes: notes })}>Save notes</Button></div><div className="flex justify-end"><Button size="sm" onClick={() => setEmailOpen(true)}>Send Email</Button></div>{booking.photo_id_paths?.length ? <div><h3 className="mb-2 text-sm font-semibold">Photo ID</h3><div className="flex flex-wrap gap-2">{booking.photo_id_paths.map((path) => <Button key={path} variant="outline" size="sm" onClick={() => void onPhoto(path)}>View private ID <ExternalLink /></Button>)}</div></div> : null}<Button variant="destructive" className="w-full" onClick={() => void onDelete(booking.id)}>Permanently delete booking</Button></div>
+      <div className="flex shrink-0 items-start justify-between border-b bg-background p-4 sm:p-5"><div className="min-w-0 pr-3"><p className="text-sm text-primary">Booking details</p><h2 id="booking-detail-title" className="mt-1 break-all text-xl font-semibold leading-tight sm:text-2xl">{booking.first_name} {booking.last_name}</h2><p className="mt-1 break-words text-sm text-muted-foreground">{display(booking.event_type)} · {formatDate(booking.pickup_date)}</p><p className="mt-1 text-xs font-medium text-primary">Booking reference: {bookingReferenceForId(booking.id)}</p></div><Button variant="ghost" size="icon" onClick={onClose} aria-label="Close details"><X /></Button></div>
+      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4 sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><Badge className={statusClass(booking.status)}>{statusLabel(booking.status)}</Badge><label className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><span>Status</span><select aria-label="Update booking status" value={booking.status} onChange={(e) => void onUpdate(booking.id, { status: e.target.value })} className="h-9 rounded-lg border bg-background px-3 text-sm font-normal text-foreground">{statuses.map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}</select></label></div><div className="grid grid-cols-1 gap-4 rounded-xl border p-4 text-sm sm:grid-cols-2"><Detail label="Customer" value={`${booking.first_name} ${booking.last_name}`} icon={<UserRound />} /><Detail label="Email" value={display(booking.email)} icon={<Mail />} /><Detail label="Booking reference" value={bookingReferenceForId(booking.id)} /><Detail label="Mobile" value={display(booking.mobile)} /><Detail label="Event address" value={display(booking.event_address)} />      <Detail label="Pickup" value={`${formatDate(booking.pickup_date)} at ${formatTime(booking.pickup_time)}`} /><Detail label="Drop-off" value={`${formatDate(booking.dropoff_date)} at ${formatTime(booking.dropoff_time)}`} />{booking.photo_id_paths?.length ? <div className="sm:col-start-2 sm:col-span-1"><h3 className="mb-2 text-sm font-semibold">Photo ID</h3><div className="flex flex-col items-stretch gap-2">{booking.photo_id_paths.map((path) => <Button key={path} variant="outline" size="sm" onClick={() => void onPhoto(path)}>View private ID <ExternalLink /></Button>)}</div></div> : null}</div><SavedHireItems booking={booking} /><div><h3 className="mb-2 text-sm font-semibold">Additional details</h3><p className="break-words rounded-lg bg-muted p-3 text-sm leading-relaxed">{display(booking.additional_details)}</p></div><div><h3 className="mb-2 text-sm font-semibold">Internal notes</h3><textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-24 w-full resize-y rounded-lg border bg-background p-3 text-sm" placeholder="Add a private note for the team…" /><Button size="sm" className="mt-2" onClick={() => void onUpdate(booking.id, { internal_notes: notes })}>Save notes</Button></div><Card><CardContent className="p-4 sm:p-5"><div className="flex items-center gap-2"><CreditCard className="size-4 text-primary" /><h3 className="text-base font-semibold">Payment collection</h3></div><p className="mt-1 text-sm text-muted-foreground">Create, update, and manage payment for this booking.</p><Button className="mt-4 w-full" onClick={() => setPaymentOpen(true)}>Open payment collection</Button></CardContent></Card><Card><CardContent className="p-4 sm:p-5"><div className="flex items-center gap-2"><Mail className="size-4 text-primary" /><h3 className="text-base font-semibold">Send Email</h3></div><p className="mt-1 text-sm text-muted-foreground">Send a message or document to this customer.</p><Button className="mt-4 w-full" onClick={() => setEmailOpen(true)}>Send Email</Button></CardContent></Card><Button variant="destructive" className="w-full" onClick={() => void onDelete(booking.id)}>Permanently delete booking</Button></div>
+      {paymentOpen ? (
+        <div role="dialog" aria-modal="true" aria-labelledby="payment-collection-title" className="fixed inset-0 z-[60] flex items-stretch justify-center bg-black/40 sm:items-center sm:p-4">
+          <div className="flex h-full w-full max-w-3xl flex-col overflow-y-auto border bg-background shadow-2xl sm:max-h-[90vh] sm:rounded-2xl">
+            <header className="flex shrink-0 items-center justify-between gap-4 border-b px-5 py-4 sm:px-6"><h2 id="payment-collection-title" className="text-lg font-semibold">Payment collection</h2><Button variant="ghost" size="icon" onClick={() => setPaymentOpen(false)} aria-label="Close payment collection"><X /></Button></header>
+            <div className="p-4 sm:p-6"><AdminPaymentPanel key={`modal-${booking.id}`} booking={booking} collapsible={false} onChanged={(values) => onPaymentUpdated(booking.id, values)} /></div>
+          </div>
+        </div>
+      ) : null}
       {emailOpen ? (
-        <div role="dialog" aria-modal="true" aria-labelledby="send-email-title" className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/40 sm:items-center sm:p-4">
+        <div role="dialog" aria-modal="true" aria-labelledby="send-email-title" className="fixed inset-0 z-[60] flex items-stretch justify-center bg-black/40 sm:items-center sm:p-4">
           <div className="flex h-full w-full max-w-2xl flex-col overflow-hidden border bg-background shadow-2xl sm:h-auto sm:max-h-[min(90vh,840px)] sm:rounded-2xl">
             <header className="flex shrink-0 items-start justify-between gap-4 border-b px-5 py-4 sm:px-6">
               <div className="flex min-w-0 items-start gap-3">

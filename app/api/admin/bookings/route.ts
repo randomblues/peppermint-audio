@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { PHOTO_ID_BUCKET } from "@/lib/supabase";
 import { sendBookingConfirmationEmail } from "@/lib/send-booking-confirmation";
 import { recordCustomerEmail } from "@/lib/email-log";
+import { parseBookingLineItems, type BookingLineItem } from "@/lib/booking-line-items";
 
 export async function GET(request: Request) {
   const session = await requireAdmin();
@@ -38,13 +39,29 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   const session = await requireAdmin();
   if (!session) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
-  let body: { id?: string; status?: string; internal_notes?: string };
+  let body: { id?: string; status?: string; internal_notes?: string; hire_line_items?: unknown };
   try {
     body = await request.json() as { id?: string; status?: string; internal_notes?: string };
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
   if (!body.id || (body.status && !["submitted", "confirmed", "completed", "cancelled"].includes(body.status))) return NextResponse.json({ error: "Invalid update." }, { status: 400 });
+  let lineItemUpdate: { hire_line_items: unknown; hire_amount_cents: number } | null = null;
+  if (body.hire_line_items !== undefined) {
+    const parsedItems = parseBookingLineItems(body.hire_line_items);
+    if ("error" in parsedItems) return NextResponse.json({ error: parsedItems.error }, { status: 400 });
+    const current = await session.admin.from("bookings")
+      .select("payment_method,hire_payment_status,deposit_payment_status")
+      .eq("id", body.id)
+      .single();
+    if (current.error) return NextResponse.json({ error: current.error.message }, { status: 500 });
+    if (!current.data) return NextResponse.json({ error: "Booking could not be found." }, { status: 404 });
+    const paymentSent = Boolean(current.data.payment_method)
+      || !["unpaid", null, undefined].includes(current.data.hire_payment_status)
+      || !["not_required", null, undefined].includes(current.data.deposit_payment_status);
+    if (paymentSent) return NextResponse.json({ error: "This booking already has a payment request. Use Update payment request while it is still unpaid." }, { status: 409 });
+    lineItemUpdate = { hire_line_items: parsedItems.items, hire_amount_cents: parsedItems.totalCents };
+  }
   let confirmation: {
     email: string;
     first_name: string;
@@ -54,18 +71,22 @@ export async function PATCH(request: Request) {
     pickup_time?: string | null;
     dropoff_time?: string | null;
     created_at?: string | null;
-    package_interest: string;
-    add_ons: string[] | null;
+    hire_line_items: BookingLineItem[] | null;
     additional_details?: string | null;
     confirmation_email_sent: boolean;
   } | null = null;
   if (body.status === "confirmed") {
     const result = await session.admin.from("bookings")
-      .select("email,first_name,event_type,pickup_date,dropoff_date,pickup_time,dropoff_time,created_at,package_interest,add_ons,additional_details,confirmation_email_sent")
+      .select("id,email,first_name,event_type,pickup_date,dropoff_date,pickup_time,dropoff_time,created_at,hire_line_items,additional_details,confirmation_email_sent,hire_payment_status,payment_method")
       .eq("id", body.id)
       .single();
     if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 });
     if (!result.data) return NextResponse.json({ error: "Booking could not be found." }, { status: 404 });
+    const paymentReady = ["paid", "succeeded", "bank_transfer_received"].includes(result.data.hire_payment_status ?? "")
+      || (result.data.payment_method === "cash_on_pickup" && result.data.hire_payment_status === "cash_due");
+    if (!paymentReady) {
+      return NextResponse.json({ error: "Mark the hire payment as paid before confirming this booking." }, { status: 409 });
+    }
     confirmation = result.data;
     if (!confirmation.confirmation_email_sent) {
       try {
@@ -87,7 +108,12 @@ export async function PATCH(request: Request) {
       }
     }
   }
-  const update = { ...(body.status ? { status: body.status } : {}), ...(body.internal_notes !== undefined ? { internal_notes: body.internal_notes } : {}), updated_at: new Date().toISOString() };
+  const update = {
+    ...(body.status ? { status: body.status } : {}),
+    ...(body.internal_notes !== undefined ? { internal_notes: body.internal_notes } : {}),
+    ...(lineItemUpdate ?? {}),
+    updated_at: new Date().toISOString(),
+  };
   if (body.status === "confirmed" && confirmation && !confirmation.confirmation_email_sent) {
     Object.assign(update, { confirmation_email_sent: true });
   }
@@ -109,7 +135,10 @@ export async function DELETE(request: Request) {
   const { data: booking, error: readError } = await session.admin.from("bookings").select("photo_id_paths").eq("id", body.id).single();
   if (readError) return NextResponse.json({ error: readError.message }, { status: 500 });
   const paths = (booking.photo_id_paths as string[] | null) ?? [];
-  if (paths.length) await session.admin.storage.from(PHOTO_ID_BUCKET).remove(paths);
+  if (paths.length) {
+    const removal = await session.admin.storage.from(PHOTO_ID_BUCKET).remove(paths);
+    if (removal.error) return NextResponse.json({ error: `Private photo ID deletion failed: ${removal.error.message}` }, { status: 502 });
+  }
   const { error } = await session.admin.from("bookings").delete().eq("id", body.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
