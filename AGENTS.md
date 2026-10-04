@@ -163,6 +163,56 @@ Every behavior change requires unit tests. The suite currently covers API routes
 
 **IF THE LOCALHOST BROWSER CHECK HAS NOT BEEN COMPLETED AT BOTH REQUIRED VIEWPORT WIDTHS, OR IDENTIFIED VISUAL/RESPONSIVE PROBLEMS HAVE NOT BEEN FIXED AND RECHECKED, THE TASK MUST BE MARKED AS A FAILURE — NOT COMPLETE, NOT READY, AND NOT SUCCESSFUL.**
 
+### 🔴 TOP PRIORITY — MANDATORY RESPONSIVE TESTING POLICY (VS CODE INTEGRATED BROWSER)
+
+**THIS POLICY IS TOP PRIORITY, STRICTLY ENFORCED, AND NON-NEGOTIABLE.**
+
+**NO TASK THAT AFFECTS UI/UX MAY BE MARKED COMPLETE UNLESS THIS POLICY IS FULLY SATISFIED.**
+
+**ANY CHANGE THAT AFFECTS UI, CSS, LAYOUT, PAGES, COMPONENTS, NAVIGATION, FORMS, DIALOGS, TABLES, ACCESSIBILITY, OR VISUAL BEHAVIOUR MUST BE TESTED IN THE VS CODE INTEGRATED BROWSER BEFORE THE TASK CAN BE CONSIDERED COMPLETE.**
+
+**WHEN THE VS CODE INTEGRATED BROWSER IS AVAILABLE, IT MUST BE USED FOR VALIDATION SO BROWSER-AWARE AI TOOLING CAN INSPECT AND VERIFY THE RENDERED APPLICATION.**
+
+Because the VS Code browser has a limited preset list, manual viewport checks are required at all of the following widths:
+
+- 360px (Small Mobile)
+- 390px (Modern iPhone)
+- 412px (Large Android)
+- 540px (Foldable Closed)
+- 768px (Tablet Portrait)
+- 1024px (Tablet Landscape)
+- 1280px (Desktop)
+- 1920px (Large Desktop)
+
+For **every** viewport width, verify:
+
+- No horizontal scrolling unless intentional
+- No clipped or hidden content
+- No overlapping text
+- No inaccessible buttons or controls
+- No layout breakage
+- Navigation remains functional
+- Forms remain usable
+- Dialogs remain within viewport bounds
+- No browser console errors
+
+If **any** viewport fails:
+
+1. Fix the issue.
+2. Re-test **all** viewport widths.
+3. Repeat until **all** viewport widths pass.
+
+The agent must **not**:
+
+- Assume responsiveness from code inspection
+- Assume responsiveness because a framework is being used
+- Skip browser testing
+- Mark work as complete without browser validation
+
+**COMPLETION REPORTS ARE MANDATORY EVIDENCE. FOR ANY UI/UX-AFFECTING TASK, THE FINAL REPORT MUST INCLUDE A VIEWPORT-BY-VIEWPORT PASS/FAIL CHECKLIST FOR 360, 390, 412, 540, 768, 1024, 1280, AND 1920 WIDTHS. IF THIS CHECKLIST IS MISSING OR INCOMPLETE, THE TASK IS AUTOMATICALLY A FAILURE AND MUST NOT BE MARKED COMPLETE.**
+
+**ANY BREACH OF THIS POLICY MEANS THE TASK IS INCOMPLETE AND MUST BE TREATED AS A FAILURE UNTIL FULL RESPONSIVE VALIDATION PASSES.**
+
 Use:
 
 ```bash

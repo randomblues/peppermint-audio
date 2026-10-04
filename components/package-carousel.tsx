@@ -22,22 +22,42 @@ export function PackageCarousel() {
       if (!carousel) return;
       const edgeThreshold = 8;
       const scrollInset = carousel.clientWidth < 640 ? 32 : 0;
+      const atLeftEdge = carousel.scrollLeft <= edgeThreshold;
+      const atRightEdge =
+        carousel.scrollLeft + carousel.clientWidth >=
+        carousel.scrollWidth - edgeThreshold;
       setFadeEdges({
-        left: carousel.scrollLeft > edgeThreshold,
-        right:
-          carousel.scrollLeft + carousel.clientWidth <
-          carousel.scrollWidth - edgeThreshold,
+        left: !atLeftEdge,
+        right: !atRightEdge,
       });
 
       const targetIndex = programmaticTarget.current;
       const targetCard = targetIndex === null ? null : packageRefs.current[targetIndex];
-      if (
-        targetCard &&
-        Math.abs(targetCard.offsetLeft - scrollInset - carousel.scrollLeft) > edgeThreshold
-      ) {
+      if (targetIndex !== null) {
+        const targetSettledAtEdge =
+          (targetIndex === 0 && atLeftEdge) ||
+          (targetIndex === packageTiers.length - 1 && atRightEdge);
+
+        if (targetSettledAtEdge) {
+          programmaticTarget.current = null;
+          setActiveIndex((currentIndex) =>
+            currentIndex === targetIndex ? currentIndex : targetIndex,
+          );
+          return;
+        }
+
+        if (
+          targetCard &&
+          Math.abs(targetCard.offsetLeft - scrollInset - carousel.scrollLeft) > edgeThreshold
+        ) {
+          return;
+        }
+        programmaticTarget.current = null;
+        setActiveIndex((currentIndex) =>
+          currentIndex === targetIndex ? currentIndex : targetIndex,
+        );
         return;
       }
-      programmaticTarget.current = null;
 
       const nearestIndex = packageRefs.current.reduce(
         (closestIndex, packageCard, index) => {
@@ -121,7 +141,7 @@ export function PackageCarousel() {
           onClick={() => moveBy(-1)}
           disabled={activeIndex === 0}
           title="Previous package"
-          className="absolute top-28 left-3 z-20 size-10 -translate-y-1/2 rounded-full border-0 bg-foreground text-background shadow-lg transition-transform hover:scale-105 hover:bg-foreground/90 disabled:opacity-40"
+          className="absolute top-28 left-3 z-20 size-10 -translate-y-1/2 rounded-full border border-primary/20 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--background)_95%,var(--primary)_10%),color-mix(in_oklab,var(--background)_82%,black))] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_8px_20px_rgb(0_0_0/0.24)] backdrop-blur-sm transition-all hover:scale-105 hover:border-primary/40 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_10px_24px_rgb(0_0_0/0.26),0_0_16px_color-mix(in_oklab,var(--primary)_14%,transparent)] disabled:opacity-45"
         >
           <span aria-hidden="true">←</span>
         </Button>
@@ -133,7 +153,7 @@ export function PackageCarousel() {
           onClick={() => moveBy(1)}
           disabled={activeIndex === packageTiers.length - 1}
           title="Next package"
-          className="absolute top-28 right-3 z-20 size-10 -translate-y-1/2 rounded-full border-0 bg-foreground text-background shadow-lg transition-transform hover:scale-105 hover:bg-foreground/90 disabled:opacity-40"
+          className="absolute top-28 right-3 z-20 size-10 -translate-y-1/2 rounded-full border border-primary/20 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--background)_95%,var(--primary)_10%),color-mix(in_oklab,var(--background)_82%,black))] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_8px_20px_rgb(0_0_0/0.24)] backdrop-blur-sm transition-all hover:scale-105 hover:border-primary/40 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_10px_24px_rgb(0_0_0/0.26),0_0_16px_color-mix(in_oklab,var(--primary)_14%,transparent)] disabled:opacity-45"
         >
           <span aria-hidden="true">→</span>
         </Button>

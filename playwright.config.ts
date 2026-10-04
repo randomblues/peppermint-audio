@@ -21,6 +21,30 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
     {
+      name: "macbook-air-13",
+      use: {
+        browserName: "chromium",
+        viewport: { width: 1440, height: 900 },
+        deviceScaleFactor: 2,
+      },
+    },
+    {
+      name: "macbook-pro-14",
+      use: {
+        browserName: "chromium",
+        viewport: { width: 1512, height: 982 },
+        deviceScaleFactor: 2,
+      },
+    },
+    {
+      name: "macbook-pro-16",
+      use: {
+        browserName: "chromium",
+        viewport: { width: 1728, height: 1117 },
+        deviceScaleFactor: 2,
+      },
+    },
+    {
       name: "mobile",
       use: { ...devices["iPhone 12"], browserName: "chromium" },
     },

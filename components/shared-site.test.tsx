@@ -195,6 +195,31 @@ describe("PackageCard", () => {
     );
   });
 
+  it("shows a checkout prompt immediately after adding a package to the cart", () => {
+    const pkg = packageTiers[0];
+
+    render(
+      <CartProvider>
+        <PackageCard pkg={pkg} />
+      </CartProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add to cart" }));
+
+    expect(screen.getByRole("dialog", { name: "Added to your cart" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check out" })).toHaveAttribute("href", "/cart");
+    expect(screen.getByRole("button", { name: "Continue shopping" })).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem("peppermint-audio-cart") ?? "[]")).toEqual([
+      {
+        id: `package:${pkg.slug}`,
+        name: pkg.name,
+        kind: "package",
+        price: pkg.price,
+        quantity: 1,
+      },
+    ]);
+  });
+
   it("gives the boom package artwork extra space around the subwoofer", () => {
     const pkg = packageTiers.find((packageTier) => packageTier.slug === "budget-with-a-boom");
     if (!pkg) throw new Error("Budget With A Boom package is missing");
