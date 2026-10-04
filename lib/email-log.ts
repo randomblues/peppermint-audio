@@ -6,6 +6,10 @@ export const customerEmailTypes = [
   "pickup_reminder",
   "custom",
   "invoice",
+  "payment_receipt",
+  "deposit_authorisation",
+  "deposit_release",
+  "deposit_capture",
   "enquiry",
 ] as const;
 

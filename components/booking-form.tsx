@@ -443,7 +443,7 @@ export function BookingForm({ initialPackageSlug, initialEquipmentName }: Bookin
           <div className="space-y-5">
             <div className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">
               <p className="font-medium text-foreground">Security deposit</p>
-              <p className="mt-1">A refundable security deposit is required for every hire. The amount will be confirmed before your booking is finalised.</p>
+              <p className="mt-1">A refundable security deposit is required for every hire. The amount and whether it is authorised by card or paid by bank transfer will be confirmed before your booking is finalised.</p>
             </div>
             <details className="rounded-lg border">
               <summary className="cursor-pointer px-4 py-3 font-medium">
