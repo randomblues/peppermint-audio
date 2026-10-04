@@ -10,7 +10,8 @@ import { createPageMetadata } from "@/lib/seo";
 
 export const metadata = createPageMetadata({
   title: "Packages",
-  description: "Simple, complete audio system hire packages for parties, presentations, weddings, and live events in Melbourne.",
+  description:
+    "Melbourne PA hire packages from $65 for parties, presentations, weddings, and live events. Ready-to-use audio systems with speakers, microphones, and cables.",
   path: "/packages",
 });
 
@@ -28,7 +29,7 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
     <Section
       eyebrow="Pricing"
       title="Choose your complete PA package"
-      description="Straightforward options starting at $65. Every package is ready to plug in and use. Weekend dates can fill quickly — send your event date and we&apos;ll check availability."
+      description="Melbourne PA hire packages from $65. Every package is ready to plug in and use. Weekend dates can fill quickly — send your event date and we&apos;ll check availability."
     >
       <Tabs defaultValue={selectedPackage} className="w-full">
         <TabsList
