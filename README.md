@@ -43,6 +43,10 @@ Administrative routes are under `/admin`; they require a Supabase session and an
 - `ADMIN_EMAILS`: comma-separated server-side allowlist for administrator email addresses
 - `CRON_SECRET`: server-only random secret used to authorize the pickup reminder cron route
 - `GOOGLE_CALENDAR_ENABLED`: optional calendar feature flag; local development is disabled by default, while production remains enabled unless this is set to `false`
+- `STRIPE_SECRET_KEY`: server-only Stripe secret key
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`: Stripe publishable key used by the customer payment page
+- `STRIPE_WEBHOOK_SECRET`: server-only Stripe webhook signature secret
+- `NEXT_PUBLIC_SITE_URL`: public site URL used to generate customer payment links
 
 ## Booking and payment management
 
@@ -85,3 +89,4 @@ npm run test:e2e
 - Package/pricing content lives in `lib/site-content.ts`.
 - Contact form validation schema is in `lib/validation/enquiry.ts`.
 - API email sending endpoint is `app/api/enquiry/route.ts`.
+- Project documentation lives in [`README/`](./README/), including the [Stripe integration guide](./README/STRIPE-INTEGRATION.md).
