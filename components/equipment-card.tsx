@@ -6,6 +6,7 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useCart } from "@/components/cart-provider";
 import {
   Card,
   CardContent,
@@ -22,6 +23,7 @@ type EquipmentCardProps = {
 
 export function EquipmentCard({ item, priority = false }: EquipmentCardProps) {
   const [selectedOption, setSelectedOption] = useState(item.options[0]);
+  const { addItem } = useCart();
 
   return (
     <Card className="h-full overflow-hidden border">
@@ -89,9 +91,28 @@ export function EquipmentCard({ item, priority = false }: EquipmentCardProps) {
           ))}
         </ul>
       </CardContent>
-      <CardFooter>
-        <Button className="w-full" nativeButton={false} render={<Link href={`/equipment/${item.slug}`} />}>
-          View equipment details
+      <CardFooter className="gap-2">
+        <Button
+          className="min-w-0 flex-1"
+          onClick={() =>
+            addItem({
+              id: `equipment:${item.slug}:${selectedOption.label}`,
+              name: item.name,
+              kind: "equipment",
+              option: selectedOption.label,
+              price: selectedOption.price,
+            })
+          }
+        >
+          Add to cart
+        </Button>
+        <Button
+          variant="outline"
+          className="shrink-0 px-3"
+          nativeButton={false}
+          render={<Link href={`/equipment/${item.slug}`} />}
+        >
+          View details
         </Button>
       </CardFooter>
     </Card>

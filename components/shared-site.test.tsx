@@ -6,6 +6,7 @@ import { Navbar } from "./navbar";
 import { PackageCard } from "./package-card";
 import { PackageCarousel } from "./package-carousel";
 import { EquipmentCard } from "./equipment-card";
+import { CartProvider } from "./cart-provider";
 import { CustomerReviews } from "./customer-reviews";
 import { PhoneCallButton } from "./phone-call-button";
 import { MobileContactBar } from "./mobile-contact-bar";
@@ -52,7 +53,11 @@ describe("Navbar", () => {
         details: ["Portable"],
       };
 
-      render(<EquipmentCard item={item} />);
+      render(
+        <CartProvider>
+          <EquipmentCard item={item} />
+        </CartProvider>,
+      );
 
       expect(screen.getByRole("button", { name: "Pair (2 speakers) $95" })).toHaveAttribute(
         "aria-pressed",
@@ -64,10 +69,23 @@ describe("Navbar", () => {
         "aria-pressed",
         "true",
       );
-      expect(screen.getByText("View equipment details").closest("a")).toHaveAttribute(
+      expect(screen.getByRole("button", { name: "Add to cart" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "View details" })).toHaveAttribute(
         "href",
         "/equipment/test-speaker",
       );
+      fireEvent.click(screen.getByRole("button", { name: "Add to cart" }));
+
+      expect(JSON.parse(localStorage.getItem("peppermint-audio-cart") ?? "[]")).toEqual([
+        {
+          id: "equipment:test-speaker:Single speaker",
+          name: "Test Speaker",
+          kind: "equipment",
+          option: "Single speaker",
+          price: 55,
+          quantity: 1,
+        },
+      ]);
     });
 
   });

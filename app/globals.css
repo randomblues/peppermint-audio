@@ -41,8 +41,8 @@
 
     35%,
     65% {
-      background-color: color-mix(in oklab, var(--primary-foreground) 17%, transparent);
-      box-shadow: 0 0 0 2px color-mix(in oklab, var(--primary-foreground) 3%, transparent);
+      background-color: color-mix(in oklab, var(--primary-foreground) 21%, transparent);
+      box-shadow: 0 0 0 4px color-mix(in oklab, var(--primary-foreground) 6%, transparent);
     }
   }
 
