@@ -33,7 +33,7 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
   return (
     <Card
       className={`h-full overflow-hidden border ${
-        compact ? "justify-start" : "justify-between"
+        compact ? "gap-2 justify-start" : "justify-between"
       }`}
     >
       <div className="relative h-56 bg-white sm:h-64">
@@ -47,7 +47,7 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
         />
       </div>
       {compact ? (
-        <CardHeader className="gap-2 border-b border-border/60 pb-4">
+        <CardHeader className="flex flex-col gap-1 border-b border-border/60 pb-2">
           <CardTitle className="min-h-10 sm:h-10">{pkg.name}</CardTitle>
           <div className="min-h-6">{pkg.notes ? <Badge>{pkg.notes}</Badge> : null}</div>
           <CardDescription className="min-h-16 sm:h-16">{pkg.bestFor}</CardDescription>
