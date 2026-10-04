@@ -12,7 +12,7 @@ import { MobileContactBar } from "./mobile-contact-bar";
 import { Section } from "./section";
 import { WhatsAppButton } from "./whatsapp-button";
 import * as googleAds from "@/lib/google-ads";
-import { packageTiers } from "@/lib/site-content";
+import { business, packageTiers } from "@/lib/site-content";
 
 const { usePathname } = vi.hoisted(() => ({
   usePathname: vi.fn(),
@@ -112,7 +112,7 @@ describe("PackageCard", () => {
       expect(screen.getByRole("button", { name: "Next package" })).toBeInTheDocument();
       expect(screen.getByLabelText("Choose a package")).toBeInTheDocument();
       for (const pkg of packageTiers) {
-        expect(screen.getByText(pkg.name)).toBeInTheDocument();
+        expect(screen.getAllByText(pkg.name).length).toBeGreaterThanOrEqual(1);
       }
       expect(screen.queryByTestId("package-carousel-left-fade")).not.toBeInTheDocument();
     });
@@ -126,15 +126,36 @@ describe("PackageCard", () => {
         screen.getByRole("button", { name: `Show ${packageTiers[1].name}` }),
       ).toHaveAttribute("aria-current", "true");
     });
+
+    it("keeps advancing when the next control is clicked repeatedly", () => {
+      render(<PackageCarousel />);
+
+      const nextButton = screen.getByRole("button", { name: "Next package" });
+      fireEvent.click(nextButton);
+      fireEvent.click(nextButton);
+
+      expect(
+        screen.getByRole("button", { name: `Show ${packageTiers[2].name}` }),
+      ).toHaveAttribute("aria-current", "true");
+    });
   });
 
   it("uses compact content and details link when requested", () => {
     const pkg = packageTiers[0];
     render(<PackageCard pkg={pkg} compact />);
 
-    expect(screen.getByText(pkg.summary)).toBeInTheDocument();
+    expect(screen.getByText(pkg.summary)).toHaveClass("text-muted-foreground");
+    expect(screen.getByText(pkg.summary).parentElement).toHaveClass("items-center");
     expect(screen.getByText(`- ${pkg.inclusions[0]}`)).toBeInTheDocument();
-    expect(screen.getByText("Included")).toBeInTheDocument();
+    expect(screen.getByText("In the box")).toBeInTheDocument();
+    const moreInclusionsButton = screen.getByRole("button", { name: "+ 1 more included" });
+    expect(screen.queryByText(`- ${pkg.inclusions[3]}`)).not.toBeInTheDocument();
+    fireEvent.click(moreInclusionsButton);
+    expect(screen.getByText(`- ${pkg.inclusions[3]}`)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show less" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
     expect(screen.queryByText("Optional add-ons")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add package to cart" })).not.toBeInTheDocument();
   });
@@ -194,24 +215,33 @@ describe("WhatsAppButton", () => {
   describe("MobileContactBar", () => {
     beforeEach(() => usePathname.mockReset());
 
-    it("shows tracked availability, WhatsApp, and phone actions on public pages", () => {
+    it("opens a unified availability contact sheet on public pages", () => {
       usePathname.mockReturnValue("/packages");
       render(<MobileContactBar />);
 
-      expect(screen.getByRole("navigation", { name: "Quick contact actions" })).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Check availability" })).toHaveAttribute("href", "/booking");
-      expect(screen.getByRole("link", { name: "WhatsApp us" })).toHaveAttribute(
+      expect(screen.getByRole("button", { name: "Check availability" })).toBeInTheDocument();
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Check availability" }));
+
+      const sheet = screen.getByRole("dialog");
+      expect(within(sheet).getByText("Let's check your date")).toBeInTheDocument();
+      expect(within(sheet).getByRole("link", { name: /WhatsApp/ })).toHaveAttribute(
         "href",
         expect.stringContaining("wa.me/61452316823"),
       );
-      expect(screen.getByRole("link", { name: "Call us" })).toHaveAttribute("href", "tel:0452316823");
+      expect(within(sheet).getByRole("link", { name: /Call/ })).toHaveAttribute("href", "tel:0452316823");
+      expect(within(sheet).getByRole("link", { name: /Email/ })).toHaveAttribute(
+        "href",
+        `mailto:${business.email}`,
+      );
     });
 
     it("is hidden from admin pages", () => {
       usePathname.mockReturnValue("/admin");
       render(<MobileContactBar />);
 
-      expect(screen.queryByRole("navigation", { name: "Quick contact actions" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Check availability" })).not.toBeInTheDocument();
     });
   });
 

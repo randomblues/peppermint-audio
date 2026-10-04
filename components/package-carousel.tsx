@@ -21,6 +21,7 @@ export function PackageCarousel() {
     function updateFadeEdges() {
       if (!carousel) return;
       const edgeThreshold = 8;
+      const scrollInset = carousel.clientWidth < 640 ? 32 : 0;
       setFadeEdges({
         left: carousel.scrollLeft > edgeThreshold,
         right:
@@ -32,7 +33,7 @@ export function PackageCarousel() {
       const targetCard = targetIndex === null ? null : packageRefs.current[targetIndex];
       if (
         targetCard &&
-        Math.abs(targetCard.offsetLeft - carousel.scrollLeft) > edgeThreshold
+        Math.abs(targetCard.offsetLeft - scrollInset - carousel.scrollLeft) > edgeThreshold
       ) {
         return;
       }
@@ -45,8 +46,8 @@ export function PackageCarousel() {
           const closestCard = packageRefs.current[closestIndex];
           if (!closestCard) return index;
 
-          return Math.abs(packageCard.offsetLeft - carousel.scrollLeft) <
-            Math.abs(closestCard.offsetLeft - carousel.scrollLeft)
+          return Math.abs(packageCard.offsetLeft - (carousel.scrollLeft + scrollInset)) <
+            Math.abs(closestCard.offsetLeft - (carousel.scrollLeft + scrollInset))
             ? index
             : closestIndex;
         },
@@ -75,9 +76,10 @@ export function PackageCarousel() {
     const carousel = carouselRef.current;
     const packageCard = packageRefs.current[activeIndex];
     if (carousel && packageCard && typeof carousel.scrollTo === "function") {
+      const scrollInset = carousel.clientWidth < 640 ? 32 : 0;
       programmaticTarget.current = activeIndex;
       carousel.scrollTo({
-        left: packageCard.offsetLeft,
+        left: Math.max(0, packageCard.offsetLeft - scrollInset),
         behavior: "smooth",
       });
       if (scrollTimer.current) clearTimeout(scrollTimer.current);
@@ -97,6 +99,17 @@ export function PackageCarousel() {
     setActiveIndex(nextIndex);
   }
 
+  function moveBy(offset: number) {
+    setActiveIndex((currentIndex) => {
+      const nextIndex = Math.max(
+        0,
+        Math.min(currentIndex + offset, packageTiers.length - 1),
+      );
+      programmaticTarget.current = nextIndex;
+      return nextIndex;
+    });
+  }
+
   return (
     <div className="relative">
       <div className="relative">
@@ -105,7 +118,7 @@ export function PackageCarousel() {
           size="icon"
           variant="outline"
           aria-label="Previous package"
-          onClick={() => moveToPackage(activeIndex - 1)}
+          onClick={() => moveBy(-1)}
           disabled={activeIndex === 0}
           title="Previous package"
           className="absolute top-28 left-3 z-20 size-10 -translate-y-1/2 rounded-full border-0 bg-foreground text-background shadow-lg transition-transform hover:scale-105 hover:bg-foreground/90 disabled:opacity-40"
@@ -117,7 +130,7 @@ export function PackageCarousel() {
           size="icon"
           variant="outline"
           aria-label="Next package"
-          onClick={() => moveToPackage(activeIndex + 1)}
+          onClick={() => moveBy(1)}
           disabled={activeIndex === packageTiers.length - 1}
           title="Next package"
           className="absolute top-28 right-3 z-20 size-10 -translate-y-1/2 rounded-full border-0 bg-foreground text-background shadow-lg transition-transform hover:scale-105 hover:bg-foreground/90 disabled:opacity-40"
@@ -140,7 +153,7 @@ export function PackageCarousel() {
         ) : null}
         <div
           ref={carouselRef}
-          className="flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain scroll-smooth pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain scroll-smooth px-4 pb-4 scroll-px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:px-0 sm:scroll-px-0"
         >
           {packageTiers.map((pkg, index) => (
             <div
@@ -148,7 +161,7 @@ export function PackageCarousel() {
               ref={(element) => {
                 packageRefs.current[index] = element;
               }}
-              className="min-w-[calc(100%-1rem)] snap-start sm:min-w-[calc((100%-1rem)/2)] lg:min-w-[calc((100%-2rem)/3)]"
+              className="min-w-[calc(100%-2rem)] snap-center sm:snap-start sm:min-w-[calc((100%-1rem)/2)] lg:min-w-[calc((100%-2rem)/3)]"
               aria-label={`Package ${index + 1}`}
             >
               <PackageCard pkg={pkg} compact priority={index === 0} />

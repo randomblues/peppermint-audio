@@ -7,7 +7,6 @@ import { CartProvider } from "@/components/cart-provider";
 import { MarketingAttribution } from "@/components/marketing-attribution";
 import { MobileContactBar } from "@/components/mobile-contact-bar";
 import { Navbar } from "@/components/navbar";
-import { WhatsAppButton } from "@/components/whatsapp-button";
 import { googleAdsConversionId } from "@/lib/google-ads";
 import { business } from "@/lib/site-content";
 import "./globals.css";
@@ -139,7 +138,6 @@ export default function RootLayout({
             <Navbar />
             <main className="flex-1 bg-background pb-20 md:pb-0">{children}</main>
             <Footer />
-            <WhatsAppButton />
             <MobileContactBar />
           </CartProvider>
         </div>

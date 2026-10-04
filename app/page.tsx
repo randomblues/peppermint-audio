@@ -96,8 +96,8 @@ export default function Home() {
 
       <Section
         eyebrow="Packages"
-        title="Simple, complete packages"
-        description="Choose a ready-to-use package for your guest count. Every option includes the equipment and cables you need for a hassle-free setup."
+        title="Pick the right setup for your event"
+        description="Compare capacity, price, and what is included at a glance. Every package is ready to collect from Abbotsford and use straight away."
       >
         <PackageCarousel />
         <Card className="mt-4 border-dashed">

@@ -35,10 +35,6 @@ vi.mock("@/components/footer", () => ({
   Footer: () => <div data-testid="footer">Footer</div>,
 }));
 
-vi.mock("@/components/whatsapp-button", () => ({
-  WhatsAppButton: () => <div data-testid="whatsapp">WhatsApp</div>,
-}));
-
 vi.mock("@/components/mobile-contact-bar", () => ({
   MobileContactBar: () => <div data-testid="mobile-contact-bar">Mobile contact bar</div>,
 }));
@@ -95,7 +91,7 @@ describe("app wrappers and metadata", () => {
     expect(screen.getByText("Page content")).toBeInTheDocument();
     expect(screen.getByTestId("navbar")).toBeInTheDocument();
     expect(screen.getByTestId("footer")).toBeInTheDocument();
-    expect(screen.getByTestId("whatsapp")).toBeInTheDocument();
+    expect(screen.getByTestId("mobile-contact-bar")).toBeInTheDocument();
 
     const structuredData = document.querySelector('script[type="application/ld+json"]');
     expect(structuredData).not.toBeNull();
