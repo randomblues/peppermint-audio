@@ -5,6 +5,47 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  --animate-availability-cta: availability-cta-wiggle 5.5s ease-in-out infinite;
+  --animate-availability-cta-glow: availability-cta-glow 1.5s ease-in-out infinite;
+
+  @keyframes availability-cta-wiggle {
+    0%,
+    86%,
+    100% {
+      transform: rotate(0deg) translateY(0);
+    }
+
+    88% {
+      transform: rotate(-6deg) translateY(-1px);
+    }
+
+    90% {
+      transform: rotate(6deg) translateY(-1px);
+    }
+
+    92% {
+      transform: rotate(-4deg);
+    }
+
+    94% {
+      transform: rotate(2deg);
+    }
+  }
+
+  @keyframes availability-cta-glow {
+    0%,
+    100% {
+      background-color: color-mix(in oklab, var(--primary-foreground) 15%, transparent);
+      box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary-foreground) 0%, transparent);
+    }
+
+    35%,
+    65% {
+      background-color: color-mix(in oklab, var(--primary-foreground) 17%, transparent);
+      box-shadow: 0 0 0 2px color-mix(in oklab, var(--primary-foreground) 3%, transparent);
+    }
+  }
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
@@ -46,6 +87,14 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+@layer utilities {
+  @media (prefers-reduced-motion: no-preference) {
+    .availability-cta-icon-shell {
+      animation: availability-cta-glow 1.5s ease-in-out infinite;
+    }
+  }
 }
 
 body {

@@ -40,8 +40,11 @@ export function MobileContactBar() {
             />
           }
         >
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-foreground/15 ring-1 ring-primary-foreground/20">
-            <CalendarCheck className="size-4.5" aria-hidden="true" />
+          <span className="availability-cta-icon-shell flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-foreground/15 ring-1 ring-primary-foreground/20 motion-safe:animate-availability-cta-glow">
+            <CalendarCheck
+              className="availability-cta-icon motion-safe:animate-availability-cta size-4.5"
+              aria-hidden="true"
+            />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm leading-tight font-bold">Check availability</span>

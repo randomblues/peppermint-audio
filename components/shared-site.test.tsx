@@ -26,7 +26,8 @@ describe("Navbar", () => {
   it("provides desktop navigation and a labelled mobile menu trigger", () => {
     render(<Navbar />);
 
-    expect(screen.getByRole("banner")).toBeInTheDocument();
+    expect(screen.getByRole("banner")).toHaveClass("bg-background");
+    expect(screen.getByRole("banner")).not.toHaveClass("bg-background/80");
     expect(screen.getByRole("link", { name: "Peppermint Audio" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("button", { name: "Products" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "How It Works" })).toHaveAttribute("href", "/how-it-works");
@@ -219,7 +220,12 @@ describe("WhatsAppButton", () => {
       usePathname.mockReturnValue("/packages");
       render(<MobileContactBar />);
 
-      expect(screen.getByRole("button", { name: "Check availability" })).toBeInTheDocument();
+      const availabilityButton = screen.getByRole("button", { name: "Check availability" });
+      expect(availabilityButton).toBeInTheDocument();
+      expect(availabilityButton.querySelector(".availability-cta-icon-shell")).toHaveClass(
+        "motion-safe:animate-availability-cta-glow",
+      );
+      expect(availabilityButton.querySelector("svg")).toHaveClass("availability-cta-icon");
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByRole("button", { name: "Check availability" }));
