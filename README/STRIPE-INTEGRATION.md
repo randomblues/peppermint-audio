@@ -127,6 +127,46 @@ Relevant routes:
 
 Cash-on-pickup remains a separate payment method for bookings where the admin chooses it. It does not use Stripe.
 
+## Internal invoicing and receipt system
+
+Stripe is the payment processor, not the application's document system. Peppermint Audio maintains its own invoicing, receipt, and billing-document workflow so the same branded records can be produced consistently for Stripe, bank-transfer, and cash-on-pickup bookings.
+
+The internal billing system is responsible for:
+
+- Generating branded invoice and receipt PDFs.
+- Selecting the appropriate document variant:
+  - Tax Invoice
+  - Invoice
+  - Payment receipt
+  - Deposit authorisation
+  - Deposit release
+  - Deposit capture
+- Assigning stable booking references and invoice numbers.
+- Presenting GST-inclusive or non-GST totals according to the booking configuration.
+- Recording invoice status and payment timestamps.
+- Sending billing documents through the configured email provider.
+- Keeping billing-document history associated with the booking.
+
+Stripe identifiers and statuses are stored alongside, but are not a replacement for, the application's invoice and billing records. A successful Stripe event can update the booking and invoice state, but document generation and delivery remain application responsibilities.
+
+The main implementation surfaces are:
+
+- [`lib/invoice-pdf.ts`](../lib/invoice-pdf.ts) — branded PDF generation and document variants.
+- [`lib/invoice-service.ts`](../lib/invoice-service.ts) — invoice creation, billing-document state, payment status, and delivery orchestration.
+- [`supabase/001_booking_management.sql`](../supabase/001_booking_management.sql) — `invoices`, `billing_documents`, and booking payment fields.
+- [`lib/email-log.ts`](../lib/email-log.ts) — records outbound billing and customer email history.
+
+### Document lifecycle
+
+1. The admin configures the booking amount, deposit, GST setting, and payment method.
+2. The application creates or updates the internal invoice record.
+3. The customer receives an invoice or secure payment request.
+4. Stripe webhooks or admin bank-transfer actions update the payment state.
+5. The application generates the relevant receipt or deposit document.
+6. The document is emailed and recorded against the booking.
+
+The internal records are important even when Stripe is involved: Stripe confirms payment activity, while Peppermint Audio's system provides the customer-facing accounting documents and the operational history used by the admin console.
+
 ## Webhooks
 
 Stripe sends events to:
