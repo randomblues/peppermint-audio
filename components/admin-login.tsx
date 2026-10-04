@@ -7,9 +7,26 @@ export function AdminLogin() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError("");
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/admin/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: form.get("email"), password: form.get("password") }) });
-    if (!response.ok) { setError((await response.json()).error ?? "Login failed."); return; }
-    window.location.href = "/admin";
+    try {
+      const response = await fetch("/api/admin/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: form.get("email"), password: form.get("password") }) });
+      if (!response.ok) {
+        const body = await response.text();
+        let message = "Login failed.";
+        if (body) {
+          try {
+            const parsed = JSON.parse(body) as { error?: unknown };
+            if (typeof parsed.error === "string") message = parsed.error;
+          } catch {
+            message = "The admin login service returned an invalid response.";
+          }
+        }
+        setError(message);
+        return;
+      }
+      window.location.href = "/admin";
+    } catch {
+      setError("The admin login service is unavailable.");
+    }
   }
   return <main className="mx-auto flex min-h-[70vh] max-w-md items-center px-6"><Card className="w-full"><CardHeader><CardTitle>Admin login</CardTitle></CardHeader><CardContent><form onSubmit={submit} className="space-y-4"><label className="block text-sm">Email<input name="email" type="email" required className="mt-1 w-full rounded border bg-background p-2" /></label><label className="block text-sm">Password<input name="password" type="password" required className="mt-1 w-full rounded border bg-background p-2" /></label>{error && <p className="text-sm text-destructive">{error}</p>}<Button type="submit">Sign in</Button></form></CardContent></Card></main>;
 }

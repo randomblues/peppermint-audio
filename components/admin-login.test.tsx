@@ -6,7 +6,7 @@ describe("AdminLogin", () => {
   it("shows the API error", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
       ok: false,
-      json: async () => ({ error: "Invalid credentials" }),
+      text: async () => JSON.stringify({ error: "Invalid credentials" }),
     }));
     render(<AdminLogin />);
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "admin@example.com" } });
@@ -32,5 +32,28 @@ describe("AdminLogin", () => {
       method: "POST",
     })));
     consoleError.mockRestore();
+  });
+
+  it("shows a useful message when the login response is empty", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: false,
+      text: async () => "",
+    }));
+    render(<AdminLogin />);
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "admin@example.com" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "password" } });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(await screen.findByText("Login failed.")).toBeInTheDocument();
+  });
+
+  it("handles a failed login request", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network failure")));
+    render(<AdminLogin />);
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "admin@example.com" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "password" } });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(await screen.findByText("The admin login service is unavailable.")).toBeInTheDocument();
   });
 });

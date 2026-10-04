@@ -315,6 +315,15 @@ describe("admin export, authentication, and photo routes", () => {
     expect((await login(jsonRequest("/api/admin/login", { email: "admin@example.com", password: "bad" }))).status).toBe(401);
   });
 
+  it("returns JSON when login configuration is unavailable", async () => {
+    mocks.createAuthClient.mockImplementation(() => {
+      throw new Error("Supabase auth is not configured.");
+    });
+    const response = await login(jsonRequest("/api/admin/login", { email: "admin@example.com", password: "secret" }));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "Admin login is not configured on this server." });
+  });
+
   it("clears auth cookies on logout", async () => {
     const response = await logout();
     expect(response.status).toBe(200);
