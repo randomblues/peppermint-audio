@@ -56,7 +56,7 @@ describe("equipmentCatalog", () => {
           slug: "budget-with-a-boom",
           name: "Budget With A Boom",
           price: 170,
-          image: "/budget-with-a-boom-package.png",
+          image: "/budget-with-a-boom-package-v2.png",
         }),
         expect.objectContaining({
           slug: "big-celebration",

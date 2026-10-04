@@ -338,7 +338,7 @@ export const packageTiers: PackageTier[] = [
     capacity: "up to 60 people",
     summary: "The Small Budget Event setup with a Behringer subwoofer for extra low-end impact.",
     bestFor: "Small parties that want more bass without moving up to a full-scale event system",
-    image: "/budget-with-a-boom-package.png",
+    image: "/budget-with-a-boom-package-v2.png",
     addOnSlugs: [
       "wireless-microphones",
       "party-lights-bar",

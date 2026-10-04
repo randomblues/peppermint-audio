@@ -25,6 +25,10 @@ type PackageCardProps = {
 
 export function PackageCard({ pkg, compact = false, priority = false }: PackageCardProps) {
   const { addItem } = useCart();
+  const imageClassName =
+    pkg.slug === "budget-with-a-boom"
+      ? "object-contain p-2"
+      : "object-contain";
 
   return (
     <Card className="h-full justify-between overflow-hidden border">
@@ -35,7 +39,7 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
           fill
           sizes="(max-width: 768px) 100vw, 33vw"
           loading={priority ? "eager" : "lazy"}
-          className="object-contain"
+          className={imageClassName}
         />
       </div>
       <CardHeader className={compact ? "flex flex-col gap-2" : undefined}>

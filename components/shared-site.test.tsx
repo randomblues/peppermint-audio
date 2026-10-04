@@ -137,6 +137,15 @@ describe("PackageCard", () => {
     expect(screen.getByText("Included")).toBeInTheDocument();
     expect(screen.queryByText("Optional add-ons")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add package to cart" })).not.toBeInTheDocument();
+  });
+
+  it("gives the boom package artwork extra space around the subwoofer", () => {
+    const pkg = packageTiers.find((packageTier) => packageTier.slug === "budget-with-a-boom");
+    if (!pkg) throw new Error("Budget With A Boom package is missing");
+
+    render(<PackageCard pkg={pkg} compact />);
+
+    expect(screen.getByRole("img", { name: pkg.name })).toHaveClass("p-2");
     expect(screen.getByText("View package details").closest("a")).toHaveAttribute(
       "href",
       `/packages?package=${pkg.slug}`,
