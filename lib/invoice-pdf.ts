@@ -65,11 +65,14 @@ export async function buildInvoicePdf(details: InvoicePdfDetails) {
   const dark = rgb(0.11, 0.16, 0.14);
   const muted = rgb(0.35, 0.37, 0.35);
   const green = rgb(0.24, 0.47, 0.37);
+  const logoWidth = 182;
+  const logoHeight = logoWidth * (101 / 532);
   let y = pageHeight - margin;
 
   page.drawRectangle({ x: 0, y: pageHeight - 112, width: pageWidth, height: 112, color: dark });
-  page.drawImage(logo, { x: margin, y: pageHeight - 75, width: 182, height: 38.4 });
-  page.drawText(pdfText(details.title), { x: margin, y: pageHeight - 86, size: 12, font: regular, color: rgb(0.78, 0.9, 0.83) });
+  page.drawImage(logo, { x: margin, y: pageHeight - 75, width: logoWidth, height: logoHeight });
+  page.drawText(pdfText(details.title), { x: margin + 12, y: pageHeight - 86, size: 12, font: regular, color: rgb(0.78, 0.9, 0.83) });
+  page.drawText(pdfText(`ABN ${business.abn}`), { x: margin + 12, y: pageHeight - 101, size: 8, font: regular, color: rgb(0.72, 0.84, 0.77) });
   page.drawText(pdfText(details.documentNumber), { x: pageWidth - margin - 150, y: pageHeight - 58, size: 10, font: regular, color: rgb(1, 1, 1) });
   page.drawText(pdfText(details.issuedAt), { x: pageWidth - margin - 150, y: pageHeight - 76, size: 9, font: regular, color: rgb(0.82, 0.84, 0.83) });
   y = pageHeight - 148;
@@ -108,7 +111,7 @@ export async function buildInvoicePdf(details: InvoicePdfDetails) {
   }
 
   page.drawLine({ start: { x: margin, y: 65 }, end: { x: pageWidth - margin, y: 65 }, thickness: 0.7, color: rgb(0.8, 0.83, 0.81) });
-  page.drawText(pdfText(`${business.name} · ${business.email} · ${business.phone}`), { x: margin, y: 47, size: 8, font: regular, color: muted });
+  page.drawText(pdfText(`${business.name} · ABN ${business.abn} · ${business.email} · ${business.phone}`), { x: margin, y: 47, size: 8, font: regular, color: muted });
   page.drawText(pdfText(`Pickup and return: ${business.pickupSuburb} ${business.pickupPostcode} · ${business.serviceArea}`), { x: margin, y: 33, size: 8, font: regular, color: muted });
   return Buffer.from(await document.save());
 }

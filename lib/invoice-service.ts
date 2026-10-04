@@ -148,7 +148,7 @@ function documentEmailType(documentType: BillingDocumentType): CustomerEmailType
 
 function documentTitle(documentType: BillingDocumentType) {
   return {
-    invoice: "Invoice",
+    invoice: "Tax Invoice",
     payment_receipt: "Payment receipt",
     deposit_authorisation: "Security deposit authorisation",
     deposit_release: "Security deposit release",

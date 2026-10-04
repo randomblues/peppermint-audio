@@ -271,6 +271,7 @@ export const hireTerms = [
 
 export const business = {
   name: "Peppermint Audio",
+  abn: "44 506 480 694",
   website: "https://www.peppermintaudio.com.au",
   serviceArea: "Melbourne",
   pickupSuburb: "Abbotsford",
