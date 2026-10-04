@@ -84,14 +84,15 @@ function configureAdmin({ insertError = null, uploadError = null, updateError = 
   const update = vi.fn().mockResolvedValue({ error: updateError });
   const insert = vi.fn().mockResolvedValue({ error: insertError });
   const upload = vi.fn().mockResolvedValue({ error: uploadError });
+  const remove = vi.fn().mockResolvedValue({ error: null });
   createAdminClient.mockReturnValue({
-    storage: { from: vi.fn(() => ({ upload })) },
+    storage: { from: vi.fn(() => ({ upload, remove })) },
     from: vi.fn((table: string) => table === "bookings"
       ? { insert, update: vi.fn(() => ({ eq: update })) }
       : {}),
   });
   insertMock = insert;
-  return { insert, upload, update };
+  return { insert, upload, remove, update };
 }
 
 describe("POST /api/booking", () => {
@@ -212,12 +213,16 @@ describe("POST /api/booking", () => {
   });
 
   it("returns a persistence error when an ID upload fails", async () => {
-    configureAdmin({ uploadError: { message: "storage down" } });
+    const { remove, upload } = configureAdmin();
+    upload
+      .mockResolvedValueOnce({ error: null })
+      .mockResolvedValueOnce({ error: { message: "storage down" } });
 
     const response = await POST(bookingRequest());
 
     expect(response.status).toBe(500);
     expect((await response.json()).error).toContain("Photo ID upload failed: storage down");
+    expect(remove).toHaveBeenCalledOnce();
   });
 
   it("records calendar failures and still sends email", async () => {

@@ -6,7 +6,7 @@ import { lineItemsTotalCents, parseBookingLineItems, type BookingLineItem } from
 import { sendInvoiceEmail } from "@/lib/invoice-service";
 import { invoiceNumberForBooking } from "@/lib/invoice-reference";
 import { parseInvoiceRecipient } from "@/lib/invoice-recipient";
-import { MAX_STRIPE_HIRE_DAYS, parseAmountCents, rentalDays } from "@/lib/payment-flow";
+import { MAX_STRIPE_HIRE_DAYS, PAYMENT_LINK_VALIDITY_DAYS, parseAmountCents, rentalDays } from "@/lib/payment-flow";
 import { getStripe } from "@/lib/stripe";
 
 type PaymentMethod = "stripe_card_hold" | "bank_transfer" | "cash_on_pickup";
@@ -124,6 +124,7 @@ export async function POST(request: Request) {
         stripe_hire_payment_intent_id: null,
         stripe_deposit_payment_intent_id: null,
         payment_token: null,
+        payment_token_expires_at: null,
         bank_transfer_reference: invoiceNumberForBooking(bookingId),
       });
     } else {
@@ -172,6 +173,7 @@ export async function POST(request: Request) {
         stripe_hire_payment_intent_id: hirePaymentIntent.id,
         stripe_deposit_payment_intent_id: depositPaymentIntent?.id ?? null,
         payment_token: existing.data.payment_token ?? crypto.randomUUID(),
+        payment_token_expires_at: new Date(Date.now() + PAYMENT_LINK_VALIDITY_DAYS * 24 * 60 * 60 * 1000).toISOString(),
         bank_transfer_reference: null,
       });
     }

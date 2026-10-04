@@ -1,7 +1,7 @@
 import { google } from "googleapis";
 import type { BookingLineItem } from "@/lib/booking-line-items";
 
-type BookingCalendarDetails = {
+export type BookingCalendarDetails = {
   firstName: string;
   lastName: string;
   email: string;

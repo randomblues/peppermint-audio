@@ -6,15 +6,24 @@ Marketing website for a Melbourne PA equipment hire business, built with:
 - Tailwind CSS
 - shadcn/ui (CLI-initialized)
 - React Hook Form + Zod
-- Resend for enquiry emails
+- Resend for enquiry and booking emails
+- Supabase for booking storage, authentication, and private photo-ID files
+- Stripe for customer payment links and deposit authorisations
 
-## Pages
+## Public routes
 
 - `/` Home
 - `/packages`
+- `/equipment`
 - `/how-it-works`
 - `/faq`
 - `/contact` (enquiry form)
+- `/get-started`
+- `/cart` (hire selection)
+- `/booking` (booking request form)
+- `/pay/[token]` (time-limited customer payment link)
+
+Administrative routes are under `/admin`; they require a Supabase session and an explicit admin role or email in `ADMIN_EMAILS`.
 
 ## Setup
 
@@ -31,14 +40,15 @@ Marketing website for a Melbourne PA equipment hire business, built with:
 - `SUPABASE_URL`: Supabase project URL
 - `SUPABASE_ANON_KEY`: Supabase publishable/anon key
 - `SUPABASE_SERVICE_ROLE_KEY`: server-only Supabase service role key
+- `ADMIN_EMAILS`: comma-separated server-side allowlist for administrator email addresses
 - `CRON_SECRET`: server-only random secret used to authorize the pickup reminder cron route
 - `GOOGLE_CALENDAR_ENABLED`: optional calendar feature flag; local development is disabled by default, while production remains enabled unless this is set to `false`
 
-## Booking management
+## Booking and payment management
 
-Run `supabase/001_booking_management.sql` in the Supabase SQL editor, then create administrator users under Supabase Authentication > Users. Rerun the migration after schema changes so existing databases receive the pickup/drop-off time columns and email-history table. Customer hire selections are built in the cart and submitted through the configured enquiry/payment workflow; requests are managed at `/admin` and changed to `confirmed` only after availability is reviewed. The customer automatically receives a confirmation email when the request is confirmed. Customer-facing email delivery metadata appears in each admin booking's **Email history** card and is automatically deleted after 30 days by the Supabase `pg_cron` job. Photo IDs remain in the private `booking-photo-ids` bucket and are only available through short-lived signed links.
+Run `supabase/001_booking_management.sql` in the Supabase SQL editor, then create administrator users under Supabase Authentication > Users. Rerun the migration after schema changes so existing databases receive the pickup/drop-off time columns and email-history table. Customer hire selections are built in the cart and carried into the booking request form at `/booking`; requests are managed at `/admin` and changed to `confirmed` only after availability is reviewed. The customer automatically receives a confirmation email when the request is confirmed. Customer-facing email delivery metadata appears in each admin booking's **Email history** card and is automatically deleted after 30 days by the Supabase `pg_cron` job. Photo IDs remain in the private `booking-photo-ids` bucket and are only available through short-lived signed links.
 
-The admin bookings view includes a **Send Email** menu with booking confirmation, pickup reminder, and custom email options. The confirmation option is available for confirmed bookings and can be used to resend the confirmation email.
+The admin bookings view includes a **Send Email** menu with booking confirmation, pickup reminder, custom email, and invoice options. Stripe payment links expire after 30 days. Bank-transfer and cash-on-pickup invoices do not expose customer payment secrets.
 
 ## Pickup reminders
 
@@ -52,13 +62,22 @@ npm run dev
 
 ## Browser testing
 
-**Use https://peppermint-audio.vercel.app/ for browser testing and manual website checks. Do not use https://www.peppermintaudio.com.au/ from this environment because Netskope can interfere with the custom domain.**
+Use the local development server for browser checks of uncommitted changes:
+
+```bash
+npm run dev
+```
+
+The deployed preview at `https://peppermint-audio.vercel.app/` may be used for separate post-deployment checks. Do not use the production custom domain from this environment because Netskope can interfere with it.
 
 ## Verify
 
 ```bash
 npm run lint
 npm run build
+npm test
+npm run test:coverage
+npm run test:e2e
 ```
 
 ## Notes

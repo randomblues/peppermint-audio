@@ -15,6 +15,10 @@ vi.mock("@/components/enquiry-form", () => ({
   ),
 }));
 
+vi.mock("@/components/payment-checkout", () => ({
+  PaymentCheckout: ({ token }: { token: string }) => <div aria-label="Payment checkout">Payment form for {token}</div>,
+}));
+
 describe("static site pages", () => {
   it("home page exposes primary calls to action, package data, and process content", () => {
     render(<Home />);
@@ -62,6 +66,16 @@ describe("static site pages", () => {
     expect(screen.getByRole("heading", { name: "Get in touch" })).toBeInTheDocument();
     expect(screen.getByLabelText("Enquiry form")).toHaveTextContent("Selected: Standard Party & Events Package");
     expect(screen.getByText("Pickup from Abbotsford 3067. We confirm the exact window after booking.")).toBeInTheDocument();
+  });
+
+  it("keeps the payment page focused on the customer action", async () => {
+    const PaymentPage = (await import("./pay/[token]/page")).default;
+    render(await PaymentPage({ params: Promise.resolve({ token: "test-token" }) }));
+
+    expect(screen.getByRole("heading", { name: "Pay for your hire" })).toBeInTheDocument();
+    expect(screen.getByText("Review your hire and deposit details, then complete your payment securely.")).toBeInTheDocument();
+    expect(screen.queryByText(/deposit hold may expire/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Payment checkout")).toHaveTextContent("Payment form for test-token");
   });
 
   it("FAQ page renders questions and the first answer by default", () => {

@@ -1,3 +1,5 @@
+/// <reference types="@testing-library/jest-dom" />
+import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -41,9 +43,9 @@ describe("Button primitive", () => {
     );
 
     expect(screen.getByRole("button", { name: "Continue" })).toHaveClass("cursor-pointer");
-    expect(screen.getByRole("button", { name: "Disabled" }))
-      .toBeDisabled()
-      .toHaveClass("disabled:cursor-not-allowed");
+    const disabledButton = screen.getByRole("button", { name: "Disabled" });
+    expect(disabledButton).toBeDisabled();
+    expect(disabledButton).toHaveClass("disabled:cursor-not-allowed");
   });
 });
 

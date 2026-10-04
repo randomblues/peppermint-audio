@@ -88,6 +88,18 @@ describe("admin booking routes", () => {
     expect(query.or).toHaveBeenCalledWith("email.ilike.%Jane%,first_name.ilike.%Jane%,last_name.ilike.%Jane%,event_type.ilike.%Jane%");
   });
 
+  it("escapes PostgREST filter characters in searches", async () => {
+    const query = {
+      select: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      in: vi.fn().mockReturnThis(),
+      or: vi.fn().mockResolvedValue({ data: [], error: null }),
+    };
+    mocks.requireAdmin.mockResolvedValue(adminSession({ from: vi.fn().mockReturnValue(query) }));
+    await getBookings(request("/api/admin/bookings?search=Jane%2C_%25"));
+    expect(query.or).toHaveBeenCalledWith("email.ilike.%Jane\\,\\_\\%%,first_name.ilike.%Jane\\,\\_\\%%,last_name.ilike.%Jane\\,\\_\\%%,event_type.ilike.%Jane\\,\\_\\%%");
+  });
+
   it("rejects unauthorised and reports list failures", async () => {
     mocks.requireAdmin.mockResolvedValueOnce(null);
     expect((await getBookings(request("/api/admin/bookings"))).status).toBe(401);

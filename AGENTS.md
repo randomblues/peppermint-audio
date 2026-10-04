@@ -1,7 +1,11 @@
 <!-- BEGIN:nextjs-agent-rules -->
-# Next.js guidance
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
 <!-- END:nextjs-agent-rules -->
 
 # Project reference
@@ -41,30 +45,31 @@ The production site is deployed to Vercel from the private GitHub repository `ra
 - `/packages`: package detail tabs with package add-to-cart and detail actions.
 - `/equipment`: individual equipment catalogue with add-to-cart and detail actions.
 - `/cart`: customer hire selection review; the cart is the only public source of package/equipment selections.
+- `/booking`: public booking-request form carrying cart items, customer details, event details, hire times, photo ID, and terms acceptance.
 - `/contact`: general enquiry form, with optional package context from catalogue links.
 - `/how-it-works`, `/faq`, `/get-started`: informational pages.
 - `/robots.txt`, `/sitemap.xml`, `/icon.svg`: metadata/assets.
 - `/admin/login`: Supabase-authenticated admin login.
 - `/admin`: protected booking operations console.
 
-The public customer flow is catalogue → cart → enquiry. There is no public `/booking` page or **Book now** entry point. The cart sends customers to `/contact`; the enquiry confirms receipt only, and availability, final pricing, payment, and hire confirmation are handled by the admin workflow.
+The public customer flow is catalogue → cart → booking request. The cart sends customers to `/booking`; the booking request confirms receipt only, and availability, final pricing, payment, and hire confirmation are handled by the admin workflow.
 
 ## Booking lifecycle and data flow
 
-1. A customer adds packages and/or individual equipment to `/cart`, then sends an enquiry through `/contact`.
-2. `POST /api/enquiry` validates the enquiry and sends the customer message to the configured business inbox.
-3. An admin creates or manages the operational booking record in `/admin`, including canonical `hire_line_items`, dates, pricing, payment method, and security-deposit state.
+1. A customer adds packages and/or individual equipment to `/cart`, then submits a booking request through `/booking`.
+2. `POST /api/booking` validates the multipart request, uploads the private photo IDs, persists the submitted booking, and runs calendar/email side effects in Next.js `after()`.
+3. An admin reviews availability and manages the operational booking record in `/admin`, including canonical `hire_line_items`, dates, pricing, payment method, and security-deposit state.
 4. Payment uses Stripe authorisation/payment-intent flows for eligible short hires or bank transfer for longer hires, with deposit capture/release/refund handled by the admin payment workflow.
 5. An admin reviews availability and payment state before changing the booking to `confirmed`.
 6. The confirmed transition sends the branded confirmation email and records `confirmation_email_sent`.
 7. The admin **Send Email** menu can send a confirmation email, pickup reminder, invoice, or custom email. Confirmation resend is restricted to confirmed bookings.
 8. Other statuses are `completed` and `cancelled`. Cancelled/completed bookings are excluded from upcoming-booking logic and automated pickup reminders.
 
-The retained `POST /api/booking` route is a server-side multipart intake for compatibility and operational use; it is not linked from the public site. It validates canonical `hire_line_items`, uploads private photo IDs when used, persists a submitted booking, and runs calendar/email side effects in Next.js `after()`. Calendar failure is recorded without invalidating persistence; email and persistence failures must be surfaced explicitly.
+`POST /api/booking` is the public multipart booking-request intake. It validates canonical `hire_line_items`, uploads private photo IDs, persists a submitted booking, and runs calendar/email side effects in Next.js `after()`. Calendar failure is recorded without invalidating persistence; email and persistence failures must be surfaced explicitly.
 
 ## API route inventory
 
-- `POST /api/booking`: server-side multipart booking intake retained for operational/compatibility use; not linked by the public site.
+- `POST /api/booking`: public multipart booking-request intake from `/booking`.
 - `POST /api/enquiry`: public general enquiry email.
 - `GET/PATCH/DELETE /api/admin/bookings`: authenticated list, status/notes update, and destructive deletion with private-ID cleanup.
 - `POST /api/admin/export`: authenticated ZIP archive export containing booking CSV/JSON/readme and private IDs.

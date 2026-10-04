@@ -247,7 +247,7 @@ export const hireTerms = [
   },
   {
     title: "2. Security Deposit",
-    body: "A refundable deposit is required for all hires. The amount depends on the package and will be confirmed before booking. For hires of seven days or less, we may authorise the deposit on a card without capturing it, so it can appear as a temporary pending hold and be released after a safe return. Longer hires use bank transfer. The deposit covers damage, missing items, late returns, or excessive cleaning. Deposits are fully refunded if equipment is returned on time, in original condition, and with all accessories.",
+    body: "A refundable deposit is required for all hires. The amount depends on the package and will be confirmed before booking. For hires of seven days or less, we may authorise the deposit on a card without capturing it, so it can appear as a temporary pending hold and be released after a safe return. Longer hires use bank transfer. The deposit covers damage, missing items, or late returns. Deposits are fully refunded if equipment is returned on time, in original condition, and with all accessories.",
   },
   {
     title: "3. Equipment Responsibility",

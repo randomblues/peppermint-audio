@@ -6,5 +6,13 @@ export async function requireAdmin() {
   if (!token) return null;
   const auth = createAuthClient();
   const { data: { user }, error } = await auth.auth.getUser(token);
-  return error || !user ? null : { user, admin: createAdminClient() };
+  if (error || !user) return null;
+  const allowedEmails = (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+  const hasAdminRole = user.app_metadata?.role === "admin";
+  const isAllowlisted = Boolean(user.email && allowedEmails.includes(user.email.toLowerCase()));
+  if (!hasAdminRole && !isAllowlisted) return null;
+  return { user, admin: createAdminClient() };
 }

@@ -273,6 +273,15 @@ describe("WhatsAppButton", () => {
       expect(screen.queryByRole("button", { name: "Check availability" })).not.toBeInTheDocument();
     });
 
+    it("stays out of the way during booking and payment actions", () => {
+      for (const pathname of ["/booking", "/pay/test-token"]) {
+        usePathname.mockReturnValue(pathname);
+        const { unmount } = render(<MobileContactBar />);
+        expect(screen.queryByRole("button", { name: "Check availability" })).not.toBeInTheDocument();
+        unmount();
+      }
+    });
+
   });
 
   it("tracks WhatsApp clicks", () => {

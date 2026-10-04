@@ -17,7 +17,7 @@ create table if not exists public.bookings (
   hire_payment_status text not null default 'unpaid', deposit_payment_status text not null default 'not_required',
   bank_transfer_option text not null default 'both' check (bank_transfer_option in ('payid','bank_account','both')),
   stripe_customer_id text, stripe_hire_payment_intent_id text, stripe_deposit_payment_intent_id text,
-  payment_token text, deposit_captured_cents integer, deposit_released_at timestamptz, deposit_captured_at timestamptz,
+  payment_token text, payment_token_expires_at timestamptz, deposit_captured_cents integer, deposit_released_at timestamptz, deposit_captured_at timestamptz,
   bank_transfer_reference text,
   internal_notes text not null default '',
   created_at timestamptz not null default now(), updated_at timestamptz not null default now()
@@ -49,6 +49,7 @@ alter table public.bookings add column if not exists stripe_customer_id text;
 alter table public.bookings add column if not exists stripe_hire_payment_intent_id text;
 alter table public.bookings add column if not exists stripe_deposit_payment_intent_id text;
 alter table public.bookings add column if not exists payment_token text;
+alter table public.bookings add column if not exists payment_token_expires_at timestamptz;
 alter table public.bookings add column if not exists deposit_captured_cents integer;
 alter table public.bookings add column if not exists deposit_released_at timestamptz;
 alter table public.bookings add column if not exists deposit_captured_at timestamptz;

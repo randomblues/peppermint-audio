@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { lineItemsForBooking } from "@/lib/booking-line-items";
 import { createAdminClient } from "@/lib/supabase";
 import { getStripe } from "@/lib/stripe";
 
@@ -9,12 +10,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
 
   const admin = createAdminClient();
   const result = await admin.from("bookings")
-    .select("id,first_name,last_name,email,pickup_date,dropoff_date,event_type,hire_amount_cents,security_deposit_cents,payment_method,hire_payment_status,deposit_payment_status,stripe_hire_payment_intent_id,stripe_deposit_payment_intent_id")
+    .select("id,first_name,last_name,email,pickup_date,dropoff_date,event_type,hire_line_items,hire_amount_cents,security_deposit_cents,payment_method,hire_payment_status,deposit_payment_status,stripe_hire_payment_intent_id,stripe_deposit_payment_intent_id,payment_token_expires_at")
     .eq("payment_token", token)
     .single();
   if (result.error) return NextResponse.json({ error: "Payment link could not be found." }, { status: 404 });
   if (!result.data || result.data.payment_method !== "stripe_card_hold") {
     return NextResponse.json({ error: "This payment link is not available." }, { status: 404 });
+  }
+  if (!result.data.payment_token_expires_at || new Date(result.data.payment_token_expires_at).getTime() <= Date.now()) {
+    return NextResponse.json({ error: "This payment link has expired. Please contact Peppermint Audio for a new link." }, { status: 410 });
   }
 
   try {
@@ -39,6 +43,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
       eventType: result.data.event_type,
       pickupDate: result.data.pickup_date,
       dropoffDate: result.data.dropoff_date,
+      hireLineItems: lineItemsForBooking(result.data),
       hireAmountCents: result.data.hire_amount_cents,
       securityDepositCents: result.data.security_deposit_cents,
       hirePaymentStatus: result.data.hire_payment_status,

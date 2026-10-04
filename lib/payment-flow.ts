@@ -1,4 +1,5 @@
 export const MAX_STRIPE_HIRE_DAYS = 7;
+export const PAYMENT_LINK_VALIDITY_DAYS = 30;
 
 export type PaymentMethod = "stripe_card_hold" | "bank_transfer" | "cash_on_pickup";
 

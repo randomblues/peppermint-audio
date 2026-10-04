@@ -51,24 +51,31 @@ export async function POST(request: Request) {
     const admin = createAdminClient();
     const bookingId = crypto.randomUUID();
     const objectPaths: string[] = [];
-    const uploadedFiles = await Promise.all(files.map(async (file, index) => {
-      const path = `${bookingId}/${index === 0 ? "front" : "back"}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-      const upload = await admin.storage.from(PHOTO_ID_BUCKET).upload(path, Buffer.from(await file.arrayBuffer()), { contentType: file.type || "application/octet-stream", upsert: false });
-      if (upload.error) throw new Error(`Photo ID upload failed: ${upload.error.message}`);
-      return path;
-    }));
-    objectPaths.push(...uploadedFiles);
+    try {
+      for (const [index, file] of files.entries()) {
+        const path = `${bookingId}/${index === 0 ? "front" : "back"}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+        const upload = await admin.storage.from(PHOTO_ID_BUCKET).upload(path, Buffer.from(await file.arrayBuffer()), { contentType: file.type || "application/octet-stream", upsert: false });
+        if (upload.error) throw new Error(`Photo ID upload failed: ${upload.error.message}`);
+        objectPaths.push(path);
+      }
 
-    const insert = await admin.from("bookings").insert({
-      id: bookingId, email: data.email, first_name: data.firstName, last_name: data.lastName, mobile: data.mobile,
-      event_type: data.eventType, event_address: data.eventAddress, pickup_date: data.pickupDate, dropoff_date: data.dropoffDate,
-      pickup_time: data.pickupTime, dropoff_time: data.dropoffTime,
-      additional_details: additionalDetails,
-      hire_line_items: hireLineItems,
-      terms_accepted: data.termsAccepted === "accepted", photo_id_paths: objectPaths, status: "submitted",
-      internal_email_sent: false, customer_email_sent: false,
-    });
-    if (insert.error) throw new Error(`Booking persistence failed: ${insert.error.message}`);
+      const insert = await admin.from("bookings").insert({
+        id: bookingId, email: data.email, first_name: data.firstName, last_name: data.lastName, mobile: data.mobile,
+        event_type: data.eventType, event_address: data.eventAddress, pickup_date: data.pickupDate, dropoff_date: data.dropoffDate,
+        pickup_time: data.pickupTime, dropoff_time: data.dropoffTime,
+        additional_details: additionalDetails,
+        hire_line_items: hireLineItems,
+        terms_accepted: data.termsAccepted === "accepted", photo_id_paths: objectPaths, status: "submitted",
+        internal_email_sent: false, customer_email_sent: false,
+      });
+      if (insert.error) throw new Error(`Booking persistence failed: ${insert.error.message}`);
+    } catch (error) {
+      if (objectPaths.length) {
+        const cleanup = await admin.storage.from(PHOTO_ID_BUCKET).remove(objectPaths);
+        if (cleanup.error) console.error("Failed to clean up uploaded photo IDs:", cleanup.error);
+      }
+      throw error;
+    }
     const bookingReference = bookingReferenceForId(bookingId);
     const updateBooking = async (updates: Record<string, unknown>) => {
       const result = await admin.from("bookings").update({ ...updates, updated_at: new Date().toISOString() }).eq("id", bookingId);

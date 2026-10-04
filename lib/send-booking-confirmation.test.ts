@@ -4,9 +4,9 @@ const { send } = vi.hoisted(() => ({ send: vi.fn() }));
 
 vi.mock("resend", () => ({ Resend: vi.fn(() => ({ emails: { send } })) }));
 
-import { sendBookingConfirmationEmail } from "./send-booking-confirmation";
+import { sendBookingConfirmationEmail, type BookingConfirmationRecord } from "./send-booking-confirmation";
 
-const booking = {
+const booking: BookingConfirmationRecord = {
   id: "12345678-90ab-cdef-1234-567890abcdef",
   email: "customer@example.com",
   first_name: "Alex",

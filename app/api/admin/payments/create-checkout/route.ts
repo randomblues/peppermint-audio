@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdmin } from "@/lib/admin-auth";
 import { lineItemsForBooking, lineItemsTotalCents } from "@/lib/booking-line-items";
-import { MAX_STRIPE_HIRE_DAYS, parseAmountCents, rentalDays } from "@/lib/payment-flow";
+import { MAX_STRIPE_HIRE_DAYS, PAYMENT_LINK_VALIDITY_DAYS, parseAmountCents, rentalDays } from "@/lib/payment-flow";
 import { sendInvoiceEmail } from "@/lib/invoice-service";
 import { invoiceNumberForBooking } from "@/lib/invoice-reference";
 import { parseInvoiceRecipient } from "@/lib/invoice-recipient";
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   }
 
   const result = await session.admin.from("bookings")
-    .select("id,email,first_name,last_name,status,pickup_date,dropoff_date,hire_line_items,payment_method,hire_amount_cents,security_deposit_cents,gst_inclusive,payment_token,stripe_customer_id")
+    .select("id,email,first_name,last_name,status,pickup_date,dropoff_date,hire_line_items,payment_method,hire_amount_cents,security_deposit_cents,gst_inclusive,payment_token,payment_token_expires_at,stripe_customer_id")
     .eq("id", bookingId)
     .single();
   if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 });
@@ -65,6 +65,8 @@ export async function POST(request: Request) {
   if (
     result.data.payment_method === "stripe_card_hold"
     && result.data.payment_token
+    && result.data.payment_token_expires_at
+    && new Date(result.data.payment_token_expires_at).getTime() > Date.now()
   ) {
     if (result.data.hire_amount_cents !== hireAmountCents || result.data.security_deposit_cents !== securityDepositCents) {
       return NextResponse.json({ error: "A payment link already exists for this booking with different amounts. Do not create a second active payment link." }, { status: 409 });
@@ -86,6 +88,7 @@ export async function POST(request: Request) {
   try {
     const stripe = getStripe();
     const paymentToken = crypto.randomUUID();
+    const paymentTokenExpiresAt = new Date(Date.now() + PAYMENT_LINK_VALIDITY_DAYS * 24 * 60 * 60 * 1000).toISOString();
     const invoiceNumber = invoiceNumberForBooking(bookingId);
     const customerId = result.data.stripe_customer_id ?? (await stripe.customers.create({
       email: result.data.email,
@@ -125,6 +128,7 @@ export async function POST(request: Request) {
       stripe_hire_payment_intent_id: hirePaymentIntent.id,
       stripe_deposit_payment_intent_id: depositPaymentIntent?.id ?? null,
       payment_token: paymentToken,
+      payment_token_expires_at: paymentTokenExpiresAt,
       bank_transfer_reference: null,
       updated_at: new Date().toISOString(),
     }).eq("id", bookingId);

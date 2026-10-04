@@ -5,6 +5,10 @@ import { sendBookingConfirmationEmail } from "@/lib/send-booking-confirmation";
 import { recordCustomerEmail } from "@/lib/email-log";
 import { parseBookingLineItems, type BookingLineItem } from "@/lib/booking-line-items";
 
+function escapePostgrestSearch(value: string) {
+  return value.replace(/[\\%_(),.]/g, "\\$&");
+}
+
 export async function GET(request: Request) {
   const session = await requireAdmin();
   if (!session) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
@@ -13,7 +17,10 @@ export async function GET(request: Request) {
   const status = url.searchParams.get("status");
   let query = session.admin.from("bookings").select("*").order("pickup_date", { ascending: true });
   if (status && ["submitted", "confirmed", "completed", "cancelled"].includes(status)) query = query.eq("status", status);
-  if (search) query = query.or(`email.ilike.%${search}%,first_name.ilike.%${search}%,last_name.ilike.%${search}%,event_type.ilike.%${search}%`);
+  if (search) {
+    const escapedSearch = escapePostgrestSearch(search);
+    query = query.or(`email.ilike.%${escapedSearch}%,first_name.ilike.%${escapedSearch}%,last_name.ilike.%${escapedSearch}%,event_type.ilike.%${escapedSearch}%`);
+  }
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const bookingIds = (data ?? []).map((booking) => booking.id);

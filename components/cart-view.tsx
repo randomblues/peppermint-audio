@@ -43,11 +43,11 @@ export function CartView() {
         </CardContent>
       </Card>
       <Card className="h-fit">
-        <CardHeader><CardTitle>Hire enquiry</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Booking request</CardTitle></CardHeader>
         <CardContent>
           <div className="flex items-center justify-between text-lg font-semibold"><span>Estimated hire total</span><span>${total}</span></div>
           <p className="mt-2 text-sm text-muted-foreground">Availability and final pricing are confirmed before your hire is accepted.</p>
-          <Button className="mt-5 w-full" nativeButton={false} render={<Link href="/contact" />}>Send an enquiry</Button>
+          <Button className="mt-5 w-full" nativeButton={false} render={<Link href="/booking" />}>Submit a Booking Request</Button>
         </CardContent>
       </Card>
     </div>

@@ -18,9 +18,10 @@ import {
   exchangeGoogleCalendarCode,
   getGoogleCalendarAuthorizationUrl,
   isGoogleCalendarEnabled,
+  type BookingCalendarDetails,
 } from "./google-calendar";
 
-const details = {
+const details: BookingCalendarDetails = {
   firstName: "Sam",
   lastName: "Jones",
   email: "sam@example.com",
