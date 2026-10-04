@@ -359,7 +359,7 @@ export function AdminPaymentPanel({ booking, onChanged, collapsible = true }: { 
               <Button type="button" variant="outline" onClick={addCustomItem}><Plus className="size-4" />Add custom</Button>
             </div>
           ) : null}
-          {canEditLineItems && lineItemsChanged ? <div className="flex justify-end border-t pt-3"><Button type="button" size="sm" onClick={() => void saveLineItems()} disabled={processing}>Save</Button></div> : null}
+          {canEditLineItems && lineItemsChanged ? <div className="flex justify-start border-t pt-4"><Button type="button" className="min-w-40" onClick={() => void saveLineItems()} disabled={processing}>Save</Button></div> : null}
         </section>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-lg bg-muted/40 p-3 text-sm"><p className="font-medium">Calculated hire total</p><p className="mt-1 text-lg font-semibold">{formatAudCents(hireTotalCents)}</p></div>
