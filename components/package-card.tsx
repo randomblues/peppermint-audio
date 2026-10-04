@@ -48,9 +48,9 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
       </div>
       {compact ? (
         <CardHeader className="gap-2 border-b border-border/60 pb-4">
-          <CardTitle className="min-h-12">{pkg.name}</CardTitle>
+          <CardTitle className="min-h-10 sm:h-10">{pkg.name}</CardTitle>
           <div className="min-h-6">{pkg.notes ? <Badge>{pkg.notes}</Badge> : null}</div>
-          <CardDescription className="min-h-20 sm:h-20">{pkg.bestFor}</CardDescription>
+          <CardDescription className="min-h-16 sm:h-16">{pkg.bestFor}</CardDescription>
           <p className="text-3xl font-semibold tracking-tight">${pkg.price}</p>
         </CardHeader>
       ) : (
