@@ -53,7 +53,7 @@ alter table public.bookings add column if not exists bank_transfer_reference tex
 alter table public.bookings add column if not exists payment_received_at timestamptz;
 alter table public.bookings add column if not exists bank_transfer_refunded_at timestamptz;
 alter table public.bookings add column if not exists bank_transfer_option text not null default 'both';
-drop constraint if exists bookings_bank_transfer_option_check on public.bookings;
+alter table public.bookings drop constraint if exists bookings_bank_transfer_option_check;
 alter table public.bookings add constraint bookings_bank_transfer_option_check check (bank_transfer_option in ('payid','bank_account','both'));
 create unique index if not exists bookings_payment_token_idx on public.bookings(payment_token) where payment_token is not null;
 
@@ -76,7 +76,7 @@ create table if not exists public.invoices (
 );
 create index if not exists invoices_booking_id_idx on public.invoices(booking_id);
 alter table public.invoices add column if not exists bank_transfer_option text not null default 'both';
-drop constraint if exists invoices_bank_transfer_option_check on public.invoices;
+alter table public.invoices drop constraint if exists invoices_bank_transfer_option_check;
 alter table public.invoices add constraint invoices_bank_transfer_option_check check (bank_transfer_option in ('payid','bank_account','both'));
 create table if not exists public.billing_documents (
   id uuid primary key default gen_random_uuid(),
