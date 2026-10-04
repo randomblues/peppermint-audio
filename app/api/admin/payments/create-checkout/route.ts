@@ -16,6 +16,34 @@ type PaymentRequest = {
   billToEmail?: unknown;
 };
 
+function isMissingStripeCustomerError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  const withCode = error as Error & { code?: unknown };
+  return withCode.code === "resource_missing" && /no such customer/i.test(error.message);
+}
+
+async function ensureStripeCustomerId(
+  stripe: ReturnType<typeof getStripe>,
+  booking: { stripe_customer_id: string | null; email: string; first_name: string; last_name: string },
+  bookingId: string,
+  invoiceNumber: string,
+) {
+  const existingCustomerId = booking.stripe_customer_id?.trim();
+  if (existingCustomerId) {
+    try {
+      const customer = await stripe.customers.retrieve(existingCustomerId);
+      if (!("deleted" in customer && customer.deleted)) return existingCustomerId;
+    } catch (error) {
+      if (!isMissingStripeCustomerError(error)) throw error;
+    }
+  }
+  return (await stripe.customers.create({
+    email: booking.email,
+    name: `${booking.first_name} ${booking.last_name}`,
+    metadata: { bookingId, invoiceNumber },
+  })).id;
+}
+
 function siteUrl(request: Request) {
   return (process.env.NEXT_PUBLIC_SITE_URL ?? new URL(request.url).origin).replace(/\/$/, "");
 }
@@ -90,11 +118,7 @@ export async function POST(request: Request) {
     const paymentToken = crypto.randomUUID();
     const paymentTokenExpiresAt = new Date(Date.now() + PAYMENT_LINK_VALIDITY_DAYS * 24 * 60 * 60 * 1000).toISOString();
     const invoiceNumber = invoiceNumberForBooking(bookingId);
-    const customerId = result.data.stripe_customer_id ?? (await stripe.customers.create({
-      email: result.data.email,
-      name: `${result.data.first_name} ${result.data.last_name}`,
-      metadata: { bookingId, invoiceNumber },
-    })).id;
+    const customerId = await ensureStripeCustomerId(stripe, result.data, bookingId, invoiceNumber);
     const hirePaymentIntent = await stripe.paymentIntents.create({
       amount: hireAmountCents,
       currency: "aud",

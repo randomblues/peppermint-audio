@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   requireAdmin: vi.fn(),
   getStripe: vi.fn(),
   customerCreate: vi.fn(),
+  customerRetrieve: vi.fn(),
   paymentIntentCreate: vi.fn(),
   paymentIntentRetrieve: vi.fn(),
   paymentIntentCancel: vi.fn(),
@@ -55,7 +56,7 @@ describe("admin payment routes", () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://www.example.com");
     mocks.requireAdmin.mockResolvedValue({ user: { id: "admin-1" } });
     mocks.getStripe.mockReturnValue({
-      customers: { create: mocks.customerCreate },
+      customers: { create: mocks.customerCreate, retrieve: mocks.customerRetrieve },
       paymentIntents: {
         create: mocks.paymentIntentCreate,
         retrieve: mocks.paymentIntentRetrieve,
@@ -63,6 +64,7 @@ describe("admin payment routes", () => {
       },
     });
     mocks.customerCreate.mockResolvedValue({ id: "cus_123" });
+    mocks.customerRetrieve.mockResolvedValue({ id: "cus_123", deleted: false });
     mocks.paymentIntentCreate
       .mockResolvedValueOnce({ id: "pi_hire", client_secret: "hire_secret" })
       .mockResolvedValueOnce({ id: "pi_deposit", client_secret: "deposit_secret" });
@@ -163,6 +165,36 @@ describe("admin payment routes", () => {
     }));
     expect(response.status).toBe(400);
     expect(mocks.paymentIntentCreate).not.toHaveBeenCalled();
+  });
+
+  it("creates a replacement Stripe customer when the saved customer no longer exists", async () => {
+    const { session, update } = adminSession({
+      id: "booking-missing-customer",
+      email: "alex@example.com",
+      first_name: "Alex",
+      last_name: "Smith",
+      status: "submitted",
+      pickup_date: "2026-10-01",
+      dropoff_date: "2026-10-03",
+      payment_method: null,
+      hire_amount_cents: null,
+      security_deposit_cents: null,
+      payment_token: null,
+      stripe_customer_id: "cus_missing",
+      hire_line_items: hireLineItems,
+    });
+    mocks.requireAdmin.mockResolvedValue({ user: { id: "admin-1" }, admin: session.admin });
+    mocks.customerRetrieve.mockRejectedValueOnce(Object.assign(new Error("No such customer: 'cus_missing'"), { code: "resource_missing" }));
+    mocks.customerCreate.mockResolvedValueOnce({ id: "cus_replacement" });
+
+    const response = await createCheckout(request("/api/admin/payments/create-checkout", {
+      bookingId: "booking-missing-customer",
+      securityDepositAmount: "100",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.customerRetrieve).toHaveBeenCalledWith("cus_missing");
+    expect(update.update).toHaveBeenCalledWith(expect.objectContaining({ stripe_customer_id: "cus_replacement" }));
   });
 
   it("records bank transfer for long hires instead of calling Stripe", async () => {
