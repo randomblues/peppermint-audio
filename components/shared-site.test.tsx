@@ -267,6 +267,14 @@ describe("WhatsAppButton", () => {
 
       expect(screen.queryByRole("button", { name: "Check availability" })).not.toBeInTheDocument();
     });
+
+    it("keeps the booking form clear on phones while retaining the desktop contact bar", () => {
+      usePathname.mockReturnValue("/booking");
+      render(<MobileContactBar />);
+
+      const availabilityButton = screen.getByRole("button", { name: "Check availability" });
+      expect(availabilityButton.parentElement).toHaveClass("hidden", "md:block");
+    });
   });
 
   it("tracks WhatsApp clicks", () => {

@@ -10,6 +10,7 @@ type PaymentRequest = {
   bookingId?: string;
   hireAmount?: unknown;
   securityDepositAmount?: unknown;
+  gstInclusive?: unknown;
 };
 
 function siteUrl(request: Request) {
@@ -28,6 +29,10 @@ export async function POST(request: Request) {
   }
 
   const bookingId = body.bookingId?.trim();
+  if (body.gstInclusive !== undefined && typeof body.gstInclusive !== "boolean") {
+    return NextResponse.json({ error: "GST-inclusive selection must be true or false." }, { status: 400 });
+  }
+  const gstInclusive = body.gstInclusive !== false;
   const hireAmountCents = parseAmountCents(body.hireAmount);
   const securityDepositCents = parseAmountCents(body.securityDepositAmount);
   if (!bookingId || hireAmountCents === null || hireAmountCents < 1 || securityDepositCents === null || securityDepositCents < 0) {
@@ -35,7 +40,7 @@ export async function POST(request: Request) {
   }
 
   const result = await session.admin.from("bookings")
-    .select("id,email,first_name,last_name,status,pickup_date,dropoff_date,payment_method,hire_amount_cents,security_deposit_cents,payment_token")
+    .select("id,email,first_name,last_name,status,pickup_date,dropoff_date,payment_method,hire_amount_cents,security_deposit_cents,gst_inclusive,payment_token")
     .eq("id", bookingId)
     .single();
   if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 });
@@ -57,6 +62,9 @@ export async function POST(request: Request) {
     if (result.data.hire_amount_cents !== hireAmountCents || result.data.security_deposit_cents !== securityDepositCents) {
       return NextResponse.json({ error: "A payment link already exists for this booking with different amounts. Do not create a second active payment link." }, { status: 409 });
     }
+    if ((result.data.gst_inclusive ?? true) !== gstInclusive) {
+      return NextResponse.json({ error: "A payment link already exists with a different GST setting. Do not create a second active payment link." }, { status: 409 });
+    }
     return NextResponse.json({
       ok: true,
       days,
@@ -64,6 +72,7 @@ export async function POST(request: Request) {
       paymentToken: result.data.payment_token,
       hireAmountCents,
       securityDepositCents,
+      gstInclusive,
     });
   }
 
@@ -101,6 +110,7 @@ export async function POST(request: Request) {
       payment_method: "stripe_card_hold",
       hire_amount_cents: hireAmountCents,
       security_deposit_cents: securityDepositCents,
+      gst_inclusive: gstInclusive,
       hire_payment_status: "pending",
       deposit_payment_status: securityDepositCents > 0 ? "pending" : "not_required",
       stripe_customer_id: customer.id,
@@ -119,6 +129,7 @@ export async function POST(request: Request) {
       paymentToken,
       hireAmountCents,
       securityDepositCents,
+      gstInclusive,
       invoiceEmailId,
     });
   } catch (error) {

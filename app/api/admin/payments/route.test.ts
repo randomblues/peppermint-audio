@@ -127,9 +127,10 @@ describe("admin payment routes", () => {
       securityDepositAmount: "100",
     }));
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, reference: "PA-BOOKING3", invoiceEmailId: "invoice-email-1" });
+    expect(await response.json()).toEqual({ ok: true, reference: "PA-BOOKING3", invoiceEmailId: "invoice-email-1", gstInclusive: true });
     expect(update.update).toHaveBeenCalledWith(expect.objectContaining({
       payment_method: "bank_transfer",
+      gst_inclusive: true,
       hire_payment_status: "bank_transfer_pending",
       deposit_payment_status: "bank_transfer_pending",
     }));

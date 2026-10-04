@@ -80,6 +80,20 @@ describe("BookingForm", () => {
     expect(screen.getByText("Ideal for up to 120 people").parentElement).toHaveClass("border-t");
   });
 
+  it("locks the cart selection instead of asking customers to choose a package again", () => {
+    render(<BookingForm cartItems={[
+      { id: "package:standard-party-events", name: "Standard Party & Events Package", kind: "package", price: 180, quantity: 1 },
+      { id: "equipment:shure-sm58:Single microphone", name: "Shure SM58", kind: "equipment", option: "Single microphone", price: 15, quantity: 2 },
+    ]} />);
+    advanceToPackage();
+
+    expect(screen.getByText("Your cart selection")).toBeInTheDocument();
+    expect(screen.getByText("Standard Party & Events Package")).toBeInTheDocument();
+    expect(screen.getByText("2 × Shure SM58")).toBeInTheDocument();
+    expect(screen.queryByText("Choose your package")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Return to your cart" })).toHaveAttribute("href", "/cart");
+  });
+
   it("shows booking API errors and the success confirmation", async () => {
     const trackSubmission = vi.spyOn(googleAds, "trackGoogleAdsBookingSubmission");
     const request = vi.fn().mockResolvedValueOnce({

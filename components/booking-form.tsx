@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 
+import type { CartItem } from "@/components/cart-provider";
 import { DatePicker } from "@/components/date-picker";
 import { TimePicker } from "@/components/time-picker";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +43,7 @@ const initialValues: BookingFormInputValues = {
   pickupTime: "",
   dropoffTime: "",
   packageInterest: "",
+  selectedEquipment: "",
   addOns: "",
   additionalDetails: "",
   termsAccepted: "",
@@ -101,16 +104,21 @@ function fieldError(errors: Record<string, string>, name: string) {
 type BookingFormProps = {
   initialPackageSlug?: string;
   initialEquipmentName?: string;
+  cartItems?: CartItem[];
 };
 
-export function BookingForm({ initialPackageSlug, initialEquipmentName }: BookingFormProps) {
+export function BookingForm({ initialPackageSlug, initialEquipmentName, cartItems = [] }: BookingFormProps) {
+  const selectedPackageName = packageTiers.find((pkg) => pkg.slug === initialPackageSlug)?.name;
+  const selectedEquipmentSummary = cartItems
+    .map((item) => `${item.quantity > 1 ? `${item.quantity} × ` : ""}${item.name}${item.option ? ` (${item.option})` : ""}`)
+    .join(", ") || initialEquipmentName || "";
+  const hasLockedSelection = cartItems.length > 0 || Boolean(initialEquipmentName);
+  const lockedPackageLabel = selectedPackageName ?? (hasLockedSelection ? "Custom equipment selection" : "");
   const [step, setStep] = useState(0);
   const [values, setValues] = useState<BookingFormState>(() => ({
     ...initialState,
-    packageInterest:
-      packageTiers.find((pkg) => pkg.slug === initialPackageSlug)?.name ??
-      initialEquipmentName ??
-      "",
+    packageInterest: lockedPackageLabel,
+    selectedEquipment: selectedEquipmentSummary,
   }));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
@@ -125,7 +133,14 @@ export function BookingForm({ initialPackageSlug, initialEquipmentName }: Bookin
         const parsed = JSON.parse(savedDraft) as { step?: number; values?: Partial<BookingFormInputValues> };
         if (parsed.values && typeof parsed.values === "object") {
           // eslint-disable-next-line react-hooks/set-state-in-effect
-          setValues((current) => ({ ...current, ...parsed.values, idFiles: [] }));
+          setValues((current) => ({
+            ...current,
+            ...parsed.values,
+            ...(hasLockedSelection
+              ? { packageInterest: lockedPackageLabel, selectedEquipment: selectedEquipmentSummary }
+              : {}),
+            idFiles: [],
+          }));
         }
         if (typeof parsed.step === "number" && parsed.step >= 0 && parsed.step < steps.length) {
           setStep(parsed.step);
@@ -135,7 +150,7 @@ export function BookingForm({ initialPackageSlug, initialEquipmentName }: Bookin
       window.localStorage.removeItem(bookingDraftStorageKey);
     }
     draftLoaded.current = true;
-  }, []);
+  }, [hasLockedSelection, lockedPackageLabel, selectedEquipmentSummary]);
 
   useEffect(() => {
     if (!draftLoaded.current || submitted) return;
@@ -256,7 +271,7 @@ export function BookingForm({ initialPackageSlug, initialEquipmentName }: Bookin
     <Card className="mx-auto w-full max-w-3xl !overflow-visible border">
       <CardHeader className="border-b">
         <div className="flex items-center justify-between gap-4">
-          <CardTitle>{steps[step]}</CardTitle>
+          <CardTitle>{step === 3 && hasLockedSelection ? "Your selection" : steps[step]}</CardTitle>
           <span className="shrink-0 text-sm text-muted-foreground">Page {step + 1} of {steps.length}</span>
         </div>
         <div className="h-2 overflow-hidden rounded-full bg-muted" aria-label={`Step ${step + 1} of ${steps.length}`}>
@@ -298,73 +313,82 @@ export function BookingForm({ initialPackageSlug, initialEquipmentName }: Bookin
 
         {step === 3 ? (
           <div className="space-y-8">
-            {initialEquipmentName && values.packageInterest === initialEquipmentName ? (
-              <div className="rounded-xl border border-primary bg-primary/5 p-5">
-                <p className="text-sm font-semibold uppercase tracking-wide text-primary">Individual equipment</p>
-                <p className="mt-2 text-lg font-semibold">{initialEquipmentName}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  This item is selected for your booking request. You can also choose a complete package below instead.
+            {hasLockedSelection ? (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-primary bg-primary/5 p-5">
+                  <p className="text-sm font-semibold uppercase tracking-wide text-primary">Your cart selection</p>
+                  <p className="mt-2 text-lg font-semibold">{selectedPackageName ?? "Individual equipment hire"}</p>
+                </div>
+                <ul className="divide-y rounded-xl border">
+                  {cartItems.map((item) => (
+                    <li key={item.id} className="flex items-start justify-between gap-4 px-4 py-3 text-sm">
+                      <span><span className="font-medium">{item.quantity > 1 ? `${item.quantity} × ` : ""}{item.name}</span>{item.option ? <span className="block text-muted-foreground">{item.option}</span> : null}</span>
+                      <span className="shrink-0 font-medium">${item.price * item.quantity}</span>
+                    </li>
+                  ))}
+                  {!cartItems.length && initialEquipmentName ? <li className="px-4 py-3 text-sm font-medium">{initialEquipmentName}</li> : null}
+                </ul>
+                <p className="text-sm text-muted-foreground">Need to change your selection? <Link href="/cart" className="font-medium text-primary underline underline-offset-4">Return to your cart</Link>.</p>
+              </div>
+            ) : (
+              <fieldset className="space-y-4">
+                <legend className="text-base font-semibold">Choose your package</legend>
+                <p className="text-sm text-muted-foreground">
+                  Start with the complete setup that best fits your event. You can add individual equipment from the equipment catalogue via your cart.
                 </p>
-              </div>
-            ) : null}
-            <fieldset className="space-y-4">
-              <legend className="text-base font-semibold">Choose your package</legend>
-              <p className="text-sm text-muted-foreground">
-                Start with the complete setup that best fits your event, or submit the individual equipment selected above.
-                If you need anything extra with a package, browse individual equipment and add it to your cart before continuing.
-              </p>
-              <div className="grid gap-4 lg:grid-cols-3">
-                {packageTiers.map((pkg) => {
-                  const isSelected = values.packageInterest === pkg.name;
+                <div className="grid gap-4 lg:grid-cols-3">
+                  {packageTiers.map((pkg) => {
+                    const isSelected = values.packageInterest === pkg.name;
 
-                  return (
-                    <label
-                      key={pkg.slug}
-                      className={`relative flex cursor-pointer flex-col rounded-xl border p-4 transition-colors ${
-                        isSelected
-                          ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                          : "hover:border-primary/50 hover:bg-muted/50"
-                      }`}
-                    >
-                      <input
-                        className="sr-only"
-                        type="radio"
-                        name="packageInterest"
-                        value={pkg.name}
-                        checked={isSelected}
-                        onChange={(event) => {
-                          updateValue("packageInterest", event.target.value);
-                          updateValue("addOns", "");
-                        }}
-                      />
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex flex-1 flex-wrap items-center gap-2">
-                          <span className="font-semibold">{pkg.name}</span>
-                          {pkg.notes ? (
-                            <span className="max-w-full text-xs font-medium leading-tight text-primary">
-                              {pkg.notes}
-                            </span>
-                          ) : null}
+                    return (
+                      <label
+                        key={pkg.slug}
+                        className={`relative flex cursor-pointer flex-col rounded-xl border p-4 transition-colors ${
+                          isSelected
+                            ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                            : "hover:border-primary/50 hover:bg-muted/50"
+                        }`}
+                      >
+                        <input
+                          className="sr-only"
+                          type="radio"
+                          name="packageInterest"
+                          value={pkg.name}
+                          checked={isSelected}
+                          onChange={(event) => {
+                            updateValue("packageInterest", event.target.value);
+                            updateValue("addOns", "");
+                          }}
+                        />
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex flex-1 flex-wrap items-center gap-2">
+                            <span className="font-semibold">{pkg.name}</span>
+                            {pkg.notes ? (
+                              <span className="max-w-full text-xs font-medium leading-tight text-primary">
+                                {pkg.notes}
+                              </span>
+                            ) : null}
+                          </div>
+                          <span className="shrink-0 whitespace-nowrap text-xl font-semibold">${pkg.price}</span>
                         </div>
-                        <span className="shrink-0 whitespace-nowrap text-xl font-semibold">${pkg.price}</span>
-                      </div>
-                      <div className="mt-3 border-t pt-3">
-                        <p className="text-sm font-medium text-foreground">Ideal for {pkg.capacity}</p>
-                        <p className="mt-2 text-sm text-muted-foreground">{pkg.summary}</p>
-                      </div>
-                      <ul className="mt-4 space-y-1.5 border-t pt-3 text-sm text-muted-foreground">
-                        {pkg.inclusions.slice(0, 4).map((item) => (
-                          <li key={item}>• {item}</li>
-                        ))}
-                      </ul>
-                      <span className="mt-auto pt-4 text-sm font-medium text-primary">
-                        {isSelected ? "Selected package" : "Select this package"}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-            </fieldset>
+                        <div className="mt-3 border-t pt-3">
+                          <p className="text-sm font-medium text-foreground">Ideal for {pkg.capacity}</p>
+                          <p className="mt-2 text-sm text-muted-foreground">{pkg.summary}</p>
+                        </div>
+                        <ul className="mt-4 space-y-1.5 border-t pt-3 text-sm text-muted-foreground">
+                          {pkg.inclusions.slice(0, 4).map((item) => (
+                            <li key={item}>• {item}</li>
+                          ))}
+                        </ul>
+                        <span className="mt-auto pt-4 text-sm font-medium text-primary">
+                          {isSelected ? "Selected package" : "Select this package"}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            )}
             {fieldError(errors, "packageInterest")}
           </div>
         ) : null}

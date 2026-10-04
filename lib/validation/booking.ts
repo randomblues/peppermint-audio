@@ -25,6 +25,7 @@ export const bookingSchema = z.object({
     .string()
     .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Please select a valid drop-off time"),
   packageInterest: z.string().min(2, "Please select a package"),
+  selectedEquipment: z.string().max(3000, "Please keep the selected equipment under 3000 characters").default(""),
   addOns: z.string().default(""),
   additionalDetails: z.string().max(3000, "Please keep additional details under 3000 characters"),
   termsAccepted: z.string().refine(

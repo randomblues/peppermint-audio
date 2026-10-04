@@ -21,6 +21,7 @@ describe("bookingSchema", () => {
   it("accepts valid values and defaults add-ons", () => {
     const result = bookingSchema.parse(validBooking);
     expect(result.addOns).toBe("");
+    expect(result.selectedEquipment).toBe("");
   });
 
   it("enforces minimum text lengths, terms, and the details maximum", () => {

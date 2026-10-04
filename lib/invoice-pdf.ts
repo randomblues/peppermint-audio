@@ -22,6 +22,7 @@ export type InvoicePdfDetails = {
   paymentMethod: string;
   lineItems: InvoicePdfLineItem[];
   totalCents: number;
+  gstIncludedCents?: number;
   notes: string[];
 };
 
@@ -99,9 +100,18 @@ export async function buildInvoicePdf(details: InvoicePdfDetails) {
     y -= 20;
   }
 
-  page.drawText("TOTAL", { x: pageWidth - margin - 155, y, size: 10, font: bold, color: dark });
-  page.drawText(aud(details.totalCents), { x: pageWidth - margin - 80, y, size: 11, font: bold, color: green });
-  y -= 42;
+  const summaryAmountX = pageWidth - margin - 80;
+  const totalLabel = details.gstIncludedCents && details.gstIncludedCents > 0 ? "TOTAL (INC. GST)" : "TOTAL";
+  const totalLabelWidth = bold.widthOfTextAtSize(totalLabel, 10);
+  if (details.gstIncludedCents && details.gstIncludedCents > 0) {
+    const gstLabel = "GST INCLUDED (10%)";
+    const gstLabelWidth = regular.widthOfTextAtSize(gstLabel, 8);
+    page.drawText(gstLabel, { x: summaryAmountX - 12 - gstLabelWidth, y: y - 18, size: 8, font: regular, color: muted });
+    page.drawText(aud(details.gstIncludedCents), { x: summaryAmountX, y: y - 18, size: 9, font: regular, color: muted });
+  }
+  page.drawText(totalLabel, { x: summaryAmountX - 12 - totalLabelWidth, y, size: 10, font: bold, color: dark });
+  page.drawText(aud(details.totalCents), { x: summaryAmountX, y, size: 11, font: bold, color: green });
+  y -= details.gstIncludedCents && details.gstIncludedCents > 0 ? 58 : 42;
   page.drawText("PAYMENT", { x: margin, y, size: 8, font: bold, color: green });
   y = drawWrapped(page, details.paymentMethod, margin, y - 18, pageWidth - margin * 2, 9, regular, muted);
   y -= 16;

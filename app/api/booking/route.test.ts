@@ -144,6 +144,25 @@ describe("POST /api/booking", () => {
     }));
   });
 
+  it("persists cart equipment alongside a custom selection", async () => {
+    const response = await POST(bookingRequest({
+      ...validFields,
+      packageInterest: "Custom equipment selection",
+      addOns: "",
+      selectedEquipment: "2 × Shure SM58 (Single microphone), Yamaha DXR15 PA Speaker (Pair)",
+    }));
+
+    expect(response.status).toBe(200);
+    const insertedBooking = insertMock.mock.calls[0]?.[0];
+    expect(insertedBooking?.package_interest).toBe("Custom equipment selection");
+    expect(insertedBooking?.additional_details).toContain("Selected hire items: 2 × Shure SM58");
+    await afterCallback.mock.calls[0][0]();
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({
+      to: ["alex@example.com"],
+      text: expect.stringContaining("Selected hire items: 2 × Shure SM58"),
+    }));
+  });
+
   it("returns a persistence error when an ID upload fails", async () => {
     configureAdmin({ uploadError: { message: "storage down" } });
 

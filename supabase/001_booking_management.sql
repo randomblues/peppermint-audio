@@ -12,6 +12,7 @@ create table if not exists public.bookings (
   customer_email_sent boolean not null default false, confirmation_email_sent boolean not null default false,
   payment_received_at timestamptz, bank_transfer_refunded_at timestamptz,
   payment_method text, hire_amount_cents integer, security_deposit_cents integer,
+  gst_inclusive boolean not null default true,
   hire_payment_status text not null default 'unpaid', deposit_payment_status text not null default 'not_required',
   bank_transfer_option text not null default 'both' check (bank_transfer_option in ('payid','bank_account','both')),
   stripe_customer_id text, stripe_hire_payment_intent_id text, stripe_deposit_payment_intent_id text,
@@ -40,6 +41,7 @@ alter table public.bookings add column if not exists dropoff_time time;
 alter table public.bookings add column if not exists payment_method text;
 alter table public.bookings add column if not exists hire_amount_cents integer;
 alter table public.bookings add column if not exists security_deposit_cents integer;
+alter table public.bookings add column if not exists gst_inclusive boolean not null default true;
 alter table public.bookings add column if not exists hire_payment_status text not null default 'unpaid';
 alter table public.bookings add column if not exists deposit_payment_status text not null default 'not_required';
 alter table public.bookings add column if not exists stripe_customer_id text;
@@ -64,6 +66,7 @@ create table if not exists public.invoices (
   payment_method text not null,
   hire_amount_cents integer not null,
   security_deposit_cents integer not null default 0,
+  gst_inclusive boolean not null default true,
   total_amount_cents integer not null,
   currency text not null default 'aud',
   payment_url text,
@@ -76,6 +79,7 @@ create table if not exists public.invoices (
 );
 create index if not exists invoices_booking_id_idx on public.invoices(booking_id);
 alter table public.invoices add column if not exists bank_transfer_option text not null default 'both';
+alter table public.invoices add column if not exists gst_inclusive boolean not null default true;
 alter table public.invoices drop constraint if exists invoices_bank_transfer_option_check;
 alter table public.invoices add constraint invoices_bank_transfer_option_check check (bank_transfer_option in ('payid','bank_account','both'));
 create table if not exists public.billing_documents (

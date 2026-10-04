@@ -206,6 +206,25 @@ describe("AdminConsole", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/logout", { method: "POST" }));
   });
 
+  it("combines full-time salary with business profit in the tax estimate", async () => {
+    const fetchMock = vi.fn().mockImplementation((request: RequestInfo | URL) => {
+      return typeof request === "string" && request.startsWith("/api/admin/tax-report")
+        ? jsonResponse({ summary: { invoiceCount: 0, taxableSalesCents: 0, gstIncludedCents: 0, securityDepositCents: 0, totalAmountCents: 0 }, rows: [] })
+        : jsonResponse({ bookings: [booking] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AdminConsole />);
+    await screen.findByText("Alex Smith");
+    fireEvent.click(screen.getByRole("link", { name: "Tax" }));
+    expect(await screen.findByRole("heading", { name: "Tax" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Tax" }));
+    fireEvent.change(screen.getByLabelText("Gross full-time salary and wages"), { target: { value: "50000" } });
+    fireEvent.change(screen.getByLabelText("Business income"), { target: { value: "10000" } });
+    fireEvent.change(screen.getByLabelText("Deductible business expenses"), { target: { value: "2000" } });
+    expect(screen.getByText("$58,000.00")).toBeInTheDocument();
+    expect(screen.getByText("$7,920.00")).toBeInTheDocument();
+  });
+
   it("shows the API error and retry action when loading fails", async () => {
     const fetchMock = vi.fn().mockImplementation(() => jsonResponse({ error: "Database unavailable" }, false));
     vi.stubGlobal("fetch", fetchMock);

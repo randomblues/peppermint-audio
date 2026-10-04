@@ -15,6 +15,7 @@ type PaymentBooking = {
   status: string;
   hire_amount_cents?: number | null;
   security_deposit_cents?: number | null;
+  gst_inclusive?: boolean | null;
   payment_method?: string | null;
   hire_payment_status?: string | null;
   deposit_payment_status?: string | null;
@@ -37,6 +38,7 @@ export function AdminPaymentPanel({ booking, onChanged }: { booking: PaymentBook
   const [bankTransferOption, setBankTransferOption] = useState<BankTransferOption>(booking.bank_transfer_option ?? "both");
   const [hireAmount, setHireAmount] = useState(booking.hire_amount_cents ? String(booking.hire_amount_cents / 100) : "");
   const [depositAmount, setDepositAmount] = useState(booking.security_deposit_cents ? String(booking.security_deposit_cents / 100) : "");
+  const [gstInclusive, setGstInclusive] = useState(booking.gst_inclusive !== false);
   const [captureAmount, setCaptureAmount] = useState(booking.security_deposit_cents ? String(booking.security_deposit_cents / 100) : "");
   const [paymentUrl, setPaymentUrl] = useState("");
   const [error, setError] = useState("");
@@ -69,6 +71,7 @@ export function AdminPaymentPanel({ booking, onChanged }: { booking: PaymentBook
       bookingId: booking.id,
       hireAmount,
       securityDepositAmount: depositAmount || "0",
+      gstInclusive,
       ...(selectedMethod === "bank_transfer" ? { bankTransferOption } : {}),
     });
     if (!data) return;
@@ -76,6 +79,7 @@ export function AdminPaymentPanel({ booking, onChanged }: { booking: PaymentBook
     onChanged({
       hire_amount_cents: typeof data.hireAmountCents === "number" ? data.hireAmountCents : Math.round(Number(hireAmount) * 100),
       security_deposit_cents: typeof data.securityDepositCents === "number" ? data.securityDepositCents : Math.round(Number(depositAmount || "0") * 100),
+      gst_inclusive: gstInclusive,
       payment_method: selectedMethod,
       bank_transfer_option: selectedMethod === "bank_transfer" ? bankTransferOption : booking.bank_transfer_option,
       payment_token: typeof data.paymentToken === "string" ? data.paymentToken : booking.payment_token,
@@ -161,6 +165,10 @@ export function AdminPaymentPanel({ booking, onChanged }: { booking: PaymentBook
           <label className="space-y-1 text-sm font-medium">Hire amount (AUD)<input aria-label="Hire amount" inputMode="decimal" value={hireAmount} onChange={(event) => setHireAmount(event.target.value)} className="h-10 w-full rounded-lg border bg-background px-3 font-normal" placeholder="100.00" /></label>
           <label className="space-y-1 text-sm font-medium">Security deposit (AUD)<input aria-label="Security deposit amount" inputMode="decimal" value={depositAmount} onChange={(event) => { setDepositAmount(event.target.value); setCaptureAmount(event.target.value); }} className="h-10 w-full rounded-lg border bg-background px-3 font-normal" placeholder="100.00" /></label>
         </div>
+        <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">
+          <input aria-label="GST-inclusive hire cost" type="checkbox" checked={gstInclusive} onChange={(event) => setGstInclusive(event.target.checked)} className="mt-1 size-4 accent-primary" />
+          <span><span className="block font-medium">GST-inclusive hire cost</span><span className="block text-xs text-muted-foreground">Keep ticked for standard hires. The invoice will show the GST component included in the hire amount.</span></span>
+        </label>
         <Button onClick={() => void createPayment()} disabled={processing || booking.status !== "confirmed" || !selectedMethod || !hireAmount}>{selectedMethod === "bank_transfer" ? "Create bank-transfer invoice" : "Create payment link"}</Button>
         {booking.payment_method ? <Button variant="outline" onClick={() => void resendInvoice()} disabled={processing}>Send invoice again</Button> : null}
         {existingPaymentUrl ? <div className="rounded-lg border p-3 text-sm"><p className="font-medium">Customer payment link</p><p className="mt-1 break-all text-xs text-muted-foreground">{existingPaymentUrl}</p><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => void copyLink()}><Copy className="size-3.5" />Copy link</Button><a href={existingPaymentUrl} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center rounded-lg border px-3 text-sm font-medium hover:bg-muted">Open link</a></div></div> : null}

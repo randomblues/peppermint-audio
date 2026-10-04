@@ -3,12 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   createAdminClient: vi.fn(),
   getStripe: vi.fn(),
+  markInvoiceStatus: vi.fn(),
   sendBillingDocument: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase", () => ({ createAdminClient: mocks.createAdminClient }));
 vi.mock("@/lib/stripe", () => ({ getStripe: mocks.getStripe }));
-vi.mock("@/lib/invoice-service", () => ({ sendBillingDocument: mocks.sendBillingDocument }));
+vi.mock("@/lib/invoice-service", () => ({ markInvoiceStatus: mocks.markInvoiceStatus, sendBillingDocument: mocks.sendBillingDocument }));
 
 import { POST } from "./route";
 
@@ -35,6 +36,7 @@ describe("Stripe webhook", () => {
     mocks.getStripe.mockReturnValue({
       webhooks: { constructEvent: vi.fn() },
     });
+    mocks.markInvoiceStatus.mockResolvedValue(undefined);
     mocks.sendBillingDocument.mockResolvedValue("document-1");
   });
 

@@ -21,7 +21,7 @@ describe("AdminPaymentPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create payment link" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/payments/create-checkout", expect.objectContaining({
-      body: JSON.stringify({ bookingId: "booking-1", hireAmount: "100", securityDepositAmount: "100" }),
+      body: JSON.stringify({ bookingId: "booking-1", hireAmount: "100", securityDepositAmount: "100", gstInclusive: true }),
     })));
     expect(await screen.findByText("One payment link created for the hire and deposit authorisation.")).toBeInTheDocument();
     expect(screen.getByText("https://example.com/pay/token")).toBeInTheDocument();
@@ -42,7 +42,7 @@ describe("AdminPaymentPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create bank-transfer invoice" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/payments/bank-transfer", expect.objectContaining({
-      body: JSON.stringify({ bookingId: "booking-1", hireAmount: "100", securityDepositAmount: "100", bankTransferOption: "payid" }),
+      body: JSON.stringify({ bookingId: "booking-1", hireAmount: "100", securityDepositAmount: "100", gstInclusive: true, bankTransferOption: "payid" }),
     })));
   });
 });

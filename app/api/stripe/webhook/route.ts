@@ -1,7 +1,7 @@
 import Stripe from "stripe";
 
 import { createAdminClient } from "@/lib/supabase";
-import { sendBillingDocument } from "@/lib/invoice-service";
+import { markInvoiceStatus, sendBillingDocument } from "@/lib/invoice-service";
 import { getStripe } from "@/lib/stripe";
 
 async function updatePayment(bookingId: string, updates: Record<string, unknown>) {
@@ -54,8 +54,10 @@ export async function POST(request: Request) {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
       const bookingId = paymentIntent.metadata.bookingId;
       if (bookingId && paymentIntent.metadata.paymentType === "hire") {
-        await updatePayment(bookingId, { hire_payment_status: "paid", stripe_hire_payment_intent_id: paymentIntent.id });
+        const paidAt = new Date().toISOString();
+        await updatePayment(bookingId, { hire_payment_status: "paid", stripe_hire_payment_intent_id: paymentIntent.id, payment_received_at: paidAt });
         await sendBillingDocument(createAdminClient(), bookingId, "payment_receipt");
+        await markInvoiceStatus(createAdminClient(), bookingId, "paid", paidAt);
       } else if (bookingId && paymentIntent.metadata.paymentType === "deposit") {
         await updatePayment(bookingId, {
           deposit_payment_status: "captured",

@@ -5,6 +5,7 @@ import { recordCustomerEmail, type CustomerEmailType } from "@/lib/email-log";
 import { buildInvoicePdf, type InvoicePdfDetails, type InvoicePdfLineItem } from "@/lib/invoice-pdf";
 import { invoiceNumberForBooking } from "@/lib/invoice-reference";
 import { formatBankTransferInstructions, type BankTransferDetails, type BankTransferOption } from "@/lib/bank-transfer";
+import { GST_HIRE_ONLY_NOTE, gstIncludedCents } from "@/lib/gst";
 import { business } from "@/lib/site-content";
 import { createAdminClient } from "@/lib/supabase";
 
@@ -24,6 +25,7 @@ type InvoiceBooking = {
   add_ons?: string[] | null;
   hire_amount_cents: number | null;
   security_deposit_cents: number | null;
+  gst_inclusive?: boolean | null;
   payment_method: string | null;
   bank_transfer_option?: BankTransferOption | null;
   bank_transfer_reference?: string | null;
@@ -38,13 +40,14 @@ type InvoiceRecord = {
   payment_method: string;
   hire_amount_cents: number;
   security_deposit_cents: number;
+  gst_inclusive: boolean;
   total_amount_cents: number;
   payment_url?: string | null;
   bank_transfer_option: BankTransferOption;
   status: string;
 };
 
-const bookingSelect = "id,email,first_name,last_name,event_type,event_address,pickup_date,dropoff_date,package_interest,add_ons,hire_amount_cents,security_deposit_cents,payment_method,bank_transfer_reference,bank_transfer_option,deposit_payment_status,deposit_captured_cents";
+const bookingSelect = "id,email,first_name,last_name,event_type,event_address,pickup_date,dropoff_date,package_interest,add_ons,hire_amount_cents,security_deposit_cents,gst_inclusive,payment_method,bank_transfer_reference,bank_transfer_option,deposit_payment_status,deposit_captured_cents";
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => ({
@@ -86,6 +89,7 @@ async function readBooking(admin: AdminClient, bookingId: string) {
 export async function ensureInvoice(admin: AdminClient, booking: InvoiceBooking, paymentUrl?: string | null, bankTransferOption?: BankTransferOption, allowTransferOptionChange = false) {
   const hireAmountCents = amount(booking.hire_amount_cents);
   const securityDepositCents = amount(booking.security_deposit_cents);
+  const gstInclusive = booking.gst_inclusive ?? true;
   if (!booking.payment_method) throw new Error("Payment method is not configured for this booking.");
   const selectedBankTransferOption = bankTransferOption ?? booking.bank_transfer_option ?? "both";
   const existing = await admin.from("invoices").select("*").eq("booking_id", booking.id).maybeSingle();
@@ -93,6 +97,7 @@ export async function ensureInvoice(admin: AdminClient, booking: InvoiceBooking,
   if (existing.data) {
     const amountsChanged = existing.data.hire_amount_cents !== hireAmountCents
       || existing.data.security_deposit_cents !== securityDepositCents
+      || (existing.data.gst_inclusive ?? true) !== gstInclusive
       || existing.data.payment_method !== booking.payment_method;
     const transferOptionChanged = booking.payment_method === "bank_transfer" && existing.data.bank_transfer_option !== selectedBankTransferOption;
     if (amountsChanged || transferOptionChanged) {
@@ -105,6 +110,7 @@ export async function ensureInvoice(admin: AdminClient, booking: InvoiceBooking,
         payment_method: booking.payment_method,
         hire_amount_cents: hireAmountCents,
         security_deposit_cents: securityDepositCents,
+        gst_inclusive: gstInclusive,
         total_amount_cents: hireAmountCents + securityDepositCents,
         bank_transfer_option: selectedBankTransferOption,
         updated_at: new Date().toISOString(),
@@ -112,6 +118,7 @@ export async function ensureInvoice(admin: AdminClient, booking: InvoiceBooking,
       if (update.error) throw new Error(`Invoice amount update failed: ${update.error.message}`);
       existing.data.hire_amount_cents = hireAmountCents;
       existing.data.security_deposit_cents = securityDepositCents;
+      existing.data.gst_inclusive = gstInclusive;
       existing.data.total_amount_cents = hireAmountCents + securityDepositCents;
       existing.data.payment_method = booking.payment_method;
       existing.data.bank_transfer_option = selectedBankTransferOption;
@@ -129,6 +136,7 @@ export async function ensureInvoice(admin: AdminClient, booking: InvoiceBooking,
     payment_method: booking.payment_method,
     hire_amount_cents: hireAmountCents,
     security_deposit_cents: securityDepositCents,
+    gst_inclusive: gstInclusive,
     total_amount_cents: hireAmountCents + securityDepositCents,
     payment_url: paymentUrl ?? null,
     bank_transfer_option: selectedBankTransferOption,
@@ -169,6 +177,7 @@ function pdfDetails(documentType: BillingDocumentType, booking: InvoiceBooking, 
     { description: "Refundable security deposit", amountCents: deposit },
   ];
   let totalCents = invoice.total_amount_cents;
+  let gstCents = invoice.gst_inclusive !== false ? gstIncludedCents(hire) : 0;
   const notes = [
     "The security deposit is refundable when all equipment is returned on time and in the agreed condition.",
   ];
@@ -183,21 +192,27 @@ function pdfDetails(documentType: BillingDocumentType, booking: InvoiceBooking, 
   } else if (documentType === "deposit_authorisation") {
     lineItems = [{ description: "Refundable security deposit", amountCents: deposit, status: "Authorised, not captured" }];
     totalCents = deposit;
+    gstCents = 0;
     notes.unshift("The amount above is a temporary card authorisation, not a completed charge. It will be released after the equipment is returned safely.");
   } else if (documentType === "deposit_release") {
     lineItems = [{ description: "Refundable security deposit", amountCents: deposit, status: "Released / refunded" }];
     totalCents = deposit;
+    gstCents = 0;
     notes.unshift("The security-deposit authorisation has been released. Your card issuer may take additional time to remove the pending hold.");
   } else if (documentType === "deposit_capture") {
     const captured = amount(booking.deposit_captured_cents);
     lineItems = [{ description: "Security deposit applied to damage, loss, or late-return costs", amountCents: captured, status: "Captured" }];
     totalCents = captured;
+    gstCents = 0;
     notes.unshift("This document records the amount captured from the security deposit.");
   } else if (invoice.payment_method === "bank_transfer") {
     const bank = bankTransferDetails();
     notes.unshift(formatBankTransferInstructions(formatAud(invoice.total_amount_cents), booking.bank_transfer_reference || invoice.invoice_number, bank, invoice.bank_transfer_option));
   } else if (invoice.payment_url) {
     notes.unshift(`Pay securely online: ${invoice.payment_url}`);
+  }
+  if (gstCents > 0) {
+    notes.push(GST_HIRE_ONLY_NOTE);
   }
   return {
     title: documentTitle(documentType),
@@ -211,6 +226,7 @@ function pdfDetails(documentType: BillingDocumentType, booking: InvoiceBooking, 
     paymentMethod: method,
     lineItems,
     totalCents,
+    gstIncludedCents: gstCents,
     notes,
   };
 }

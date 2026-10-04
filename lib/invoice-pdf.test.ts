@@ -49,6 +49,7 @@ describe("invoice PDF generation", () => {
         { description: "Refundable security deposit", amountCents: 10000 },
       ],
       totalCents: 20000,
+      gstIncludedCents: 909,
       notes: ["Please use reference PA-ABC12345."],
     });
 
@@ -58,6 +59,8 @@ describe("invoice PDF generation", () => {
     expect(pdfBytes.toString("latin1")).toContain("/Subtype /Image");
     expect(pdfText).toContain("Tax Invoice");
     expect(pdfText).toContain("ABN 44 506 480 694");
+    expect(pdfText).toContain("GST INCLUDED (10%)");
+    expect(pdfText).toContain("AUD $9.09");
     expect(pdf.byteLength).toBeGreaterThan(500);
   });
 });
