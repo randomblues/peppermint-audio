@@ -71,6 +71,10 @@ describe("AdminConsole", () => {
     fireEvent.click(await screen.findByText("Alex Smith"));
     expect(screen.getByText("Email history")).toBeInTheDocument();
     expect(screen.getByText("Booking confirmation")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send Email" })).toBeInTheDocument();
+    expect(screen.queryByText("Actions & outcomes")).not.toBeInTheDocument();
+    expect(screen.queryByText("Internal email")).not.toBeInTheDocument();
+    expect(screen.queryByText("Google Calendar")).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Update booking status"), { target: { value: "confirmed" } });
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/bookings", expect.objectContaining({
