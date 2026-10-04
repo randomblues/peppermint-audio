@@ -66,6 +66,14 @@ describe("equipmentCatalog", () => {
     );
   });
 
+  it("places the standard package before the subwoofer package", () => {
+    const packageSlugs = packageTiers.map((pkg) => pkg.slug);
+
+    expect(packageSlugs.indexOf("standard-party-events")).toBeLessThan(
+      packageSlugs.indexOf("budget-with-a-boom"),
+    );
+  });
+
   it("uses customer-facing generic speech package equipment wording", () => {
     const speechPackage = packageTiers.find(
       (pkg) => pkg.slug === "speech-presentation-wireless",

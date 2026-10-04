@@ -31,7 +31,11 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
       : "object-contain";
 
   return (
-    <Card className="h-full justify-between overflow-hidden border">
+    <Card
+      className={`h-full overflow-hidden border ${
+        compact ? "justify-start" : "justify-between"
+      }`}
+    >
       <div className="relative h-56 bg-white sm:h-64">
         <Image
           src={pkg.image}
@@ -42,23 +46,34 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
           className={imageClassName}
         />
       </div>
-      <CardHeader className={compact ? "flex flex-col gap-2" : undefined}>
-        <CardTitle>{pkg.name}</CardTitle>
-        <CardAction>{pkg.notes ? <Badge>{pkg.notes}</Badge> : null}</CardAction>
-        <CardDescription>{pkg.bestFor}</CardDescription>
-        <p className="mt-2 text-3xl font-semibold tracking-tight">${pkg.price}</p>
-      </CardHeader>
+      {compact ? (
+        <CardHeader className="gap-2 border-b border-border/60 pb-4">
+          <CardTitle className="min-h-12">{pkg.name}</CardTitle>
+          <div className="min-h-6">{pkg.notes ? <Badge>{pkg.notes}</Badge> : null}</div>
+          <CardDescription className="min-h-20 sm:h-20">{pkg.bestFor}</CardDescription>
+          <p className="text-3xl font-semibold tracking-tight">${pkg.price}</p>
+        </CardHeader>
+      ) : (
+        <CardHeader>
+          <CardTitle>{pkg.name}</CardTitle>
+          <CardAction>{pkg.notes ? <Badge>{pkg.notes}</Badge> : null}</CardAction>
+          <CardDescription>{pkg.bestFor}</CardDescription>
+          <p className="mt-2 text-3xl font-semibold tracking-tight">${pkg.price}</p>
+        </CardHeader>
+      )}
       <CardContent>
         <p className="text-sm font-medium text-foreground">Ideal for {pkg.capacity}</p>
         {compact ? (
           <>
             <p className="mt-2 text-sm text-muted-foreground">{pkg.summary}</p>
-            <p className="mt-4 text-sm font-semibold text-foreground">Included</p>
-            <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
-              {pkg.inclusions.map((item) => (
-                <li key={item}>- {item}</li>
-              ))}
-            </ul>
+            <div className="mt-4 border-t border-border/60 pt-4">
+              <p className="text-sm font-semibold text-foreground">Included</p>
+              <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
+                {pkg.inclusions.map((item) => (
+                  <li key={item}>- {item}</li>
+                ))}
+              </ul>
+            </div>
           </>
         ) : (
           <>
@@ -77,7 +92,7 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
           </>
         )}
       </CardContent>
-      <CardFooter className="flex-col gap-2">
+      <CardFooter className={`flex-col gap-2 ${compact ? "mt-auto" : ""}`}>
         <Button
           className="w-full"
           nativeButton={false}
