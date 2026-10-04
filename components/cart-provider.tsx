@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  startTransition,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 export type CartItem = {
   id: string;
@@ -34,20 +41,26 @@ const emptyCart: CartContextValue = {
 };
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const stored = window.localStorage.getItem(storageKey);
-      return stored ? (JSON.parse(stored) as CartItem[]) : [];
-    } catch {
-      window.localStorage.removeItem(storageKey);
-      return [];
-    }
-  });
+  const [items, setItems] = useState<CartItem[]>([]);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(storageKey);
+      startTransition(() => {
+        setItems(stored ? (JSON.parse(stored) as CartItem[]) : []);
+        setHydrated(true);
+      });
+    } catch {
+      window.localStorage.removeItem(storageKey);
+      startTransition(() => setHydrated(true));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
     window.localStorage.setItem(storageKey, JSON.stringify(items));
-  }, [items]);
+  }, [hydrated, items]);
 
   const value = useMemo<CartContextValue>(() => ({
     items,
