@@ -82,12 +82,12 @@ export function AdminPaymentPanel({ booking, onChanged, collapsible = true }: { 
           ? "Deposit cash due on pickup"
           : booking.deposit_payment_status === "not_required" ? "No deposit required" : "Deposit not settled";
 
-  async function submit(endpoint: string, body: Record<string, unknown>) {
+  async function submit(endpoint: string, body: Record<string, unknown>, method: "POST" | "PATCH" = "POST") {
     setError("");
     setMessage("");
     setProcessing(true);
     try {
-      const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const response = await fetch(endpoint, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const raw = typeof response.text === "function"
         ? await response.text()
         : JSON.stringify(await response.json());
@@ -147,7 +147,7 @@ export function AdminPaymentPanel({ booking, onChanged, collapsible = true }: { 
       return;
     }
     if (lineItemsChanged) {
-      const saved = await submit("/api/admin/bookings", { id: booking.id, hire_line_items: lineItems });
+      const saved = await submit("/api/admin/bookings", { id: booking.id, hire_line_items: lineItems }, "PATCH");
       if (!saved) return;
       setSavedLineItems(lineItems);
       onChanged({ hire_line_items: lineItems, hire_amount_cents: hireTotalCents });
@@ -192,7 +192,7 @@ export function AdminPaymentPanel({ booking, onChanged, collapsible = true }: { 
         gstInclusive,
         ...(selectedMethod === "bank_transfer" ? { bankTransferOption } : {}),
       })
-      : await submit("/api/admin/bookings", { id: booking.id, hire_line_items: lineItems });
+      : await submit("/api/admin/bookings", { id: booking.id, hire_line_items: lineItems }, "PATCH");
     if (!saved) return;
     setSavedLineItems(lineItems);
     onChanged({ hire_line_items: lineItems, hire_amount_cents: hireTotalCents });

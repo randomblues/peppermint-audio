@@ -197,6 +197,32 @@ describe("AdminPaymentPanel", () => {
     expect(await screen.findByText("Payment update failed (502): The server returned an invalid response.")).toBeInTheDocument();
   });
 
+  it("uses PATCH when saving line items before creating a payment request", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ ok: true }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ paymentUrl: "https://example.com/pay/token", paymentToken: "token", hireAmountCents: 20000, securityDepositCents: 10000 }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AdminPaymentPanel booking={booking()} onChanged={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Increase Audio hire quantity" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send invoice" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/admin/bookings", expect.objectContaining({
+      method: "PATCH",
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/admin/payments/create-checkout", expect.objectContaining({
+      method: "POST",
+    }));
+  });
+
   it("adds a catalogue item and recalculates the hire total", () => {
     render(<AdminPaymentPanel booking={booking({ hire_line_items: [] })} onChanged={vi.fn()} />);
 
