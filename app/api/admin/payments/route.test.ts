@@ -197,6 +197,70 @@ describe("admin payment routes", () => {
     expect(update.update).toHaveBeenCalledWith(expect.objectContaining({ stripe_customer_id: "cus_replacement" }));
   });
 
+  it("rotates Stripe links by cancelling old pending intents and issuing a new token", async () => {
+    const { session, update } = adminSession({
+      id: "booking-rotate",
+      email: "alex@example.com",
+      first_name: "Alex",
+      last_name: "Smith",
+      status: "submitted",
+      pickup_date: "2026-10-01",
+      dropoff_date: "2026-10-03",
+      payment_method: "stripe_card_hold",
+      payment_token: "old-token",
+      payment_token_expires_at: "2099-01-01T00:00:00.000Z",
+      stripe_hire_payment_intent_id: "pi_old_hire",
+      stripe_deposit_payment_intent_id: "pi_old_deposit",
+      hire_payment_status: "pending",
+      deposit_payment_status: "pending",
+      hire_line_items: hireLineItems,
+    });
+    mocks.requireAdmin.mockResolvedValue({ user: { id: "admin-1" }, admin: session.admin });
+
+    const response = await createCheckout(request("/api/admin/payments/create-checkout", {
+      bookingId: "booking-rotate",
+      securityDepositAmount: "100",
+    }));
+    const payload = await response.json() as { paymentToken: string };
+
+    expect(response.status).toBe(200);
+    expect(payload.paymentToken).not.toBe("old-token");
+    expect(mocks.paymentIntentRetrieve).toHaveBeenCalledWith("pi_old_hire");
+    expect(mocks.paymentIntentRetrieve).toHaveBeenCalledWith("pi_old_deposit");
+    expect(mocks.paymentIntentCancel).toHaveBeenCalledWith("pi_old_hire");
+    expect(mocks.paymentIntentCancel).toHaveBeenCalledWith("pi_old_deposit");
+    expect(update.update).toHaveBeenCalledWith(expect.objectContaining({
+      stripe_hire_payment_intent_id: "pi_hire",
+      stripe_deposit_payment_intent_id: "pi_deposit",
+      payment_token: expect.any(String),
+    }));
+  });
+
+  it("rejects Stripe link rotation after payment is settled", async () => {
+    const { session } = adminSession({
+      id: "booking-paid",
+      email: "alex@example.com",
+      first_name: "Alex",
+      last_name: "Smith",
+      status: "confirmed",
+      pickup_date: "2026-10-01",
+      dropoff_date: "2026-10-03",
+      payment_method: "stripe_card_hold",
+      hire_payment_status: "paid",
+      deposit_payment_status: "authorized",
+      hire_line_items: hireLineItems,
+    });
+    mocks.requireAdmin.mockResolvedValue({ user: { id: "admin-1" }, admin: session.admin });
+
+    const response = await createCheckout(request("/api/admin/payments/create-checkout", {
+      bookingId: "booking-paid",
+      securityDepositAmount: "100",
+    }));
+
+    expect(response.status).toBe(409);
+    expect(mocks.paymentIntentCreate).not.toHaveBeenCalled();
+  });
+
   it("records bank transfer for long hires instead of calling Stripe", async () => {
     const { session, update } = adminSession({
       id: "booking-3",

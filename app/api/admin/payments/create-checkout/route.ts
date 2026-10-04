@@ -16,10 +16,35 @@ type PaymentRequest = {
   billToEmail?: unknown;
 };
 
+function paymentIsSettled(booking: { hire_payment_status?: string | null; deposit_payment_status?: string | null }) {
+  return ["paid", "succeeded", "captured", "bank_transfer_received"].includes(String(booking.hire_payment_status))
+    || ["authorized", "captured", "bank_transfer_received"].includes(String(booking.deposit_payment_status));
+}
+
 function isMissingStripeCustomerError(error: unknown) {
   if (!(error instanceof Error)) return false;
   const withCode = error as Error & { code?: unknown };
   return withCode.code === "resource_missing" && /no such customer/i.test(error.message);
+}
+
+function isMissingStripeIntentError(error: unknown) {
+  const maybeStripeError = error as { code?: unknown; type?: unknown; message?: unknown };
+  return maybeStripeError.code === "resource_missing"
+    || (maybeStripeError.type === "StripeInvalidRequestError" && typeof maybeStripeError.message === "string" && maybeStripeError.message.includes("No such payment_intent"));
+}
+
+async function cancelPendingIntent(stripe: ReturnType<typeof getStripe>, paymentIntentId: string | null | undefined) {
+  if (!paymentIntentId) return;
+  let intent: Awaited<ReturnType<typeof stripe.paymentIntents.retrieve>>;
+  try {
+    intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+  } catch (error) {
+    if (isMissingStripeIntentError(error)) return;
+    throw error;
+  }
+  if (["requires_payment_method", "requires_confirmation", "requires_action"].includes(intent.status)) {
+    await stripe.paymentIntents.cancel(paymentIntentId);
+  }
 }
 
 async function ensureStripeCustomerId(
@@ -72,12 +97,15 @@ export async function POST(request: Request) {
   }
 
   const result = await session.admin.from("bookings")
-    .select("id,email,first_name,last_name,status,pickup_date,dropoff_date,hire_line_items,payment_method,hire_amount_cents,security_deposit_cents,gst_inclusive,payment_token,payment_token_expires_at,stripe_customer_id")
+    .select("id,email,first_name,last_name,status,pickup_date,dropoff_date,hire_line_items,payment_method,hire_amount_cents,security_deposit_cents,gst_inclusive,payment_token,payment_token_expires_at,stripe_customer_id,stripe_hire_payment_intent_id,stripe_deposit_payment_intent_id,hire_payment_status,deposit_payment_status")
     .eq("id", bookingId)
     .single();
   if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 });
   if (!result.data) return NextResponse.json({ error: "Booking could not be found." }, { status: 404 });
   if (!["submitted", "confirmed"].includes(result.data.status)) return NextResponse.json({ error: "Only submitted or confirmed bookings can receive a payment request." }, { status: 400 });
+  if (paymentIsSettled(result.data)) {
+    return NextResponse.json({ error: "This booking has already been paid or its deposit has been processed." }, { status: 409 });
+  }
   const hireLineItems = lineItemsForBooking(result.data);
   const hireAmountCents = lineItemsTotalCents(hireLineItems);
   if (!hireAmountCents) return NextResponse.json({ error: "Add at least one priced hire item before creating a payment request." }, { status: 400 });
@@ -90,31 +118,13 @@ export async function POST(request: Request) {
   if (result.data.payment_method === "bank_transfer") {
     return NextResponse.json({ error: "This booking is already configured for bank transfer. Do not create a second payment method." }, { status: 409 });
   }
-  if (
-    result.data.payment_method === "stripe_card_hold"
-    && result.data.payment_token
-    && result.data.payment_token_expires_at
-    && new Date(result.data.payment_token_expires_at).getTime() > Date.now()
-  ) {
-    if (result.data.hire_amount_cents !== hireAmountCents || result.data.security_deposit_cents !== securityDepositCents) {
-      return NextResponse.json({ error: "A payment link already exists for this booking with different amounts. Do not create a second active payment link." }, { status: 409 });
-    }
-    if ((result.data.gst_inclusive ?? true) !== gstInclusive) {
-      return NextResponse.json({ error: "A payment link already exists with a different GST setting. Do not create a second active payment link." }, { status: 409 });
-    }
-    return NextResponse.json({
-      ok: true,
-      days,
-      paymentUrl: `${siteUrl(request)}/pay/${result.data.payment_token}`,
-      paymentToken: result.data.payment_token,
-      hireAmountCents,
-      securityDepositCents,
-      gstInclusive,
-    });
-  }
 
   try {
     const stripe = getStripe();
+    if (result.data.payment_method === "stripe_card_hold") {
+      await cancelPendingIntent(stripe, result.data.stripe_hire_payment_intent_id);
+      await cancelPendingIntent(stripe, result.data.stripe_deposit_payment_intent_id);
+    }
     const paymentToken = crypto.randomUUID();
     const paymentTokenExpiresAt = new Date(Date.now() + PAYMENT_LINK_VALIDITY_DAYS * 24 * 60 * 60 * 1000).toISOString();
     const invoiceNumber = invoiceNumberForBooking(bookingId);

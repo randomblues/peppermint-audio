@@ -181,7 +181,7 @@ export async function POST(request: Request) {
         stripe_customer_id: customerId,
         stripe_hire_payment_intent_id: hirePaymentIntent.id,
         stripe_deposit_payment_intent_id: depositPaymentIntent?.id ?? null,
-        payment_token: existing.data.payment_token ?? crypto.randomUUID(),
+        payment_token: crypto.randomUUID(),
         payment_token_expires_at: new Date(Date.now() + PAYMENT_LINK_VALIDITY_DAYS * 24 * 60 * 60 * 1000).toISOString(),
         bank_transfer_reference: null,
       });
