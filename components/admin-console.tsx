@@ -68,6 +68,7 @@ const statusClass = (value: string) => ({
   completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
   cancelled: "border-red-200 bg-red-50 text-red-700",
 }[value] ?? "border-border bg-muted text-muted-foreground");
+
 const emailTemplates = [
   { value: "blank", label: "Blank email" },
   { value: "booking-confirmation", label: "Booking confirmation" },

@@ -21,6 +21,13 @@ describe("AdminLogin", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Admin login" })).toHaveClass("sr-only");
   });
 
+  it("uses the shared input treatment for login fields", () => {
+    render(<AdminLogin />);
+
+    expect(screen.getByLabelText("Email")).toHaveAttribute("data-slot", "input");
+    expect(screen.getByLabelText("Password")).toHaveAttribute("data-slot", "input");
+  });
+
   it("shows the API error", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
       ok: false,
