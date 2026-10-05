@@ -35,13 +35,18 @@ export function MobileContactBar() {
             <button
               type="button"
               aria-label="Check availability"
-              className="group flex min-h-11 w-full items-center gap-2.5 rounded-full border border-primary/35 bg-background/95 px-3 text-left text-foreground shadow-[0_8px_24px_rgb(0_0_0/0.2)] backdrop-blur-xl transition hover:border-primary/60 hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99] md:min-h-14 md:gap-3 md:rounded-xl md:px-4"
+              className="group flex min-h-11 w-full items-center gap-2.5 rounded-full border border-primary/45 bg-background/95 px-3 text-left text-foreground shadow-[0_8px_24px_rgb(0_0_0/0.2)] backdrop-blur-xl transition hover:border-primary/70 hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99] md:min-h-14 md:gap-3 md:rounded-xl md:px-4"
             />
           }
         >
-          <span className="availability-cta-icon-shell flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary ring-1 ring-primary/25 motion-safe:animate-availability-cta-glow md:size-9">
+          <span className="availability-cta-icon-shell relative flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/18 text-primary ring-1 ring-primary/35 md:size-9">
+            <span aria-hidden="true" className="availability-cta-pulse absolute inset-0 rounded-full bg-primary/40 opacity-0" />
+            <span
+              aria-hidden="true"
+              className="availability-cta-pulse availability-cta-pulse-delay absolute inset-0 rounded-full bg-primary/40 opacity-0"
+            />
             <CalendarCheck
-              className="availability-cta-icon motion-safe:animate-availability-cta size-4"
+              className="availability-cta-icon relative z-10 size-4"
               aria-hidden="true"
             />
           </span>

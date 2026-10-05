@@ -30,7 +30,7 @@ export default function Home() {
             <Badge variant="secondary" className="site-hero-badge">
               Pickup from Abbotsford 3067
             </Badge>
-            <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">
+            <h1 className="font-heading mt-4 max-w-[16ch] text-3xl font-medium leading-[1.08] tracking-[-0.01em] text-foreground/95 sm:text-4xl lg:text-[2.9rem]">
               {business.heroHeading}
             </h1>
             <p className="mt-4 text-lg text-foreground/80">{business.heroSubheading}</p>
@@ -232,7 +232,7 @@ export default function Home() {
         <div className="absolute inset-0 -z-10 bg-gradient-to-r from-background/80 via-background/60 to-background/45" />
         <div className="relative mx-auto w-full max-w-6xl px-4 py-20 sm:px-6 lg:px-8">
           <div className="max-w-2xl">
-            <h2 className="text-3xl font-semibold tracking-tight">
+            <h2 className="font-heading text-3xl font-semibold tracking-tight">
               Ready to lock in your date?
             </h2>
             <p className="mt-3 text-muted-foreground">

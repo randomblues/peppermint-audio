@@ -20,7 +20,7 @@ export function Section({ eyebrow, title, description, headingAs = "h2", childre
             <p className="text-xs font-semibold tracking-[0.2em] text-primary uppercase">{eyebrow}</p>
           </div>
         ) : null}
-        <HeadingTag className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+        <HeadingTag className="font-heading mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
           {title}
         </HeadingTag>
         {description ? <p className="mt-3 text-muted-foreground">{description}</p> : null}

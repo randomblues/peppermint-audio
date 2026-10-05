@@ -18,7 +18,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useCart } from "@/components/cart-provider";
-import type { PackageTier } from "@/lib/site-content";
+import { addOnCatalog, type PackageTier } from "@/lib/site-content";
 
 type PackageCardProps = {
   pkg: PackageTier;
@@ -26,18 +26,97 @@ type PackageCardProps = {
   priority?: boolean;
 };
 
+const addOnCoverageKeywords: Record<string, string[]> = {
+  "wireless-microphones": ["wireless microphone", "wireless microphones"],
+  "party-lights-bar": ["party lights", "party bar", "magikbar"],
+  "party-light-par-can": ["party lights", "par can"],
+  "extension-reel-10m": ["extension reel", "extension lead", "extension leads"],
+};
+
+const upsellPriority = [
+  "wireless-microphones",
+  "party-lights-bar",
+  "party-light-par-can",
+  "extension-reel-10m",
+] as const;
+
+function isAddOnAlreadyCovered(inclusionsText: string, addOnSlug: string) {
+  const keywordMatches = addOnCoverageKeywords[addOnSlug];
+  if (keywordMatches) {
+    return keywordMatches.some((term) => inclusionsText.includes(term));
+  }
+
+  const addOnName = addOnCatalog[addOnSlug]?.name
+    .toLowerCase()
+    .replace(" upgrade", "");
+  if (!addOnName) return false;
+
+  return inclusionsText.includes(addOnName);
+}
+
+function createUpsellReason(addOnSlug: string) {
+  if (addOnSlug === "wireless-microphones") {
+    return "Great for roaming speeches and toasts";
+  }
+  if (addOnSlug === "party-lights-bar" || addOnSlug === "party-light-par-can") {
+    return "Adds party atmosphere to your setup";
+  }
+
+  return "Popular extra with this package";
+}
+
 export function PackageCard({ pkg, compact = false, priority = false }: PackageCardProps) {
   const { addItem } = useCart();
   const [showAllInclusions, setShowAllInclusions] = useState(false);
   const [showCheckoutPrompt, setShowCheckoutPrompt] = useState(false);
+  const [addedUpsellSlugs, setAddedUpsellSlugs] = useState<string[]>([]);
+  const inclusionsText = pkg.inclusions.join(" ").toLowerCase();
+  const candidateUpsellSlugs = pkg.slug === "speech-presentation-wireless"
+    ? ["party-light-par-can"]
+    : Array.from(new Set([...upsellPriority, ...pkg.addOnSlugs]));
+  const upsellSuggestions = candidateUpsellSlugs
+    .filter((slug) => addOnCatalog[slug] && !isAddOnAlreadyCovered(inclusionsText, slug))
+    .slice(0, 2)
+    .map((slug) => ({
+      slug,
+      name: addOnCatalog[slug].name.replace(" Upgrade", ""),
+      price: addOnCatalog[slug].price,
+      reason: createUpsellReason(slug),
+    }));
+  const hasSuggestions = upsellSuggestions.length > 0;
   const imageClassName =
     pkg.slug === "budget-with-a-boom"
       ? "object-contain p-2"
       : "object-contain";
 
+  function getAddOnDetailsHref(addOnSlug: string) {
+    if (addOnSlug === "wireless-microphones") {
+      return "/equipment/k60-wireless";
+    }
+
+    return `/equipment/hire-${addOnSlug}`;
+  }
+
   function handleAddPackageToCart() {
     addItem({ id: `package:${pkg.slug}`, name: pkg.name, kind: "package", price: pkg.price });
+    setAddedUpsellSlugs([]);
     setShowCheckoutPrompt(true);
+  }
+
+  function handleAddOnToCart(addOnSlug: string) {
+    const addOn = addOnCatalog[addOnSlug];
+    if (!addOn) return;
+
+    addItem({
+      id: `equipment:hire-${addOnSlug}:Single item`,
+      name: addOn.name.replace(" Upgrade", ""),
+      kind: "equipment",
+      option: "Single item",
+      price: addOn.price,
+    });
+    setAddedUpsellSlugs((current) =>
+      current.includes(addOnSlug) ? current : [...current, addOnSlug],
+    );
   }
 
   return (
@@ -181,33 +260,78 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
           <DialogPrimitive.Popup className="fixed top-1/2 left-1/2 z-50 w-[min(92vw,28rem)] -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-white/20 bg-[linear-gradient(155deg,color-mix(in_oklab,var(--background)_78%,black),color-mix(in_oklab,var(--background)_62%,var(--primary)_18%)_48%,color-mix(in_oklab,var(--background)_74%,black))] p-6 text-foreground shadow-[0_28px_70px_rgb(0_0_0/0.45),inset_0_1px_0_rgba(255,255,255,0.22)] ring-1 ring-primary/20 transition-all duration-300 ease-out data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 sm:p-7">
             <div className="pointer-events-none absolute inset-x-10 top-0 h-20 -translate-y-1/2 rounded-full bg-primary/30 blur-2xl" />
             <DialogPrimitive.Title className="relative text-xl font-semibold sm:text-2xl">
-              Added to your cart
+              Recommended add-ons for {pkg.name}
             </DialogPrimitive.Title>
             <DialogPrimitive.Description className="relative mt-2 text-sm leading-6 text-muted-foreground">
-              {pkg.name} is ready to go. Would you like to head to checkout or continue browsing packages?
+              Pick any extras you want — each one is added to your cart as an individual item.
             </DialogPrimitive.Description>
+            {hasSuggestions ? (
+              <ul className="relative mt-4 space-y-2">
+                {upsellSuggestions.map((suggestion) => {
+                  const isAdded = addedUpsellSlugs.includes(suggestion.slug);
+                  return (
+                    <li
+                      key={suggestion.slug}
+                      className="rounded-2xl border border-white/15 bg-white/5 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-foreground">
+                            {suggestion.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{suggestion.reason}</p>
+                        </div>
+                        <p className="shrink-0 text-sm font-semibold text-primary">+${suggestion.price}</p>
+                      </div>
+                      <div className="mt-3 grid grid-cols-[1fr_auto] items-center gap-2">
+                        <Button
+                          variant={isAdded ? "secondary" : "outline"}
+                          className={`w-full rounded-xl ${
+                            isAdded
+                              ? "border-primary/25 bg-primary/15 text-foreground"
+                              : "border-white/20 bg-white/5 text-foreground hover:bg-white/10"
+                          }`}
+                          onClick={() => handleAddOnToCart(suggestion.slug)}
+                        >
+                          {isAdded ? "Added to cart" : "Add this to my cart"}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-9 rounded-lg border border-white/20 px-2 text-xs text-muted-foreground hover:text-foreground"
+                          nativeButton={false}
+                          render={<Link href={getAddOnDetailsHref(suggestion.slug)} />}
+                          onClick={() => setShowCheckoutPrompt(false)}
+                        >
+                          View details
+                          <ArrowUpRight className="size-3" aria-hidden="true" />
+                        </Button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="relative mt-4 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-muted-foreground">
+                No specific recommendations for this package yet. You can still browse add-ons.
+              </p>
+            )}
             <div className="relative mt-6 grid gap-3 sm:grid-cols-2">
-              <DialogPrimitive.Close
-                render={
-                  <Button
-                    className="w-full rounded-xl border border-primary/40 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_88%,white),color-mix(in_oklab,var(--primary)_72%,black))] text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_12px_26px_rgb(0_0_0/0.28)] transition-all hover:-translate-y-0.5 hover:brightness-105"
-                    nativeButton={false}
-                    render={<Link href="/cart" />}
-                  />
-                }
+              <Button
+                variant="outline"
+                className="w-full rounded-xl border border-white/20 bg-white/5 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_10px_20px_rgb(0_0_0/0.24)] backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:bg-white/10"
+                onClick={() => setShowCheckoutPrompt(false)}
               >
-                Check out
-              </DialogPrimitive.Close>
-              <DialogPrimitive.Close
-                render={
-                  <Button
-                    variant="outline"
-                    className="w-full rounded-xl border border-white/20 bg-white/5 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_10px_20px_rgb(0_0_0/0.24)] backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:bg-white/10"
-                  />
-                }
+                Back
+              </Button>
+              <Button
+                className="w-full rounded-xl border border-primary/40 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_88%,white),color-mix(in_oklab,var(--primary)_72%,black))] text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_12px_26px_rgb(0_0_0/0.28)] transition-all hover:-translate-y-0.5 hover:brightness-105"
+                nativeButton={false}
+                render={<Link href="/cart" />}
+                onClick={() => setShowCheckoutPrompt(false)}
               >
-                Continue shopping
-              </DialogPrimitive.Close>
+                Continue to checkout
+              </Button>
             </div>
           </DialogPrimitive.Popup>
         </DialogPrimitive.Portal>

@@ -88,6 +88,7 @@ describe("app wrappers and metadata", () => {
     );
 
     expect(document.documentElement).toHaveAttribute("lang", "en");
+    expect(document.documentElement.className).toContain("geist-sans");
     expect(screen.getByText("Page content")).toBeInTheDocument();
     expect(screen.getByTestId("navbar")).toBeInTheDocument();
     expect(screen.getByTestId("footer")).toBeInTheDocument();

@@ -375,9 +375,7 @@ describe("WhatsAppButton", () => {
 
       const availabilityButton = screen.getByRole("button", { name: "Check availability" });
       expect(availabilityButton).toBeInTheDocument();
-      expect(availabilityButton.querySelector(".availability-cta-icon-shell")).toHaveClass(
-        "motion-safe:animate-availability-cta-glow",
-      );
+      expect(availabilityButton.querySelector(".availability-cta-icon-shell")).toBeInTheDocument();
       expect(availabilityButton.querySelector("svg")).toHaveClass("availability-cta-icon");
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 

@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CartView } from "./cart-view";
 
@@ -16,6 +16,14 @@ vi.mock("@/components/cart-provider", () => ({
 }));
 
 describe("CartView", () => {
+  beforeEach(() => {
+    mockCart.items = [{ id: "speaker", name: "Bose S1 Pro", kind: "equipment", price: 65, quantity: 1 }];
+    mockCart.total = 65;
+    mockCart.removeItem.mockClear();
+    mockCart.updateQuantity.mockClear();
+    mockCart.clearCart.mockClear();
+  });
+
   it("starts the booking request from the selected hire cart", () => {
     render(<CartView />);
 
@@ -59,5 +67,28 @@ describe("CartView", () => {
     act(() => vi.advanceTimersByTime(240));
     expect(screen.getByRole("button", { name: "Remove" })).toBeInTheDocument();
     vi.useRealTimers();
+  });
+
+  it("shows a quantity stepper and disables decrease at quantity 1", () => {
+    render(<CartView />);
+
+    const decreaseButton = screen.getByRole("button", { name: "Decrease quantity for Bose S1 Pro" });
+    const increaseButton = screen.getByRole("button", { name: "Increase quantity for Bose S1 Pro" });
+
+    expect(screen.getByLabelText("Quantity for Bose S1 Pro")).toHaveTextContent("1");
+    expect(decreaseButton).toBeDisabled();
+    expect(increaseButton).toBeEnabled();
+  });
+
+  it("updates quantity from the stepper controls", () => {
+    mockCart.items = [{ id: "speaker", name: "Bose S1 Pro", kind: "equipment", price: 65, quantity: 2 }];
+    mockCart.total = 130;
+    render(<CartView />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Increase quantity for Bose S1 Pro" }));
+    fireEvent.click(screen.getByRole("button", { name: "Decrease quantity for Bose S1 Pro" }));
+
+    expect(mockCart.updateQuantity).toHaveBeenNthCalledWith(1, "speaker", 3);
+    expect(mockCart.updateQuantity).toHaveBeenNthCalledWith(2, "speaker", 1);
   });
 });

@@ -74,8 +74,32 @@ export function CartView() {
                 <p className="mt-1 text-sm">${item.price} each</p>
               </div>
               <div className="flex items-center gap-2">
-                <label className="sr-only" htmlFor={`quantity-${item.id}`}>Quantity for {item.name}</label>
-                <input id={`quantity-${item.id}`} type="number" min="1" value={item.quantity} onChange={(event) => updateQuantity(item.id, Number(event.target.value))} className="h-10 w-20 rounded-md border bg-background px-3" />
+                <div className="inline-flex h-10 items-center overflow-hidden rounded-xl border border-border bg-background shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                  <button
+                    type="button"
+                    aria-label={`Decrease quantity for ${item.name}`}
+                    disabled={item.quantity <= 1}
+                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                    className="flex h-full w-10 items-center justify-center border-r border-border text-base font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    −
+                  </button>
+                  <span
+                    aria-label={`Quantity for ${item.name}`}
+                    aria-live="polite"
+                    className="flex h-full min-w-12 items-center justify-center px-2 text-sm font-semibold tabular-nums"
+                  >
+                    {item.quantity}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`Increase quantity for ${item.name}`}
+                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                    className="flex h-full w-10 items-center justify-center border-l border-border text-base font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    +
+                  </button>
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"
