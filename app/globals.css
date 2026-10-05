@@ -197,6 +197,12 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   padding-right: 2.75rem;
 }
 
+@media (min-width: 768px) {
+  .site-shell:has(.admin-console-sidebar) + footer {
+    padding-left: 16rem;
+  }
+}
+
 .site-shell {
   background:
     radial-gradient(circle at 12% 0%, color-mix(in oklab, var(--primary) 14%, transparent), transparent 30rem),
