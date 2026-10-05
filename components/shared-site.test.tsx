@@ -24,6 +24,17 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("Navbar", () => {
+  beforeEach(() => {
+    usePathname.mockReturnValue("/");
+  });
+
+  it("is hidden from admin pages", () => {
+    usePathname.mockReturnValue("/admin");
+    render(<Navbar />);
+
+    expect(screen.queryByRole("banner")).not.toBeInTheDocument();
+  });
+
   it("provides desktop navigation and a labelled mobile menu trigger", () => {
     render(<Navbar />);
 

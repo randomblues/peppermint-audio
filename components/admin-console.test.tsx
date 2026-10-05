@@ -65,6 +65,7 @@ describe("AdminConsole", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     resolve(jsonResponse({ bookings: [booking] }));
     expect(await screen.findByText("Alex Smith")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Go to Peppermint Audio home" })).toHaveAttribute("href", "/");
     expect(fetchMock).toHaveBeenCalledWith("/api/admin/bookings?", { cache: "no-store" });
   });
 
