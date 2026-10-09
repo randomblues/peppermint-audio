@@ -29,6 +29,21 @@ afterEach(() => {
 });
 
 describe("AdminPaymentPanel", () => {
+  it("offers card holds for three nights but not four nights", () => {
+    const { rerender } = render(<AdminPaymentPanel booking={booking({ dropoff_date: "2026-10-04" })} onChanged={vi.fn()} />);
+    expect(screen.getByRole("radio", { name: /Stripe Available for hires of 3 nights/ })).toBeEnabled();
+    rerender(<AdminPaymentPanel booking={booking({ dropoff_date: "2026-10-05" })} onChanged={vi.fn()} />);
+    expect(screen.getByRole("radio", { name: /Stripe Available for hires of 3 nights/ })).toBeDisabled();
+  });
+
+  it("shows scheduled deposit state and errors separately from the paid hire", () => {
+    render(<AdminPaymentPanel booking={booking({
+      payment_method: "stripe_card_hold", hire_payment_status: "paid", deposit_payment_status: "scheduled",
+      deposit_error: "Authentication is required before pickup.",
+    })} onChanged={vi.fn()} />);
+    expect(screen.getByText(/paid hire does not yet mean the deposit is secured/)).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Authentication is required");
+  });
   it("includes extra nights in catalogue pricing but not custom charges or deposits", () => {
     render(<AdminPaymentPanel booking={booking({
       dropoff_date: "2026-10-04",
@@ -44,6 +59,8 @@ describe("AdminPaymentPanel", () => {
     render(<AdminPaymentPanel booking={booking({ status: "submitted", hire_payment_status: "unpaid" })} onChanged={vi.fn()} />);
 
     expect(screen.getByText("Payment request yet to be sent")).toBeInTheDocument();
+    expect(screen.getByText("Payment request yet to be sent")).toHaveClass("max-w-full", "whitespace-normal");
+    expect(screen.getByText("Payment status").parentElement).toHaveClass("flex-wrap");
     expect(screen.queryByText("Security deposit")).not.toBeInTheDocument();
   });
 

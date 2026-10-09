@@ -254,7 +254,7 @@ export const hireTerms = [
   },
   {
     title: "2. Security Deposit",
-    body: "A refundable deposit is required for all hires. The amount depends on the package and will be confirmed before booking. For hires of seven days or less, we may authorise the deposit on a card without capturing it, so it can appear as a temporary pending hold and be released after a safe return. Longer hires use bank transfer. The deposit covers damage, missing items, or late returns. Deposits are fully refunded if equipment is returned on time, in original condition, and with all accessories.",
+    body: "A refundable deposit is required for all hires. The amount depends on the package and will be confirmed before booking. For hires of three nights or less, the hire payment is taken when you pay and, with your consent, your card is saved securely for a temporary deposit hold one day before pickup. For last-minute bookings, the hold is attempted after payment. We will contact you if the deposit needs attention before pickup. Longer hires use bank transfer. The deposit covers damage, missing items, or late returns. Card holds are released, or transferred deposits refunded, if equipment is returned on time, in original condition, and with all accessories.",
   },
   {
     title: "3. Equipment Responsibility",

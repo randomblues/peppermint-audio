@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   }
 
   const result = await session.admin.from("bookings")
-    .select("security_deposit_cents,stripe_deposit_payment_intent_id,deposit_payment_status,payment_method")
+    .select("security_deposit_cents,stripe_deposit_payment_intent_id,deposit_payment_status,payment_method,deposit_hold_date,deposit_capture_before")
     .eq("id", bookingId)
     .single();
   if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 });
@@ -55,6 +55,9 @@ export async function POST(request: Request) {
     const stripe = getStripe();
     const now = new Date().toISOString();
     if (body.action === "release") {
+      if (result.data.deposit_hold_date) {
+        await stripe.paymentIntents.update(result.data.stripe_deposit_payment_intent_id, { metadata: { releaseRequested: "true" } });
+      }
       await stripe.paymentIntents.cancel(result.data.stripe_deposit_payment_intent_id);
       const update = await session.admin.from("bookings").update({
         deposit_payment_status: "released",
@@ -67,6 +70,9 @@ export async function POST(request: Request) {
     }
 
     const amountCents = parseAmountCents(body.amount);
+    if (result.data.deposit_capture_before && Date.parse(result.data.deposit_capture_before) <= Date.now()) {
+      return NextResponse.json({ error: "The security-deposit hold has expired. Do not attempt capture." }, { status: 409 });
+    }
     if (amountCents === null || amountCents < 1 || amountCents > result.data.security_deposit_cents) {
       return NextResponse.json({ error: "Capture amount must be greater than zero and no more than the authorised deposit." }, { status: 400 });
     }

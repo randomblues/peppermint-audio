@@ -24,6 +24,8 @@ type PaymentBooking = {
   deposit_payment_status?: string | null;
   payment_token?: string | null;
   deposit_captured_cents?: number | null;
+  deposit_capture_before?: string | null;
+  deposit_error?: string | null;
   invoice_number?: string | null;
   bank_transfer_option?: BankTransferOption | null;
   hire_line_items?: BookingLineItem[] | null;
@@ -286,18 +288,18 @@ export function AdminPaymentPanel({ booking, onChanged, collapsible = true }: { 
       {(!collapsible || paymentOpen) ? <CardContent className="space-y-4">
         <div className="rounded-lg bg-muted/50 p-3 text-sm">
           <p className="flex items-center gap-2 font-medium">{selectedMethod === "bank_transfer" ? <Landmark className="size-4" /> : selectedMethod === "cash_on_pickup" ? <WalletCards className="size-4" /> : <CreditCard className="size-4" />}{days === null ? "Check booking dates" : selectedMethod === "bank_transfer" ? `Bank transfer · ${days} hire days` : selectedMethod === "cash_on_pickup" ? "Cash on pickup" : `Stripe · ${days} hire day${days === 1 ? "" : "s"}`}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{selectedMethod === "bank_transfer" ? "Bank transfer is available for any hire length and does not create Stripe payments." : selectedMethod === "cash_on_pickup" ? "The invoice will state that hire and deposit payment are due in cash on the day of pickup. You can confirm the booking immediately." : "One card form creates a captured hire payment and a separate uncaptured deposit authorisation. Create it close to return because card holds can expire after about seven days."}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{selectedMethod === "bank_transfer" ? "Bank transfer is available for any hire length and does not create Stripe payments." : selectedMethod === "cash_on_pickup" ? "The invoice will state that hire and deposit payment are due in cash on the day of pickup. You can confirm the booking immediately." : "The hire is paid now and the card is saved with consent. The deposit hold is attempted one day before pickup, with its actual expiry checked against return and check-in."}</p>
         </div>
-        <section className="flex items-center justify-between gap-3 rounded-xl border bg-muted/20 p-3">
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/20 p-3">
           <p className="text-sm font-medium">Payment status</p>
-          <Badge variant="outline" className="border-primary/30 bg-primary/5 text-primary">{hirePaymentState}</Badge>
+          <Badge variant="outline" className="max-w-full whitespace-normal border-primary/30 bg-primary/5 text-primary">{hirePaymentState}</Badge>
         </section>
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium">Payment method</legend>
           <div className="grid gap-2 sm:grid-cols-3">
             <label className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm ${selectedMethod === "stripe_card_hold" ? "border-primary bg-primary/5" : ""}`}>
               <input type="radio" name={`payment-method-${booking.id}`} value="stripe_card_hold" checked={selectedMethod === "stripe_card_hold"} disabled={!canSelectStripe} onChange={() => selectPaymentMethod("stripe_card_hold")} className="mt-1" />
-              <span><span className="block font-medium">Stripe</span><span className="block text-xs text-muted-foreground">Available for hires of 7 days or less.</span></span>
+              <span><span className="block font-medium">Stripe</span><span className="block text-xs text-muted-foreground">Available for hires of {MAX_STRIPE_HIRE_DAYS} nights or less.</span></span>
             </label>
             <label className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm ${selectedMethod === "cash_on_pickup" ? "border-primary bg-primary/5" : ""}`}>
               <input type="radio" name={`payment-method-${booking.id}`} value="cash_on_pickup" checked={selectedMethod === "cash_on_pickup"} disabled={!canSelectBankTransfer} onChange={() => selectPaymentMethod("cash_on_pickup")} className="mt-1" />
@@ -425,6 +427,9 @@ export function AdminPaymentPanel({ booking, onChanged, collapsible = true }: { 
           {showExistingPaymentLink ? <div className="rounded-xl border bg-background p-3 text-sm shadow-sm"><div className="flex items-center justify-between gap-3"><p className="font-medium">Customer payment link</p><Badge variant="outline">Active</Badge></div><p className="mt-2 break-all rounded-lg bg-muted/50 p-2 text-xs text-muted-foreground">{existingPaymentUrl}</p><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => void copyLink()}><Copy className="size-3.5" />Copy link</Button><a href={existingPaymentUrl} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center rounded-lg border px-3 text-sm font-medium hover:bg-muted">Open link</a></div></div> : null}
         </section>
         {booking.deposit_payment_status === "authorized" ? <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-3"><p className="flex items-center gap-2 text-sm font-medium text-primary"><CheckCircle2 className="size-4" />Deposit is authorised, not captured</p><label className="space-y-1 text-sm font-medium">Damage amount to capture (AUD)<input aria-label="Damage amount to capture" inputMode="decimal" value={captureAmount} onChange={(event) => setCaptureAmount(event.target.value)} className="h-10 w-full rounded-lg border bg-background px-3 font-normal" /></label><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={processing} onClick={() => void manageDeposit("release")}><Unlock className="size-3.5" />Release deposit</Button><Button size="sm" variant="destructive" disabled={processing} onClick={() => void manageDeposit("capture")}>Capture damage amount</Button></div></div> : null}
+        {booking.deposit_payment_status === "scheduled" ? <p className="rounded-lg border bg-muted/30 p-3 text-sm">Deposit hold scheduled one day before pickup. A paid hire does not yet mean the deposit is secured.</p> : null}
+        {booking.deposit_capture_before ? <p className="text-sm text-muted-foreground">Card hold expires: {new Date(booking.deposit_capture_before).toLocaleString("en-AU", { timeZone: "Australia/Melbourne" })} Melbourne time.</p> : null}
+        {booking.deposit_error ? <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">{booking.deposit_error}</p> : null}
         {booking.payment_method === "bank_transfer" && (booking.hire_payment_status === "bank_transfer_pending" || booking.deposit_payment_status === "bank_transfer_received") ? (
           <section className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
             <div className="grid gap-2 sm:grid-cols-2">

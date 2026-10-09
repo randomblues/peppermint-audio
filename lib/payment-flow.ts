@@ -1,5 +1,24 @@
-export const MAX_STRIPE_HIRE_DAYS = 7;
+export const MAX_STRIPE_HIRE_DAYS = 3;
 export const PAYMENT_LINK_VALIDITY_DAYS = 30;
+
+export function depositHoldDate(pickupDate: string) {
+  if (rentalDays(pickupDate, pickupDate) === null) throw new Error("Invalid pickup date.");
+  return new Date(Date.parse(`${pickupDate}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+}
+
+export function paymentLinkExpiry(dropoffDate: string, now = Date.now()) {
+  if (rentalDays(dropoffDate, dropoffDate) === null) throw new Error("Invalid return date.");
+  return new Date(Math.max(now + PAYMENT_LINK_VALIDITY_DAYS * 86_400_000, Date.parse(`${dropoffDate}T00:00:00Z`) + 3 * 86_400_000)).toISOString();
+}
+
+export function depositHoldCoversReturn(captureBefore: number | null, dropoffDate: string, dropoffTime?: string | null) {
+  if (rentalDays(dropoffDate, dropoffDate) === null || !captureBefore) return false;
+  const time = dropoffTime || "23:59:59";
+  if (!/^\d{2}:\d{2}(?::\d{2})?$/.test(time)) return false;
+  // +10 is conservative during daylight saving; allow another hour for check-in.
+  const returnAt = Date.parse(`${dropoffDate}T${time}+10:00`);
+  return Number.isFinite(returnAt) && captureBefore * 1000 > returnAt + 3_600_000;
+}
 
 export type PaymentMethod = "stripe_card_hold" | "bank_transfer" | "cash_on_pickup";
 

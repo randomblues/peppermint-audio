@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createAuthClient } from "@/lib/supabase";
 import { NextResponse, type NextRequest } from "next/server";
 import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE, setAuthCookies } from "@/lib/auth-cookies";
 
@@ -26,11 +26,7 @@ export async function proxy(request: NextRequest) {
   const refreshToken = request.cookies.get(REFRESH_TOKEN_COOKIE)?.value;
   if (!accessToken || !refreshToken || !tokenExpiresSoon(accessToken)) return NextResponse.next();
 
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_ANON_KEY;
-  if (!url || !key) return NextResponse.next();
-
-  const auth = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+  const auth = createAuthClient();
   const { data, error } = await auth.auth.refreshSession({ refresh_token: refreshToken });
   if (error || !data.session) return NextResponse.next();
 

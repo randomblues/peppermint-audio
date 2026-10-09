@@ -237,6 +237,55 @@ The focused test command is preferred while iterating; the full suite and build 
 - Preserve unrelated working-tree changes. In particular, inspect `git status --short` before edits and never reset or checkout files as a recovery shortcut.
 - Use `git diff --check` before commits. Do not commit or push unless the user explicitly asks.
 
+## Local development database and test administrator
+
+Every new agent session must use the local-only Supabase stack when working
+locally. Never use the hosted database, production admin credentials or real
+customer data for local validation.
+
+- Run `npm run db:local:status` in the current checkout to check its stack and
+  discover its local API, Studio and Auth inbox URLs without printing keys.
+- If it is not running, ensure Docker Desktop is running, then use
+  `npm run db:local:start`. This applies the canonical booking schema without
+  resetting local data. Do not run a database reset or delete volumes without
+  explicit approval.
+- Run `npm run db:local:seed` when the test account or fixtures are needed.
+  It creates the local administrator `admin@peppermint.local` with the admin role
+  and three disposable bookings. Repeated seeding preserves existing fixtures.
+- The generated test-admin password is in the ignored, owner-readable
+  `.local-supabase/admin-login.json` inside that checkout. Never print, commit,
+  paste into chat or place these credentials in command arguments.
+- Start the app with `npm run dev` (or `npm start` for a built local app), not
+  a bare Next.js command. These launchers inject only this worktree's local
+  credentials. Keep one task server on the agreed port and do not interrupt
+  another agent's server without approval.
+- The admin console is at `/admin`; the normal login form is at `/admin/login`.
+  **The agent must sign in itself; do not ask the user to fill in credentials.**
+  For the integrated browser, reuse the localhost tab and run:
+  `await page.evaluate(async () => { const result = await fetch("/api/dev/admin-login", { method: "POST" }); if (!result.ok) throw new Error(await result.text()); });`
+  Then navigate that same tab to `/admin`. This endpoint reads the local login
+  file on the server and authenticates through local Supabase; it returns normal
+  HTTP-only session cookies, never credentials. It is available only in
+  development on a loopback, same-origin request, and never on Vercel or in a
+  production build. The normal login form remains unchanged.
+  For terminal-run Playwright checks, call
+  `context.request.post(localUrl + "/api/dev/admin-login", { headers: { origin: localUrl } })`
+  then open `/admin` using `context.newPage()` in that same context.
+  If the helper reports missing fixtures, run the start/seed commands above and
+  retry once. Report browser-tool connection failures instead of asking the user
+  to log in or repeatedly retrying a broken browser connection.
+  Do not print login data, cookie values or storage-state contents.
+- Each worktree has its own stack, ports, data and test-admin credentials.
+  Do not borrow another checkout's login file or connect to its database.
+- `npm run db:local:verify` checks actual local Auth, the admin role, booking
+  persistence, anonymous access denial and private storage with disposable
+  fixtures; it cleans up its own verification records and files.
+- Local database isolation does not sandbox Stripe, Resend or Google Calendar.
+  Use Stripe test keys, safe email settings and disabled calendar integration.
+  Never assume a local booking cannot trigger an external side effect.
+- Follow the existing integrated-browser validation policy. Independent
+  Playwright checks do not replace mandatory integrated-browser evidence.
+
 ## Self-improvement and technical issue log
 
 This section is a persistent, lightweight feedback loop. When a technical issue causes wasted work, a misleading result, a repeated validation loop, or a preventable delay, append a dated entry with the symptom, root cause, prevention rule, and the next action. Read this section before starting similar work and apply the prevention rule. Do not silently repeat a known failure.
@@ -282,6 +331,20 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Root cause:** The hook attempted to JSON-parse every string-valued tool argument, including raw `apply_patch` text.
 - **Prevention:** Parse tool arguments according to the tool's input format. Decode JSON-encoded parallel arguments for lock inspection, but preserve raw patch text and keep browser/terminal ownership checks intact.
 - **Next action:** Add regression coverage for raw patch arguments alongside existing JSON-encoded parallel payload tests before extending tool hooks.
+
+### 2026-10-09 — Local Supabase email login and signup flags
+
+- **Symptom:** The local test administrator could be created, but signing in failed with "Email logins are disabled".
+- **Root cause:** Setting `[auth.email].enable_signup = false` disabled the email login provider, not just public account creation.
+- **Prevention:** Keep `[auth].enable_signup = false` to block public signup while setting `[auth.email].enable_signup = true` to allow administrator email login.
+- **Next action:** After changing Auth configuration, stop/start only the affected local stack and run `npm run db:local:verify` against real local Auth.
+
+### 2026-10-09 — Responsive admin selectors and post-login state
+
+- **Symptom:** Browser checks timed out waiting for a booking name even though local authentication and booking retrieval worked.
+- **Root cause:** Text selectors matched a hidden responsive copy; client-side navigation also exposed the initial loading state before booking controls were ready.
+- **Prevention:** Select visible semantic controls rather than the first duplicated text label. For data-access smoke checks, sign in through the same Playwright context's request API, navigate to `/admin`, and wait for the actual booking control. Test the login form separately when its behavior is in scope.
+- **Next action:** Use a booking button's accessible name and wait for loaded controls at every viewport; preserve the separate integrated-browser validation requirement.
 
 # Agent working rules
 

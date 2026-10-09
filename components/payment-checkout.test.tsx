@@ -1,13 +1,16 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PaymentCheckout } from "./payment-checkout";
 
+const stripe = vi.hoisted(() => ({
+  createPaymentMethod: vi.fn(), confirmCardPayment: vi.fn(), clear: vi.fn(),
+}));
 vi.mock("@stripe/react-stripe-js", () => ({
   CardElement: () => null,
   Elements: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useElements: () => null,
-  useStripe: () => null,
+  useElements: () => ({ getElement: () => ({ clear: stripe.clear }) }),
+  useStripe: () => stripe,
 }));
 
 vi.mock("@stripe/stripe-js", () => ({
@@ -15,6 +18,64 @@ vi.mock("@stripe/stripe-js", () => ({
 }));
 
 describe("PaymentCheckout", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stripe.createPaymentMethod.mockResolvedValue({ paymentMethod: { id: "pm_test" } });
+    stripe.confirmCardPayment.mockResolvedValue({ paymentIntent: { status: "succeeded" } });
+  });
+
+  const scheduled = {
+    customerName: "Test Customer", email: "test@example.com", eventType: "Party",
+    pickupDate: "2026-11-09", dropoffDate: "2026-11-12",
+    hireLineItems: [{ id: "speaker", kind: "equipment", name: "Test speaker", quantity: 1, unitPriceCents: 5500 }],
+    hireAmountCents: 11000, securityDepositCents: 10000,
+    hirePaymentStatus: "pending", depositPaymentStatus: "scheduled",
+    depositHoldDate: "2026-11-08", depositConsentRecorded: false,
+    hireClientSecret: "hire_secret", depositClientSecret: null,
+  };
+
+  it("requires consent, records it, charges only hire and leaves the deposit scheduled", async () => {
+    vi.stubEnv("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", "pk_test_placeholder");
+    const fetch = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => scheduled })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) });
+    vi.stubGlobal("fetch", fetch);
+    render(<PaymentCheckout token="advance-token" />);
+    const pay = await screen.findByRole("button", { name: "Pay $110.00" });
+    expect(pay).toBeDisabled();
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(pay).toBeEnabled();
+    fireEvent.click(pay);
+    expect(await screen.findByText(/hold is scheduled before pickup; it has not been authorised yet/)).toBeInTheDocument();
+    expect(fetch).toHaveBeenLastCalledWith("/api/payment/advance-token", expect.objectContaining({ method: "POST", body: '{"consent":true}' }));
+    expect(stripe.confirmCardPayment).toHaveBeenCalledTimes(1);
+    expect(stripe.confirmCardPayment).toHaveBeenCalledWith("hire_secret", { payment_method: "pm_test" });
+  });
+
+  it("does not charge when consent persistence fails", async () => {
+    vi.stubEnv("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", "pk_test_placeholder");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce({ ok: true, json: async () => scheduled })
+      .mockResolvedValueOnce({ ok: false, json: async () => ({ error: "Consent could not be saved." }) }));
+    render(<PaymentCheckout token="token" />);
+    await screen.findByRole("checkbox");
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Pay $110.00" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Consent could not be saved");
+    expect(stripe.confirmCardPayment).not.toHaveBeenCalled();
+  });
+
+  it("authenticates only the deposit during recovery without charging hire again", async () => {
+    vi.stubEnv("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", "pk_test_placeholder");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({
+      ...scheduled, hirePaymentStatus: "paid", depositPaymentStatus: "action_required",
+      depositConsentRecorded: true, hireClientSecret: null, depositClientSecret: "deposit_secret",
+    }) }).mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, status: "authorized" }) }));
+    stripe.confirmCardPayment.mockResolvedValue({ paymentIntent: { status: "requires_capture" } });
+    render(<PaymentCheckout token="token" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Authorise $100.00 deposit hold" }));
+    await screen.findByText(/deposit has been authorised/);
+    expect(stripe.confirmCardPayment).toHaveBeenCalledTimes(1);
+    expect(stripe.confirmCardPayment).toHaveBeenCalledWith("deposit_secret", { payment_method: "pm_test" });
+  });
   it.each(["unpaid", "paid"])("shows the white vector Stripe wordmark when hire is %s", async (hirePaymentStatus) => {
     vi.stubEnv("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", "pk_test_placeholder");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
@@ -58,7 +119,8 @@ describe("PaymentCheckout", () => {
     render(<PaymentCheckout token="pricing-test" />);
     expect(await screen.findByText(/3 nights.*additional nights half price/)).toBeInTheDocument();
     expect(screen.getAllByText("$220.00")).toHaveLength(2);
-    expect(screen.getByText("$320.00")).toBeInTheDocument();
+    expect(screen.getByText("$0.00")).toBeInTheDocument();
+    expect(screen.queryByText("$320.00")).not.toBeInTheDocument();
   });
 
   afterEach(() => {

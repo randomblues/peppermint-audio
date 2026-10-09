@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { canSwitchPendingBankTransfer, formatAudCents, parseAmountCents, paymentMethodForRental, rentalDays } from "./payment-flow";
+import { canSwitchPendingBankTransfer, depositHoldCoversReturn, depositHoldDate, paymentLinkExpiry, formatAudCents, parseAmountCents, paymentMethodForRental, rentalDays } from "./payment-flow";
 
 describe("payment flow helpers", () => {
   it("calculates rental days from date-only values without timezone drift", () => {
@@ -13,9 +13,30 @@ describe("payment flow helpers", () => {
     expect(rentalDays("2026-1-01", "2026-01-02")).toBeNull();
   });
 
-  it("routes seven-day-or-shorter hires to Stripe and longer hires to bank transfer", () => {
-    expect(paymentMethodForRental("2026-10-01", "2026-10-08")).toBe("stripe_card_hold");
-    expect(paymentMethodForRental("2026-10-01", "2026-10-09")).toBe("bank_transfer");
+  it("routes up to three nights to Stripe and four or more to bank transfer", () => {
+    expect(paymentMethodForRental("2026-10-01", "2026-10-04")).toBe("stripe_card_hold");
+    expect(paymentMethodForRental("2026-10-01", "2026-10-05")).toBe("bank_transfer");
+    expect(paymentMethodForRental("2026-10-01", "2026-10-08")).toBe("bank_transfer");
+  });
+
+  it("schedules the calendar day before pickup across month/year boundaries", () => {
+    expect(depositHoldDate("2027-01-01")).toBe("2026-12-31");
+    expect(depositHoldDate("2026-03-01")).toBe("2026-02-28");
+    expect(() => depositHoldDate("2026-02-30")).toThrow();
+  });
+
+  it("keeps advance-booking links valid through deposit authentication", () => {
+    const now = Date.parse("2026-01-01T00:00:00Z");
+    expect(paymentLinkExpiry("2026-04-03", now)).toBe("2026-04-06T00:00:00.000Z");
+    expect(paymentLinkExpiry("2026-01-02", now)).toBe("2026-01-31T00:00:00.000Z");
+  });
+
+  it("checks the exact hold expiry against return and a check-in margin", () => {
+    const boundary = Date.parse("2026-10-12T19:00:00+10:00") / 1000;
+    expect(depositHoldCoversReturn(boundary, "2026-10-12", "18:00")).toBe(false);
+    expect(depositHoldCoversReturn(boundary + 1, "2026-10-12", "18:00")).toBe(true);
+    expect(depositHoldCoversReturn(null, "2026-10-12")).toBe(false);
+    expect(depositHoldCoversReturn(boundary, "2026-02-30")).toBe(false);
   });
 
   it("parses decimal dollar amounts into safe cents", () => {

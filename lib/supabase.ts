@@ -1,21 +1,13 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-
-function supabaseConfig() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Supabase is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
-  return { url, key };
-}
+import { supabaseConnection } from "./supabase-config";
 
 export function createAdminClient(): SupabaseClient {
-  const { url, key } = supabaseConfig();
+  const { url, key } = supabaseConnection("admin");
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
 export function createAuthClient() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_ANON_KEY;
-  if (!url || !key) throw new Error("Supabase auth is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY.");
+  const { url, key } = supabaseConnection("auth");
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 

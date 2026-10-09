@@ -57,6 +57,12 @@ alter table public.bookings add column if not exists bank_transfer_reference tex
 alter table public.bookings add column if not exists payment_received_at timestamptz;
 alter table public.bookings add column if not exists bank_transfer_refunded_at timestamptz;
 alter table public.bookings add column if not exists bank_transfer_option text not null default 'both';
+alter table public.bookings add column if not exists deposit_hold_date date;
+alter table public.bookings add column if not exists deposit_consent_at timestamptz;
+alter table public.bookings add column if not exists deposit_capture_before timestamptz;
+alter table public.bookings add column if not exists deposit_error text;
+alter table public.bookings add column if not exists deposit_attention_sent_at timestamptz;
+create index if not exists bookings_deposit_hold_date_idx on public.bookings(deposit_hold_date) where deposit_hold_date is not null;
 alter table public.bookings drop constraint if exists bookings_status_check;
 alter table public.bookings add constraint bookings_status_check check (status in ('submitted','confirmed','completed','cancelled'));
 alter table public.bookings drop constraint if exists bookings_bank_transfer_option_check;

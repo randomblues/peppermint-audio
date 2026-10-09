@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => {
     send,
     sendBookingConfirmationEmail: vi.fn(),
     recordCustomerEmail: vi.fn(),
+    releaseCancelledDeferredDeposit: vi.fn(),
     Resend: vi.fn(() => ({ emails: { send } })),
   };
 });
@@ -38,6 +39,7 @@ vi.mock("@/lib/send-booking-confirmation", () => ({
 vi.mock("@/lib/email-log", () => ({
   recordCustomerEmail: mocks.recordCustomerEmail,
 }));
+vi.mock("@/lib/deferred-deposits", () => ({ releaseCancelledDeferredDeposit: mocks.releaseCancelledDeferredDeposit }));
 
 import { GET as getBookings, PATCH as patchBooking, DELETE as deleteBooking } from "./admin/bookings/route";
 import { POST as exportBookings } from "./admin/export/route";

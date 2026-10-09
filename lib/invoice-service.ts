@@ -2,7 +2,7 @@ import { Resend } from "resend";
 
 import { emailFooterText } from "@/lib/email-footer";
 import { bookingHireTotalCents, lineItemHireTotalCents, lineItemsForBooking, type BookingLineItem } from "@/lib/booking-line-items";
-import { rentalDays } from "@/lib/payment-flow";
+import { formatAudCents, rentalDays } from "@/lib/payment-flow";
 import { emailDetailsTable, emailLayout, emailPanel, escapeEmailHtml } from "@/lib/email-template";
 import { recordCustomerEmail, type CustomerEmailType } from "@/lib/email-log";
 import { buildInvoicePdf, type InvoicePdfDetails, type InvoicePdfLineItem } from "@/lib/invoice-pdf";
@@ -33,6 +33,7 @@ type InvoiceBooking = {
   bank_transfer_reference?: string | null;
   deposit_payment_status?: string | null;
   deposit_captured_cents?: number | null;
+  deposit_hold_date?: string | null;
 };
 
 type InvoiceRecord = {
@@ -49,7 +50,7 @@ type InvoiceRecord = {
   status: string;
 };
 
-const bookingSelect = "id,email,first_name,last_name,event_type,event_address,pickup_date,dropoff_date,hire_line_items,hire_amount_cents,security_deposit_cents,gst_inclusive,payment_method,bank_transfer_reference,bank_transfer_option,deposit_payment_status,deposit_captured_cents";
+const bookingSelect = "id,email,first_name,last_name,event_type,event_address,pickup_date,dropoff_date,hire_line_items,hire_amount_cents,security_deposit_cents,gst_inclusive,payment_method,bank_transfer_reference,bank_transfer_option,deposit_payment_status,deposit_captured_cents,deposit_hold_date";
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-AU", { day: "numeric", month: "long", year: "numeric", timeZone: "Australia/Melbourne" }).format(new Date(`${value}T00:00:00`));
@@ -198,6 +199,9 @@ function pdfDetails(documentType: BillingDocumentType, booking: InvoiceBooking, 
   const notes = [
     "The security deposit is refundable when all equipment is returned on time and in the agreed condition.",
   ];
+  if (invoice.payment_method === "stripe_card_hold" && booking.deposit_hold_date && documentType === "invoice") {
+    notes.unshift(`The hire payment is due now. The ${formatAudCents(deposit)} security deposit is a separate temporary card hold scheduled for ${formatDate(booking.deposit_hold_date)}, or after payment for a last-minute booking. It is not charged with the hire payment.`);
+  }
   const bank = invoice.payment_method === "bank_transfer" ? bankTransferDetails() : undefined;
   const bankTransfer = bank
     ? {
@@ -209,7 +213,10 @@ function pdfDetails(documentType: BillingDocumentType, booking: InvoiceBooking, 
   if (documentType === "payment_receipt") {
     if (invoice.payment_method === "stripe_card_hold") {
       lineItems = [...hireLineItems.map((item) => formatLineItem(item, "Paid and captured")), { description: "Refundable security deposit", amountCents: deposit, status: booking.deposit_payment_status === "authorized" ? "Authorised, not captured" : "Pending authorisation" }];
-      notes.unshift("This receipt confirms the hire payment was captured and the security deposit was authorised as a temporary card hold.");
+      totalCents = hire;
+      notes.unshift(booking.deposit_payment_status === "authorized"
+        ? "This receipt confirms the hire payment. The security deposit is a separate temporary card hold, not an additional payment."
+        : "This receipt confirms the hire payment only. The security deposit has not yet been authorised.");
     } else {
       const receivedBy = invoice.payment_method === "cash_on_pickup" ? "Received in cash" : "Received by bank transfer";
       lineItems = [...hireLineItems.map((item) => formatLineItem(item, receivedBy)), { description: "Refundable security deposit", amountCents: deposit, status: receivedBy }];

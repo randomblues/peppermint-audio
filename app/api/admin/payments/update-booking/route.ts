@@ -6,7 +6,7 @@ import { lineItemsTotalCents, parseBookingLineItems, type BookingLineItem } from
 import { sendInvoiceEmail } from "@/lib/invoice-service";
 import { invoiceNumberForBooking } from "@/lib/invoice-reference";
 import { parseInvoiceRecipient } from "@/lib/invoice-recipient";
-import { MAX_STRIPE_HIRE_DAYS, PAYMENT_LINK_VALIDITY_DAYS, parseAmountCents, rentalDays } from "@/lib/payment-flow";
+import { MAX_STRIPE_HIRE_DAYS, depositHoldDate, paymentLinkExpiry, parseAmountCents, rentalDays } from "@/lib/payment-flow";
 import { getStripe } from "@/lib/stripe";
 
 type PaymentMethod = "stripe_card_hold" | "bank_transfer" | "cash_on_pickup";
@@ -150,6 +150,11 @@ export async function POST(request: Request) {
     Object.assign(update, {
       security_deposit_cents: depositCents,
       gst_inclusive: gstInclusive,
+      deposit_hold_date: null,
+      deposit_consent_at: null,
+      deposit_capture_before: null,
+      deposit_error: null,
+      deposit_attention_sent_at: null,
     });
 
     if (!targetMethod) {
@@ -197,31 +202,21 @@ export async function POST(request: Request) {
         amount: hireAmountCents,
         currency: "aud",
         customer: customerId,
-        automatic_payment_methods: { enabled: true, allow_redirects: "never" },
-        setup_future_usage: "on_session",
+        allowed_payment_method_types: ["card"],
+        ...(depositCents > 0 ? { setup_future_usage: "off_session" as const } : {}),
         description: `Peppermint Audio hire · ${invoiceNumberForBooking(bookingId)}`,
-        metadata: { bookingId, invoiceNumber: invoiceNumberForBooking(bookingId), paymentType: "hire" },
+        metadata: { bookingId, invoiceNumber: invoiceNumberForBooking(bookingId), paymentType: "hire", depositSchedule: depositCents > 0 ? "deferred" : "none" },
       });
-      const depositPaymentIntent = depositCents > 0
-        ? await stripe.paymentIntents.create({
-          amount: depositCents,
-          currency: "aud",
-          customer: customerId,
-          automatic_payment_methods: { enabled: true, allow_redirects: "never" },
-          capture_method: "manual",
-          description: `Refundable security deposit · ${invoiceNumberForBooking(bookingId)}`,
-          metadata: { bookingId, invoiceNumber: invoiceNumberForBooking(bookingId), paymentType: "deposit" },
-        })
-        : null;
       Object.assign(update, {
         payment_method: "stripe_card_hold",
         hire_payment_status: "pending",
-        deposit_payment_status: depositCents > 0 ? "pending" : "not_required",
+        deposit_payment_status: depositCents > 0 ? "scheduled" : "not_required",
+        deposit_hold_date: depositCents > 0 ? depositHoldDate(existing.data.pickup_date) : null,
         stripe_customer_id: customerId,
         stripe_hire_payment_intent_id: hirePaymentIntent.id,
-        stripe_deposit_payment_intent_id: depositPaymentIntent?.id ?? null,
+        stripe_deposit_payment_intent_id: null,
         payment_token: crypto.randomUUID(),
-        payment_token_expires_at: new Date(Date.now() + PAYMENT_LINK_VALIDITY_DAYS * 24 * 60 * 60 * 1000).toISOString(),
+        payment_token_expires_at: paymentLinkExpiry(existing.data.dropoff_date),
         bank_transfer_reference: null,
       });
     }

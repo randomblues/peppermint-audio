@@ -13,6 +13,8 @@
 # testing
 /coverage
 /.copilot-dev-session.json
+/.local-supabase/
+/supabase/.temp/
 
 # next.js
 /.next/

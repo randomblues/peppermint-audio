@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { createAdminClient } from "@/lib/supabase";
 import { markInvoiceStatus, sendBillingDocument } from "@/lib/invoice-service";
 import { getStripe } from "@/lib/stripe";
+import { attemptDeferredDeposit, notifyDepositAttention, readDepositBooking, syncDeferredDeposit } from "@/lib/deferred-deposits";
 
 async function updatePayment(bookingId: string, updates: Record<string, unknown>) {
   const admin = createAdminClient();
@@ -25,6 +26,30 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (event.type.startsWith("payment_intent.")) {
+      const intent = event.data.object as Stripe.PaymentIntent;
+      if (intent.metadata.paymentType === "hire" && intent.metadata.depositSchedule === "deferred" && intent.metadata.bookingId) {
+        const booking = await readDepositBooking(createAdminClient(), intent.metadata.bookingId);
+        if (!booking || booking.stripe_hire_payment_intent_id !== intent.id
+          || (booking.hire_payment_status === "paid" && event.type !== "payment_intent.succeeded")) {
+          return Response.json({ received: true });
+        }
+      }
+      if (intent.metadata.paymentType === "deposit" && intent.metadata.deferredDeposit === "true" && intent.metadata.bookingId) {
+        const admin = createAdminClient();
+        const booking = await readDepositBooking(admin, intent.metadata.bookingId);
+        // Ignore replaced intents and use current state for out-of-order delivery.
+        if (!booking || booking.stripe_deposit_payment_intent_id !== intent.id) return Response.json({ received: true });
+        const current = await getStripe().paymentIntents.retrieve(intent.id, { expand: ["latest_charge"] });
+        const status = await syncDeferredDeposit(admin, booking, current);
+        if (status === "authorized") await sendBillingDocument(admin, booking.id, "deposit_authorisation");
+        if (status === "captured") await sendBillingDocument(admin, booking.id, "deposit_capture");
+        if (status === "released") await sendBillingDocument(admin, booking.id, "deposit_release");
+        const updated = await readDepositBooking(admin, booking.id);
+        if (updated) await notifyDepositAttention(admin, updated);
+        return Response.json({ received: true });
+      }
+    }
     if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
       const session = event.data.object as Stripe.Checkout.Session;
       const bookingId = session.metadata?.bookingId;
@@ -56,6 +81,9 @@ export async function POST(request: Request) {
       if (bookingId && paymentIntent.metadata.paymentType === "hire") {
         const paidAt = new Date().toISOString();
         await updatePayment(bookingId, { hire_payment_status: "paid", stripe_hire_payment_intent_id: paymentIntent.id, payment_received_at: paidAt });
+        await attemptDeferredDeposit(createAdminClient(), bookingId);
+        const depositBooking = await readDepositBooking(createAdminClient(), bookingId);
+        if (depositBooking) await notifyDepositAttention(createAdminClient(), depositBooking);
         await sendBillingDocument(createAdminClient(), bookingId, "payment_receipt");
         await markInvoiceStatus(createAdminClient(), bookingId, "paid", paidAt);
       } else if (bookingId && paymentIntent.metadata.paymentType === "deposit") {

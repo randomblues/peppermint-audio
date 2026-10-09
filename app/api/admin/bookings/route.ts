@@ -5,6 +5,7 @@ import { sendBookingConfirmationEmail } from "@/lib/send-booking-confirmation";
 import { recordCustomerEmail } from "@/lib/email-log";
 import { lineItemsTotalCents, parseBookingLineItems, type BookingLineItem } from "@/lib/booking-line-items";
 import { rentalDays } from "@/lib/payment-flow";
+import { releaseCancelledDeferredDeposit } from "@/lib/deferred-deposits";
 
 function escapePostgrestSearch(value: string) {
   return value.replace(/[\\%_(),.]/g, "\\$&");
@@ -129,6 +130,14 @@ export async function PATCH(request: Request) {
   }
   const { error } = await session.admin.from("bookings").update(update).eq("id", body.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (body.status === "cancelled") {
+    try {
+      await releaseCancelledDeferredDeposit(session.admin, body.id);
+    } catch (cause) {
+      console.error("Cancelled booking deposit release failed:", cause);
+      return NextResponse.json({ error: "Booking cancelled, but the deposit hold could not be released. Please review the deposit before retrying." }, { status: 502 });
+    }
+  }
   return NextResponse.json({ ok: true });
 }
 

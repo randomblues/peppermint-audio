@@ -11,6 +11,37 @@ import { catalogLineItemFromKey } from "./booking-line-items";
 afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks(); });
 
 describe("billing document email copy", () => {
+  it.each([true, false])("a scheduled card deposit is not represented as money received (GST %s)", async gstInclusive => {
+    vi.stubEnv("RESEND_API_KEY", "re_test_placeholder");
+    vi.stubEnv("ENQUIRY_FROM_EMAIL", "test@example.com");
+    mocks.pdf.mockResolvedValue(Buffer.from("test-pdf"));
+    mocks.send.mockResolvedValue({ data: { id: "test-email" }, error: null });
+    const booking = {
+      id: "booking-1", email: "test@example.com", first_name: "Test", last_name: "Customer", event_type: "Party",
+      pickup_date: "2026-11-09", dropoff_date: "2026-11-10", hire_line_items: [catalogLineItemFromKey("package:standard-party-events")],
+      hire_amount_cents: 16000, security_deposit_cents: 10000, gst_inclusive: gstInclusive,
+      payment_method: "stripe_card_hold", deposit_payment_status: "scheduled", deposit_hold_date: "2026-11-08",
+    };
+    const invoice = {
+      id: "invoice-1", booking_id: booking.id, invoice_number: "PA-TEST", payment_method: "stripe_card_hold",
+      hire_amount_cents: 16000, security_deposit_cents: 10000, total_amount_cents: 26000, gst_inclusive: gstInclusive,
+      bank_transfer_option: "both", status: "issued",
+    };
+    const query = (data: unknown) => ({
+      select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), update: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data, error: null }), maybeSingle: vi.fn().mockResolvedValue({ data, error: null }),
+    });
+    const admin = { from: vi.fn((table: string) => query(table === "bookings" ? booking : table === "invoices" ? invoice : { id: "doc-1", status: "pending" })) };
+    await sendBillingDocument(admin as never, booking.id, "payment_receipt");
+    expect(mocks.pdf).toHaveBeenCalledWith(expect.objectContaining({
+      totalCents: 16000,
+      notes: expect.arrayContaining(["This receipt confirms the hire payment only. The security deposit has not yet been authorised."]),
+    }));
+    await sendBillingDocument(admin as never, booking.id, "invoice");
+    expect(mocks.pdf).toHaveBeenLastCalledWith(expect.objectContaining({
+      notes: expect.arrayContaining([expect.stringContaining("It is not charged with the hire payment.")]),
+    }));
+  });
   it.each([true, false])("keeps multi-night invoice and receipt line amounts consistent (GST %s)", async (gstInclusive) => {
     vi.stubEnv("RESEND_API_KEY", "re_test_placeholder");
     vi.stubEnv("ENQUIRY_FROM_EMAIL", "test@example.com");

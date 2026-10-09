@@ -75,7 +75,7 @@ describe("admin payment routes", () => {
     }));
     if (method === "stripe") {
       expect(mocks.paymentIntentCreate).toHaveBeenNthCalledWith(1, expect.objectContaining({ amount: 32000 }));
-      expect(mocks.paymentIntentCreate).toHaveBeenNthCalledWith(2, expect.objectContaining({ amount: 10000 }));
+      expect(mocks.paymentIntentCreate).toHaveBeenCalledTimes(1);
     }
   });
 
@@ -94,9 +94,7 @@ describe("admin payment routes", () => {
     });
     mocks.customerCreate.mockResolvedValue({ id: "cus_123" });
     mocks.customerRetrieve.mockResolvedValue({ id: "cus_123", deleted: false });
-    mocks.paymentIntentCreate
-      .mockResolvedValueOnce({ id: "pi_hire", client_secret: "hire_secret" })
-      .mockResolvedValueOnce({ id: "pi_deposit", client_secret: "deposit_secret" });
+    mocks.paymentIntentCreate.mockReset().mockResolvedValue({ id: "pi_hire", client_secret: "hire_secret" });
     mocks.sendInvoiceEmail.mockResolvedValue("invoice-email-1");
     mocks.paymentIntentRetrieve.mockResolvedValue({ status: "requires_payment_method" });
     mocks.paymentIntentCancel.mockResolvedValue({ id: "cancelled" });
@@ -135,7 +133,7 @@ describe("admin payment routes", () => {
     ...overrides,
   });
 
-  it("creates one captured hire intent and one manual-capture deposit intent", async () => {
+  it("creates only the hire intent and schedules the deposit with off-session card saving", async () => {
     const { session, update } = adminSession({
       id: "booking-1",
       email: "alex@example.com",
@@ -162,28 +160,28 @@ describe("admin payment routes", () => {
     expect((await response.json()).paymentUrl).toMatch(/^https:\/\/www\.example\.com\/pay\//);
     expect(mocks.paymentIntentCreate).toHaveBeenNthCalledWith(1, expect.objectContaining({
       amount: 10000,
+      setup_future_usage: "off_session",
+      allowed_payment_method_types: ["card"],
       description: "Peppermint Audio hire · PA-BOOKING1",
-      metadata: { bookingId: "booking-1", invoiceNumber: "PA-BOOKING1", paymentType: "hire" },
+      metadata: { bookingId: "booking-1", invoiceNumber: "PA-BOOKING1", paymentType: "hire", depositSchedule: "deferred" },
     }));
-    expect(mocks.paymentIntentCreate).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      amount: 10000,
-      capture_method: "manual",
-      description: "Refundable security deposit · PA-BOOKING1",
-      metadata: { bookingId: "booking-1", invoiceNumber: "PA-BOOKING1", paymentType: "deposit" },
-    }));
+    expect(mocks.paymentIntentCreate).toHaveBeenCalledTimes(1);
     expect(update.update).toHaveBeenCalledWith(expect.objectContaining({
       stripe_hire_payment_intent_id: "pi_hire",
-      stripe_deposit_payment_intent_id: "pi_deposit",
+      stripe_deposit_payment_intent_id: null,
+      deposit_payment_status: "scheduled",
+      deposit_hold_date: "2026-09-30",
+      deposit_consent_at: null,
       payment_method: "stripe_card_hold",
     }));
   });
 
-  it("rejects Stripe for hires longer than seven days", async () => {
+  it("rejects Stripe for a four-night hire", async () => {
     const { session } = adminSession({
       id: "booking-2",
       status: "confirmed",
       pickup_date: "2026-10-01",
-      dropoff_date: "2026-10-09",
+      dropoff_date: "2026-10-05",
       hire_line_items: hireLineItems,
     });
     mocks.requireAdmin.mockResolvedValue({ user: { id: "admin-1" }, admin: session.admin });
@@ -260,7 +258,7 @@ describe("admin payment routes", () => {
     expect(mocks.paymentIntentCancel).toHaveBeenCalledWith("pi_old_deposit");
     expect(update.update).toHaveBeenCalledWith(expect.objectContaining({
       stripe_hire_payment_intent_id: "pi_hire",
-      stripe_deposit_payment_intent_id: "pi_deposit",
+      stripe_deposit_payment_intent_id: null,
       payment_token: expect.any(String),
     }));
   });
