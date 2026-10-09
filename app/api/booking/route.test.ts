@@ -115,6 +115,24 @@ describe("POST /api/booking", () => {
     expect(createAdminClient).not.toHaveBeenCalled();
   });
 
+  it("persists canonical multi-night totals regardless of submitted catalogue prices", async () => {
+    const response = await POST(bookingRequest({
+      ...validFields,
+      pickupDate: "2099-10-09",
+      dropoffDate: "2099-10-12",
+      hireLineItems: JSON.stringify([{
+        id: "package:standard-party-events", kind: "package", catalogKey: "package:standard-party-events",
+        name: "Standard package", quantity: 2, unitPriceCents: 1,
+      }]),
+    }));
+    expect(response.status).toBe(200);
+    expect(insertMock).toHaveBeenCalledWith(expect.objectContaining({ hire_amount_cents: 64000 }));
+    await afterCallback.mock.calls[0][0]();
+    const customerEmail = send.mock.calls.find(([email]) => email.to?.includes(validFields.email))?.[0];
+    expect(customerEmail.html).toContain("$640.00");
+    expect(customerEmail.html).toContain("Estimated hire total");
+  });
+
   it("returns a configuration error before touching Supabase", async () => {
     vi.stubEnv("RESEND_API_KEY", "");
     vi.resetModules();

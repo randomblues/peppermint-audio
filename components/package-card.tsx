@@ -18,7 +18,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useCart } from "@/components/cart-provider";
-import { addOnCatalog, type PackageTier } from "@/lib/site-content";
+import { addOnCatalog, hirePricing, type PackageTier } from "@/lib/site-content";
 
 type PackageCardProps = {
   pkg: PackageTier;
@@ -148,7 +148,7 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
               </div>
               <div className="relative z-20 min-w-0 shrink-0 rounded-lg border border-border/70 bg-muted/30 px-2 py-1 text-right">
                 <p className="text-[0.65rem] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
-                  Hire price
+                  Per night
                 </p>
                 <p className="mt-0.5 whitespace-nowrap text-2xl font-semibold tracking-tight sm:text-3xl">
                   ${pkg.price}
@@ -176,10 +176,11 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
             <CardTitle>{pkg.name}</CardTitle>
             <CardAction>{pkg.notes ? <Badge>{pkg.notes}</Badge> : null}</CardAction>
             <CardDescription>{pkg.bestFor}</CardDescription>
-            <p className="mt-2 text-3xl font-semibold tracking-tight">${pkg.price}</p>
+            <p className="mt-2 text-3xl font-semibold tracking-tight">${pkg.price}<span className="text-base font-normal text-muted-foreground"> / night</span></p>
           </CardHeader>
         )}
         <CardContent>
+          <p className="mb-4 text-sm text-muted-foreground">{hirePricing.summary}</p>
           {compact ? (
             <>
               <div className="flex min-h-20 items-center sm:min-h-24">
@@ -257,7 +258,7 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
       <DialogPrimitive.Root open={showCheckoutPrompt} onOpenChange={setShowCheckoutPrompt}>
         <DialogPrimitive.Portal>
           <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-black/45 transition-opacity duration-300 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-backdrop-filter:backdrop-blur-md" />
-          <DialogPrimitive.Popup className="fixed top-1/2 left-1/2 z-50 w-[min(92vw,28rem)] -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-white/20 bg-[linear-gradient(155deg,color-mix(in_oklab,var(--background)_78%,black),color-mix(in_oklab,var(--background)_62%,var(--primary)_18%)_48%,color-mix(in_oklab,var(--background)_74%,black))] p-6 text-foreground shadow-[0_28px_70px_rgb(0_0_0/0.45),inset_0_1px_0_rgba(255,255,255,0.22)] ring-1 ring-primary/20 transition-all duration-300 ease-out data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 sm:p-7">
+          <DialogPrimitive.Popup className="fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[min(92vw,28rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl border border-white/20 bg-[linear-gradient(155deg,color-mix(in_oklab,var(--background)_78%,black),color-mix(in_oklab,var(--background)_62%,var(--primary)_18%)_48%,color-mix(in_oklab,var(--background)_74%,black))] p-6 text-foreground shadow-[0_28px_70px_rgb(0_0_0/0.45),inset_0_1px_0_rgba(255,255,255,0.22)] ring-1 ring-primary/20 transition-all duration-300 ease-out data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 sm:p-7">
             <div className="pointer-events-none absolute inset-x-10 top-0 h-20 -translate-y-1/2 rounded-full bg-primary/30 blur-2xl" />
             <DialogPrimitive.Title className="relative text-xl font-semibold sm:text-2xl">
               Recommended add-ons for {pkg.name}
@@ -281,9 +282,9 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
                           </p>
                           <p className="text-xs text-muted-foreground">{suggestion.reason}</p>
                         </div>
-                        <p className="shrink-0 text-sm font-semibold text-primary">+${suggestion.price}</p>
+                        <p className="shrink-0 text-sm font-semibold text-primary">+${suggestion.price} / night</p>
                       </div>
-                      <div className="mt-3 grid grid-cols-[1fr_auto] items-center gap-2">
+                      <div className="mt-3 grid grid-cols-1 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                         <Button
                           variant={isAdded ? "secondary" : "outline"}
                           className={`w-full rounded-xl ${

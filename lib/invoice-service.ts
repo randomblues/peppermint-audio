@@ -1,7 +1,8 @@
 import { Resend } from "resend";
 
 import { emailFooterText } from "@/lib/email-footer";
-import { lineItemsForBooking, lineItemsTotalCents, type BookingLineItem } from "@/lib/booking-line-items";
+import { bookingHireTotalCents, lineItemHireTotalCents, lineItemsForBooking, type BookingLineItem } from "@/lib/booking-line-items";
+import { rentalDays } from "@/lib/payment-flow";
 import { emailDetailsTable, emailLayout, emailPanel, escapeEmailHtml } from "@/lib/email-template";
 import { recordCustomerEmail, type CustomerEmailType } from "@/lib/email-log";
 import { buildInvoicePdf, type InvoicePdfDetails, type InvoicePdfLineItem } from "@/lib/invoice-pdf";
@@ -79,7 +80,7 @@ async function readBooking(admin: AdminClient, bookingId: string) {
 
 export async function ensureInvoice(admin: AdminClient, booking: InvoiceBooking, paymentUrl?: string | null, bankTransferOption?: BankTransferOption, allowTransferOptionChange = false, allowPaymentMethodChange = false, allowInvoiceAmountChange = false) {
   const lineItems = lineItemsForBooking(booking);
-  const hireAmountCents = lineItemsTotalCents(lineItems);
+  const hireAmountCents = bookingHireTotalCents(lineItems, booking.pickup_date, booking.dropoff_date);
   if (!hireAmountCents) throw new Error("Add at least one priced hire item before creating an invoice.");
   const securityDepositCents = amount(booking.security_deposit_cents);
   const gstInclusive = booking.gst_inclusive ?? true;
@@ -181,9 +182,11 @@ function pdfDetails(documentType: BillingDocumentType, booking: InvoiceBooking, 
       ? "Cash on pickup"
       : "Stripe card payment and security-deposit authorisation";
   const hireLineItems = lineItemsForBooking(booking);
+  const nights = rentalDays(booking.pickup_date, booking.dropoff_date);
+  if (nights === null) throw new Error("The booking dates are invalid.");
   const formatLineItem = (item: BookingLineItem, status?: string): InvoicePdfLineItem => ({
-    description: `${item.quantity > 1 ? `${item.quantity} × ` : ""}${item.name}${item.option ? ` · ${item.option}` : ""}`,
-    amountCents: item.unitPriceCents * item.quantity,
+    description: `${item.quantity > 1 ? `${item.quantity} × ` : ""}${item.name}${item.option ? ` · ${item.option}` : ""}${item.kind === "custom" ? "" : ` · ${nights} ${nights === 1 ? "night" : "nights"}`}`,
+    amountCents: lineItemHireTotalCents(item, nights),
     status,
   });
   let lineItems: InvoicePdfLineItem[] = [

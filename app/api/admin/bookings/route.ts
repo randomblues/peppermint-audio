@@ -3,7 +3,8 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { PHOTO_ID_BUCKET } from "@/lib/supabase";
 import { sendBookingConfirmationEmail } from "@/lib/send-booking-confirmation";
 import { recordCustomerEmail } from "@/lib/email-log";
-import { parseBookingLineItems, type BookingLineItem } from "@/lib/booking-line-items";
+import { lineItemsTotalCents, parseBookingLineItems, type BookingLineItem } from "@/lib/booking-line-items";
+import { rentalDays } from "@/lib/payment-flow";
 
 function escapePostgrestSearch(value: string) {
   return value.replace(/[\\%_(),.]/g, "\\$&");
@@ -58,7 +59,7 @@ export async function PATCH(request: Request) {
     const parsedItems = parseBookingLineItems(body.hire_line_items);
     if ("error" in parsedItems) return NextResponse.json({ error: parsedItems.error }, { status: 400 });
     const current = await session.admin.from("bookings")
-      .select("payment_method,hire_payment_status,deposit_payment_status")
+      .select("payment_method,hire_payment_status,deposit_payment_status,pickup_date,dropoff_date")
       .eq("id", body.id)
       .single();
     if (current.error) return NextResponse.json({ error: current.error.message }, { status: 500 });
@@ -67,7 +68,9 @@ export async function PATCH(request: Request) {
       || !["unpaid", null, undefined].includes(current.data.hire_payment_status)
       || !["not_required", null, undefined].includes(current.data.deposit_payment_status);
     if (paymentSent) return NextResponse.json({ error: "This booking already has a payment request. Use Update payment request while it is still unpaid." }, { status: 409 });
-    lineItemUpdate = { hire_line_items: parsedItems.items, hire_amount_cents: parsedItems.totalCents };
+    const nights = rentalDays(current.data.pickup_date, current.data.dropoff_date);
+    if (nights === null) return NextResponse.json({ error: "The booking dates are invalid." }, { status: 400 });
+    lineItemUpdate = { hire_line_items: parsedItems.items, hire_amount_cents: lineItemsTotalCents(parsedItems.items, nights) };
   }
   let confirmation: {
     email: string;

@@ -88,13 +88,13 @@ describe("Navbar", () => {
         </CartProvider>,
       );
 
-      expect(screen.getByRole("button", { name: "Pair (2 speakers) $95" })).toHaveAttribute(
+      expect(screen.getByRole("button", { name: "Pair (2 speakers) $95 / night" })).toHaveAttribute(
         "aria-pressed",
         "true",
       );
-      fireEvent.click(screen.getByRole("button", { name: "Single speaker $55" }));
+      fireEvent.click(screen.getByRole("button", { name: "Single speaker $55 / night" }));
 
-      expect(screen.getByRole("button", { name: "Single speaker $55" })).toHaveAttribute(
+      expect(screen.getByRole("button", { name: "Single speaker $55 / night" })).toHaveAttribute(
         "aria-pressed",
         "true",
       );
@@ -238,6 +238,9 @@ describe("PackageCard", () => {
         name: `Recommended add-ons for ${pkg.name}`,
       }),
     ).toBeInTheDocument();
+    const pricingDialog = screen.getByRole("dialog", { name: `Recommended add-ons for ${pkg.name}` });
+    expect(pricingDialog).toHaveClass("max-h-[calc(100dvh-2rem)]", "overflow-y-auto");
+    expect(within(pricingDialog).getByRole("button", { name: "Add this to my cart" }).parentElement).toHaveClass("grid-cols-1");
     expect(screen.getByRole("button", { name: "Continue to checkout" })).toHaveAttribute("href", "/cart");
     expect(screen.getByText("Party Light PAR Can")).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem("peppermint-audio-cart") ?? "[]")).toEqual(

@@ -32,6 +32,7 @@ describe("bookingSchema", () => {
   });
 
   it("rejects dates before today and drop-off dates before pickup", () => {
+    expect(bookingSchema.safeParse({ ...validBooking, pickupDate: "2099-02-30", dropoffDate: "2099-03-02" }).success).toBe(false);
     expect(bookingSchema.safeParse({ ...validBooking, pickupDate: "2000-01-01" }).success).toBe(false);
     expect(bookingSchema.safeParse({ ...validBooking, dropoffDate: "2099-09-30" }).success).toBe(false);
     expect(bookingSchema.safeParse({ ...validBooking, pickupTime: "25:00" }).success).toBe(false);

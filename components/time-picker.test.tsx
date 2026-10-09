@@ -20,6 +20,21 @@ function ControlledTimePicker({ onChange }: { onChange: (value: string) => void 
 }
 
 describe("TimePicker", () => {
+  it("keeps a wide popup inside a narrow viewport", () => {
+    const viewport = vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(360);
+    render(<ControlledTimePicker onChange={vi.fn()} />);
+    const trigger = screen.getByRole("button", { name: "Pickup time" });
+    const bounds = vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue({
+      x: 64, y: 400, left: 64, right: 296, top: 400, bottom: 448, width: 232, height: 48,
+      toJSON: () => ({}),
+    });
+    fireEvent.click(trigger);
+    expect(screen.getByRole("dialog")).toHaveStyle({ left: "-56px", width: "344px" });
+    expect(screen.getByRole("button", { name: "AM" }).parentElement).toHaveClass("col-span-3", "sm:col-span-1");
+    bounds.mockRestore();
+    viewport.mockRestore();
+  });
+
   it("sets a time with the segmented controls", () => {
     const onChange = vi.fn();
     render(<ControlledTimePicker onChange={onChange} />);

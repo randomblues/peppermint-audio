@@ -18,6 +18,7 @@ vi.mock("@/lib/invoice-service", () => ({ sendInvoiceEmail: mocks.sendInvoiceEma
 import { POST as createCheckout } from "./create-checkout/route";
 import { POST as createBankTransfer } from "./bank-transfer/route";
 import { POST as updateBooking } from "./update-booking/route";
+import { catalogLineItemFromKey } from "@/lib/booking-line-items";
 
 const hireLineItems = [{
   id: "custom:test-hire",
@@ -50,6 +51,34 @@ function adminSession(readData: Record<string, unknown>) {
 }
 
 describe("admin payment routes", () => {
+  it.each(["stripe", "bank", "cash", "update"])("uses multi-night catalogue totals for %s without discounting the deposit", async (method) => {
+    const { session, update } = adminSession({
+      id: "booking-1", email: "alex@example.com", first_name: "Alex", last_name: "Smith",
+      status: "submitted", pickup_date: "2026-10-09", dropoff_date: "2026-10-12",
+      hire_line_items: [catalogLineItemFromKey("package:standard-party-events")],
+      payment_method: null, hire_payment_status: "unpaid", deposit_payment_status: "not_required",
+    });
+    mocks.requireAdmin.mockResolvedValue(session);
+    const body = { bookingId: "booking-1", securityDepositAmount: "100" };
+    const response = method === "stripe"
+      ? await createCheckout(request("/api/admin/payments/create-checkout", body))
+      : method === "update"
+        ? await updateBooking(request("/api/admin/payments/update-booking", {
+          ...body, hireLineItems: [catalogLineItemFromKey("package:standard-party-events")], paymentMethod: "cash_on_pickup",
+        }))
+        : await createBankTransfer(request("/api/admin/payments/bank-transfer", {
+          ...body, ...(method === "cash" ? { paymentMethod: "cash_on_pickup" } : {}),
+        }));
+    expect(response.status).toBe(200);
+    expect(update.update).toHaveBeenCalledWith(expect.objectContaining({
+      hire_amount_cents: 32000, security_deposit_cents: 10000,
+    }));
+    if (method === "stripe") {
+      expect(mocks.paymentIntentCreate).toHaveBeenNthCalledWith(1, expect.objectContaining({ amount: 32000 }));
+      expect(mocks.paymentIntentCreate).toHaveBeenNthCalledWith(2, expect.objectContaining({ amount: 10000 }));
+    }
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_key");

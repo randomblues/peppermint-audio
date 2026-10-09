@@ -122,6 +122,26 @@ describe("admin booking routes", () => {
     expect((await patchBooking(jsonRequest("/api/admin/bookings", { id: "b1" }))).status).toBe(500);
   });
 
+  it("recalculates saved hire items using the booking nights", async () => {
+    const read = {
+      select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: {
+        pickup_date: "2026-10-20", dropoff_date: "2026-10-23",
+        payment_method: null, hire_payment_status: "unpaid", deposit_payment_status: "not_required",
+      }, error: null }),
+    };
+    const write = { update: vi.fn().mockReturnThis(), eq: vi.fn().mockResolvedValue({ error: null }) };
+    mocks.requireAdmin.mockResolvedValue(adminSession({ from: vi.fn().mockReturnValueOnce(read).mockReturnValueOnce(write) }));
+    const response = await patchBooking(jsonRequest("/api/admin/bookings", {
+      id: "pricing-test", hire_line_items: [{
+        id: "package:standard-party-events", kind: "package", catalogKey: "package:standard-party-events",
+        name: "Standard package", quantity: 2, unitPriceCents: 1,
+      }],
+    }));
+    expect(response.status).toBe(200);
+    expect(write.update).toHaveBeenCalledWith(expect.objectContaining({ hire_amount_cents: 64000 }));
+  });
+
   it("sends a confirmation email when an unconfirmed request is approved", async () => {
     const read = {
       select: vi.fn().mockReturnThis(),

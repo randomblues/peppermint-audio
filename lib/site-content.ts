@@ -1,3 +1,10 @@
+export const hirePricing = {
+  additionalNightRate: 0.5,
+  summary: "Standard rate for the first night. Every additional night half price.",
+  cartSummary: "Hiring for multiple nights? Every extra night is 50% off the standard nightly rate.",
+  details: "Applies to all packages and individual equipment. Nights are counted between pickup and return dates, with a one-night minimum for same-day hires. Pickup and return times are agreed separately.",
+};
+
 export type PackageTier = {
   slug: string;
   name: string;
@@ -465,6 +472,10 @@ export const howItWorks = [
 
 export const faqs = [
   {
+    question: "How does pricing work for multiple nights?",
+    answer: `${hirePricing.summary} ${hirePricing.details} Security deposits and separately quoted services are not included in this discount.`,
+  },
+  {
     question: "Why hire Peppermint Audio?",
     answer:
       "Most rental companies hand you a pair of speakers and leave you to work out the rest. We make it simple with complete, ready-to-go systems for your event. But hey, if two speakers is all you need, we've got your back too ;)",
@@ -472,7 +483,7 @@ export const faqs = [
   {
     question: "What packages are available?",
     answer:
-      "Our complete, ready-to-use packages include the Speech & Presentation Package with a portable Bose PA speaker and wireless microphone for up to 40 people at $65, the Small Budget Event Package for up to 60 people at $120, Budget With A Boom with a Behringer subwoofer for up to 60 people at $170, the Standard Party & Events Package for up to 120 people at $160, and the Big Celebration Package for up to 300 people at $240.",
+      `Our complete, ready-to-use packages include ${packageTiers.map((pkg) => `${pkg.name} for ${pkg.capacity} at $${pkg.price} per night`).join(", ")}. ${hirePricing.summary}`,
   },
   {
     question: "Which package is right for my event?",

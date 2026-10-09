@@ -15,7 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { EquipmentItem } from "@/lib/site-content";
+import { hirePricing, type EquipmentItem } from "@/lib/site-content";
 
 type EquipmentCardProps = {
   item: EquipmentItem;
@@ -81,11 +81,12 @@ export function EquipmentCard({ item, priority = false }: EquipmentCardProps) {
                 }`}
               >
                 <span className="font-medium">{option.label}</span>
-                <span className="shrink-0 font-semibold">${option.price}</span>
+                <span className="shrink-0 font-semibold">${option.price} / night</span>
               </button>
             );
           })}
         </div>
+        <p className="mt-3 text-sm text-muted-foreground">{hirePricing.summary}</p>
         <ul className="mt-5 space-y-2 text-sm text-muted-foreground">
           {item.details.map((detail) => (
             <li key={detail}>- {detail}</li>

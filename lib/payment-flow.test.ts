@@ -8,6 +8,9 @@ describe("payment flow helpers", () => {
     expect(rentalDays("2026-10-01", "2026-10-08")).toBe(7);
     expect(rentalDays("2026-10-01", "2026-10-09")).toBe(8);
     expect(rentalDays("2026-10-09", "2026-10-01")).toBeNull();
+    expect(rentalDays("2026-02-30", "2026-03-02")).toBeNull();
+    expect(rentalDays("2026-13-01", "2027-01-02")).toBeNull();
+    expect(rentalDays("2026-1-01", "2026-01-02")).toBeNull();
   });
 
   it("routes seven-day-or-shorter hires to Stripe and longer hires to bank transfer", () => {

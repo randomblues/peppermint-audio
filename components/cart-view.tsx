@@ -3,17 +3,28 @@
 import Link from "next/link";
 
 import { useCart } from "@/components/cart-provider";
+import { DatePicker } from "@/components/date-picker";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { lineItemsFromCart, lineItemsTotalCents } from "@/lib/booking-line-items";
+import { getMelbourneToday } from "@/lib/date-utils";
+import { formatAudCents, rentalDays } from "@/lib/payment-flow";
+import { hirePricing } from "@/lib/site-content";
 import { ArrowUpRight, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 export function CartView() {
-  const { items, total, removeItem, updateQuantity, clearCart } = useCart();
+  const { items, hireDates, setHireDates, removeItem, updateQuantity, clearCart } = useCart();
   const [isClearing, setIsClearing] = useState(false);
   const [removingItemId, setRemovingItemId] = useState<string | null>(null);
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const removeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const today = getMelbourneToday();
+  const nights = rentalDays(hireDates.pickupDate, hireDates.dropoffDate);
+  const datesValid = nights !== null && hireDates.pickupDate >= today;
+  const lineItems = lineItemsFromCart(JSON.stringify(items));
+  const itemsValid = lineItems.length === items.length;
 
   useEffect(() => () => {
     if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
@@ -71,7 +82,7 @@ export function CartView() {
               <div>
                 <p className="font-medium">{item.name}</p>
                 {item.option ? <p className="text-sm text-muted-foreground">{item.option}</p> : null}
-                <p className="mt-1 text-sm">${item.price} each</p>
+                <p className="mt-1 text-sm">${item.price} each / night</p>
               </div>
               <div className="flex items-center gap-2">
                 <div className="inline-flex h-10 items-center overflow-hidden rounded-xl border border-border bg-background shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
@@ -122,10 +133,42 @@ export function CartView() {
             <Trash2 aria-hidden="true" className="site-clear-cart-icon" />
             <span>{isClearing ? "Clearing cart" : "Clear cart"}</span>
           </Button>
-          <div className="site-cart-total flex items-center justify-between border-t pt-4">
-            <span className="text-sm font-medium text-muted-foreground">Estimated hire total</span>
-            <span className="text-2xl font-semibold tracking-tight">${total}</span>
+        </CardContent>
+      </Card>
+      <Card className="overflow-visible">
+        <CardHeader>
+          <CardTitle>Your hire dates</CardTitle>
+          <p className="text-sm text-muted-foreground">{hirePricing.cartSummary}</p>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="hire-start-date">Start date</Label>
+              <DatePicker
+                id="hire-start-date"
+                value={hireDates.pickupDate}
+                minDate={today}
+                rangeStart={hireDates.pickupDate}
+                rangeEnd={hireDates.dropoffDate}
+                onBlur={() => undefined}
+                onChange={(pickupDate) => setHireDates({ pickupDate, dropoffDate: "" })}
+                onRangeChange={(pickupDate, dropoffDate) => setHireDates({ pickupDate, dropoffDate })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="hire-end-date">End date</Label>
+              <DatePicker id="hire-end-date" value={hireDates.dropoffDate} minDate={hireDates.pickupDate > today ? hireDates.pickupDate : today} rangeStart={hireDates.pickupDate} rangeEnd={hireDates.dropoffDate} onBlur={() => undefined} onChange={(dropoffDate) => setHireDates({ ...hireDates, dropoffDate })} />
+            </div>
           </div>
+          <div className="site-cart-total flex flex-wrap items-center justify-between gap-3 border-t pt-4" aria-live="polite">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Hire total</p>
+              <p className="mt-1 text-xs text-muted-foreground">{datesValid ? `${nights} ${nights === 1 ? "night" : "nights"}${hireDates.pickupDate === hireDates.dropoffDate ? " · Same-day hire" : ""}` : "1-night rate"}</p>
+            </div>
+            <span className="text-2xl font-semibold tracking-tight">{formatAudCents(lineItemsTotalCents(lineItems, datesValid ? nights : 1))}</span>
+          </div>
+          {!itemsValid ? <p role="alert" className="text-sm text-destructive">Some selected items are no longer available. Remove them before continuing.</p> : null}
+          {hireDates.pickupDate && hireDates.pickupDate < today ? <p role="alert" className="text-sm text-destructive">Start date must be today or later.</p> : null}
         </CardContent>
       </Card>
       <Card className="site-cart-summary">
@@ -134,7 +177,11 @@ export function CartView() {
           <div>
             <p className="text-sm text-muted-foreground">Availability and final pricing are confirmed before your hire is accepted.</p>
           </div>
-          <Button className="w-full md:w-auto md:min-w-56" nativeButton={false} render={<Link href="/booking" />}>Submit a Booking Request</Button>
+          {datesValid && itemsValid ? (
+            <Button className="w-full md:w-auto md:min-w-56" nativeButton={false} render={<Link href="/booking" />}>Submit a Booking Request</Button>
+          ) : (
+            <Button className="w-full md:w-auto md:min-w-56" disabled>Submit a Booking Request</Button>
+          )}
         </CardContent>
       </Card>
     </div>

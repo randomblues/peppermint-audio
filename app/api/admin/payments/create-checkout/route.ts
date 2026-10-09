@@ -107,11 +107,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "This booking has already been paid or its deposit has been processed." }, { status: 409 });
   }
   const hireLineItems = lineItemsForBooking(result.data);
-  const hireAmountCents = lineItemsTotalCents(hireLineItems);
-  if (!hireAmountCents) return NextResponse.json({ error: "Add at least one priced hire item before creating a payment request." }, { status: 400 });
-
   const days = rentalDays(result.data.pickup_date, result.data.dropoff_date);
   if (days === null) return NextResponse.json({ error: "The booking dates are invalid." }, { status: 400 });
+  const hireAmountCents = lineItemsTotalCents(hireLineItems, days);
+  if (!hireAmountCents) return NextResponse.json({ error: "Add at least one priced hire item before creating a payment request." }, { status: 400 });
   if (days > MAX_STRIPE_HIRE_DAYS) {
     return NextResponse.json({ error: `Stripe card authorisations are limited to hires of ${MAX_STRIPE_HIRE_DAYS} days or less. Use bank transfer for this booking.` }, { status: 400 });
   }

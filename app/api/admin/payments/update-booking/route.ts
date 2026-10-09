@@ -114,15 +114,17 @@ export async function POST(request: Request) {
   const parsedLineItems = parseBookingLineItems(body.hireLineItems);
   if ("error" in parsedLineItems) return NextResponse.json({ error: parsedLineItems.error }, { status: 400 });
   const hireLineItems: BookingLineItem[] = parsedLineItems.items;
-  const hireAmountCents = lineItemsTotalCents(hireLineItems);
   const securityDepositCents = body.securityDepositAmount === undefined ? null : parseAmountCents(body.securityDepositAmount);
-  if (!hireAmountCents || (securityDepositCents !== null && securityDepositCents < 0)) {
+  if (!lineItemsTotalCents(hireLineItems) || (securityDepositCents !== null && securityDepositCents < 0)) {
     return NextResponse.json({ error: "Add at least one priced hire item and enter a valid security deposit amount." }, { status: 400 });
   }
 
   const existing = await session.admin.from("bookings").select("*").eq("id", bookingId).single();
   if (existing.error) return NextResponse.json({ error: existing.error.message }, { status: 500 });
   if (!existing.data) return NextResponse.json({ error: "Booking could not be found." }, { status: 404 });
+  const nights = rentalDays(existing.data.pickup_date, existing.data.dropoff_date);
+  if (nights === null) return NextResponse.json({ error: "The booking dates are invalid." }, { status: 400 });
+  const hireAmountCents = lineItemsTotalCents(hireLineItems, nights);
   if (!["submitted", "confirmed"].includes(existing.data.status)) return NextResponse.json({ error: "Only submitted or confirmed bookings can be updated." }, { status: 400 });
   if (paymentIsSettled(existing.data)) {
     return NextResponse.json({ error: "This booking has been paid or its deposit has been processed. Create a separate booking for additional items." }, { status: 409 });

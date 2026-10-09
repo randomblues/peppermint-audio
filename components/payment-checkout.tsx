@@ -6,8 +6,8 @@ import { loadStripe } from "@stripe/stripe-js";
 import { CheckCircle2, ChevronDown, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import type { BookingLineItem } from "@/lib/booking-line-items";
-import { formatAudCents } from "@/lib/payment-flow";
+import { lineItemHireTotalCents, type BookingLineItem } from "@/lib/booking-line-items";
+import { formatAudCents, rentalDays } from "@/lib/payment-flow";
 import { business } from "@/lib/site-content";
 
 function StripeTrustMark() {
@@ -37,6 +37,7 @@ type PaymentData = {
 };
 
 function HireSummary({ data }: { data: PaymentData }) {
+  const nights = rentalDays(data.pickupDate, data.dropoffDate);
   const itemCount = data.hireLineItems.reduce((total, item) => total + item.quantity, 0);
   const totalDueCents = data.hireAmountCents + data.securityDepositCents;
 
@@ -55,10 +56,11 @@ function HireSummary({ data }: { data: PaymentData }) {
               <span className="font-medium">{item.quantity} × {item.name}</span>
               {item.option ? <span className="block text-xs text-muted-foreground">{item.option}</span> : null}
             </span>
-            <span className="shrink-0 font-medium">{formatAudCents(item.unitPriceCents * item.quantity)}</span>
+            <span className="shrink-0 font-medium">{nights === null ? "Invalid dates" : formatAudCents(lineItemHireTotalCents(item, nights))}</span>
           </div>
         ))}
       </div>
+      <p className="mt-3 text-xs text-muted-foreground">{nights === null ? "Please contact us to check your hire dates." : `${nights} ${nights === 1 ? "night" : "nights"} · Standard first-night rate, additional nights half price.`}</p>
       <div className="mt-4 space-y-2 border-t pt-4 text-sm">
         <div className="flex items-center justify-between gap-4">
           <span className="text-muted-foreground">Hire subtotal</span>

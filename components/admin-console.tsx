@@ -15,8 +15,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { bookingStatuses, filterBookings, isUpcoming, statusCounts } from "@/lib/admin-dashboard";
 import { buildBookingConfirmationEmail } from "@/lib/booking-confirmation-email";
 import { bookingReferenceForId } from "@/lib/booking-reference";
-import { lineItemsForBooking } from "@/lib/booking-line-items";
-import { formatAudCents } from "@/lib/payment-flow";
+import { lineItemHireTotalCents, lineItemsForBooking, lineItemsTotalCents } from "@/lib/booking-line-items";
+import { formatAudCents, rentalDays } from "@/lib/payment-flow";
 import { buildPickupReminderEmail } from "@/lib/pickup-reminders";
 import { calculateMedicareLevy, calculateResidentIncomeTax, type IncomeTaxYear } from "@/lib/income-tax";
 import type { BankTransferOption } from "@/lib/bank-transfer";
@@ -302,15 +302,16 @@ export function AdminConsole() {
 
 function SavedHireItems({ booking }: { booking: Booking }) {
   const items = lineItemsForBooking(booking);
+  const nights = rentalDays(booking.pickup_date, booking.dropoff_date ?? booking.pickup_date);
   return <section aria-labelledby="saved-hire-items-title" className="rounded-xl border p-4">
     <div>
       <h3 id="saved-hire-items-title" className="text-sm font-semibold">Hire items</h3>
-      <p className="mt-1 text-xs text-muted-foreground">Current items saved to this booking.</p>
+      <p className="mt-1 text-xs text-muted-foreground">Current items saved to this booking. {nights === null ? "Invalid hire dates." : `${nights} ${nights === 1 ? "night" : "nights"}.`}</p>
     </div>
-    {items.length ? <div className="mt-3 divide-y rounded-lg border">{items.map((item) => <div key={item.id} className="flex items-start justify-between gap-3 p-3 text-sm"><div className="min-w-0"><p className="break-words font-medium">{item.name}</p>{item.option ? <p className="text-xs text-muted-foreground">{item.option}</p> : null}<p className="text-xs text-muted-foreground">Quantity: {item.quantity} · {formatAudCents(item.unitPriceCents)} each</p></div><p className="shrink-0 font-medium">{formatAudCents(item.unitPriceCents * item.quantity)}</p></div>)}</div> : <p className="mt-3 rounded-lg bg-muted p-3 text-sm text-muted-foreground">No saved hire items.</p>}
+    {items.length ? <div className="mt-3 divide-y rounded-lg border">{items.map((item) => <div key={item.id} className="flex items-start justify-between gap-3 p-3 text-sm"><div className="min-w-0"><p className="break-words font-medium">{item.name}</p>{item.option ? <p className="text-xs text-muted-foreground">{item.option}</p> : null}<p className="text-xs text-muted-foreground">Quantity: {item.quantity} · {formatAudCents(item.unitPriceCents)} each{item.kind === "custom" ? " (flat charge)" : " / night"}</p></div><p className="shrink-0 font-medium">{nights === null ? "Invalid dates" : formatAudCents(lineItemHireTotalCents(item, nights))}</p></div>)}</div> : <p className="mt-3 rounded-lg bg-muted p-3 text-sm text-muted-foreground">No saved hire items.</p>}
     <div className="mt-3 flex items-center justify-end gap-3 border-t pt-3">
       <span className="text-sm text-muted-foreground">Total</span>
-      <p aria-label="Hire items total" className="text-sm font-semibold">{formatAudCents(items.reduce((total, item) => total + item.unitPriceCents * item.quantity, 0))}</p>
+      <p aria-label="Hire items total" className="text-sm font-semibold">{nights === null ? "Invalid dates" : formatAudCents(lineItemsTotalCents(items, nights))}</p>
     </div>
   </section>;
 }

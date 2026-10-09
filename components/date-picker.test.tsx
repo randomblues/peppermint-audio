@@ -3,6 +3,64 @@ import { describe, expect, it, vi } from "vitest";
 import { DatePicker } from "./date-picker";
 
 describe("DatePicker", () => {
+  it("keeps the range calendar open, previews the end, and completes across months", () => {
+    const onChange = vi.fn();
+    const onRangeChange = vi.fn();
+    const onBlur = vi.fn();
+    render(<DatePicker id="start" value="2026-10-15" onChange={onChange} onRangeChange={onRangeChange} onBlur={onBlur} />);
+    fireEvent.click(screen.getByRole("button", { name: "15 October 2026" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Select your start date, then your end date");
+    fireEvent.click(screen.getByRole("button", { name: "30/10/2026" }));
+    expect(onChange).toHaveBeenCalledWith("2026-10-30");
+    expect(onBlur).not.toHaveBeenCalled();
+    expect(screen.getByRole("status")).toHaveTextContent("Select your end date");
+    fireEvent.click(screen.getByRole("button", { name: "Next month" }));
+    fireEvent.mouseEnter(screen.getByRole("button", { name: "03/11/2026" }));
+    expect(screen.getByRole("button", { name: "02/11/2026" }).parentElement).toHaveAttribute("data-range-middle", "true");
+    fireEvent.click(screen.getByRole("button", { name: "03/11/2026" }));
+    expect(onRangeChange).toHaveBeenCalledWith("2026-10-30", "2026-11-03");
+    expect(onBlur).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("restarts the range for an earlier second date and supports same-day hire", () => {
+    const onChange = vi.fn();
+    const onRangeChange = vi.fn();
+    render(<DatePicker id="start" value="2026-10-15" minDate="2026-10-09" onChange={onChange} onRangeChange={onRangeChange} onBlur={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "15 October 2026" }));
+    expect(screen.getByRole("button", { name: "08/10/2026" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "20/10/2026" }));
+    fireEvent.click(screen.getByRole("button", { name: "18/10/2026" }));
+    expect(onChange).toHaveBeenLastCalledWith("2026-10-18");
+    expect(onRangeChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "18/10/2026" }));
+    expect(onRangeChange).toHaveBeenCalledWith("2026-10-18", "2026-10-18");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("resets partial range selection when dismissed outside or with Escape", () => {
+    const onRangeChange = vi.fn();
+    render(
+      <div>
+        <DatePicker id="start" value="2026-10-15" onChange={vi.fn()} onRangeChange={onRangeChange} onBlur={vi.fn()} />
+        <button>Outside</button>
+      </div>,
+    );
+    const trigger = screen.getByRole("button", { name: "15 October 2026" });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("button", { name: "20/10/2026" }));
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Outside" }));
+    fireEvent.click(trigger);
+    expect(screen.getByRole("status")).toHaveTextContent("Select your start date, then your end date");
+    fireEvent.click(screen.getByRole("button", { name: "22/10/2026" }));
+    expect(onRangeChange).not.toHaveBeenCalled();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    fireEvent.click(trigger);
+    expect(screen.getByRole("status")).toHaveTextContent("Select your start date, then your end date");
+  });
+
   it("opens, changes month, and returns the selected date", () => {
     const onChange = vi.fn();
     const onBlur = vi.fn();

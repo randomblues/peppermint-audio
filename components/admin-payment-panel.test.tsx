@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AdminPaymentPanel } from "./admin-payment-panel";
+import { catalogLineItemFromKey } from "@/lib/booking-line-items";
 
 const lineItems = [{
   id: "custom:test-hire",
@@ -28,6 +29,17 @@ afterEach(() => {
 });
 
 describe("AdminPaymentPanel", () => {
+  it("includes extra nights in catalogue pricing but not custom charges or deposits", () => {
+    render(<AdminPaymentPanel booking={booking({
+      dropoff_date: "2026-10-04",
+      hire_line_items: [catalogLineItemFromKey("equipment:bose-s1-pro:Single speaker")!, ...lineItems],
+    })} onChanged={vi.fn()} />);
+    expect(screen.getAllByText("$210.00")).toHaveLength(2);
+    expect(screen.getByText(/3 nights.*Every additional night half price/)).toBeInTheDocument();
+    expect(screen.getByText("$55.00 each / night")).toBeInTheDocument();
+    expect(screen.getByText("$100.00 each (flat charge)")).toBeInTheDocument();
+  });
+
   it("shows that a fresh booking has not received a payment request", () => {
     render(<AdminPaymentPanel booking={booking({ status: "submitted", hire_payment_status: "unpaid" })} onChanged={vi.fn()} />);
 
@@ -286,7 +298,7 @@ describe("AdminPaymentPanel", () => {
 
     expect(screen.getByText(/Hire total is calculated from these items/)).toBeInTheDocument();
     expect(screen.getByText("Total with deposit")).toBeInTheDocument();
-    expect(screen.getByText("$460.00")).toBeInTheDocument();
+    expect(screen.getByText("$540.00")).toBeInTheDocument();
     const hireTotal = screen.getByText("Calculated hire total");
     const saveButton = screen.getByRole("button", { name: "Save" });
     expect(saveButton).toBeInTheDocument();

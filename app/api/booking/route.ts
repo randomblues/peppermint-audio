@@ -5,7 +5,8 @@ import { emailDetailsTable, emailLayout, emailPanel } from "@/lib/email-template
 import { recordCustomerEmail } from "@/lib/email-log";
 import { createBookingCalendarEvent } from "@/lib/google-calendar";
 import { bookingReferenceForId } from "@/lib/booking-reference";
-import { parseBookingLineItems, summarizeBookingLineItems } from "@/lib/booking-line-items";
+import { bookingHireTotalCents, parseBookingLineItems, summarizeBookingLineItems } from "@/lib/booking-line-items";
+import { formatAudCents, rentalDays } from "@/lib/payment-flow";
 import { createAdminClient, PHOTO_ID_BUCKET } from "@/lib/supabase";
 import { bookingSchema } from "@/lib/validation/booking";
 
@@ -46,6 +47,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsedHireLineItems.error }, { status: 400 });
     }
     const hireLineItems = parsedHireLineItems.items;
+    const hireAmountCents = bookingHireTotalCents(hireLineItems, data.pickupDate, data.dropoffDate);
+    const nights = rentalDays(data.pickupDate, data.dropoffDate);
     const hireItemsSummary = summarizeBookingLineItems(hireLineItems);
     const additionalDetails = data.additionalDetails.trim();
     const admin = createAdminClient();
@@ -65,6 +68,7 @@ export async function POST(request: Request) {
         pickup_time: data.pickupTime, dropoff_time: data.dropoffTime,
         additional_details: additionalDetails,
         hire_line_items: hireLineItems,
+        hire_amount_cents: hireAmountCents,
         terms_accepted: data.termsAccepted === "accepted", photo_id_paths: objectPaths, status: "submitted",
         internal_email_sent: false, customer_email_sent: false,
       });
@@ -96,7 +100,7 @@ export async function POST(request: Request) {
       "New audio equipment booking", `Booking Reference: ${bookingReference}`, `Name: ${data.firstName} ${data.lastName}`, `Email: ${data.email}`, `Mobile: ${data.mobile}`,
       `Event type: ${data.eventType}`, `Event address: ${data.eventAddress}`,
       `Pickup: ${data.pickupDate} at ${data.pickupTime}`, `Drop-off: ${data.dropoffDate} at ${data.dropoffTime}`, "",
-      `Hire items: ${hireItemsSummary || "None specified"}`, "",
+      `Hire items: ${hireItemsSummary || "None specified"}`, `Hire duration: ${nights} night(s)`, `Estimated hire total: ${formatAudCents(hireAmountCents)}`, "",
       "Additional details:", data.additionalDetails || "None provided", "",
       "Terms: Customer confirmed they have read and agree to the PA Equipment Hire Terms & Conditions.",
       calendarEventLink ? `Google Calendar event: ${calendarEventLink}` : "",
@@ -120,6 +124,8 @@ export async function POST(request: Request) {
           { label: "Pickup", value: `${data.pickupDate} at ${data.pickupTime}` },
           { label: "Drop-off", value: `${data.dropoffDate} at ${data.dropoffTime}` },
           { label: "Hire items", value: hireItemsSummary || "None specified" },
+          { label: "Hire nights", value: String(nights) },
+          { label: "Estimated hire total", value: formatAudCents(hireAmountCents) },
         ]), "accent"),
       }),
       attachments: await Promise.all(files.map(async (file) => ({ filename: file.name, content: Buffer.from(await file.arrayBuffer()).toString("base64") }))),
@@ -135,6 +141,8 @@ export async function POST(request: Request) {
           { label: "Pickup", value: `${formatEmailDate(data.pickupDate)} at ${data.pickupTime}` },
           { label: "Drop-off", value: `${formatEmailDate(data.dropoffDate)} at ${data.dropoffTime}` },
           { label: "Hire items", value: hireItemsSummary || "None specified" },
+          { label: "Hire nights", value: String(nights) },
+          { label: "Estimated hire total", value: formatAudCents(hireAmountCents) },
         ],), "accent") + `<p style="margin:24px 0 0;color:#718078;font-size:14px;line-height:1.65">If any of these details need correcting, simply reply to this email and our team will help.</p>`,
       });
       const customerEmail = resend.emails.send({
@@ -144,6 +152,7 @@ export async function POST(request: Request) {
         `Event: ${data.eventType}`, `Event address: ${data.eventAddress}`, `Pickup: ${formatEmailDate(data.pickupDate)} at ${data.pickupTime}`,
         `Drop-off: ${formatEmailDate(data.dropoffDate)} at ${data.dropoffTime}`,
         `Hire items: ${hireItemsSummary || "None specified"}`,
+        `Hire nights: ${nights}`, `Estimated hire total: ${formatAudCents(hireAmountCents)}`,
         "", "We have received your booking request and photo ID. Your request is not confirmed yet; our team will review availability and be in touch shortly.", "",
         emailFooterText,
       ].join("\n"),

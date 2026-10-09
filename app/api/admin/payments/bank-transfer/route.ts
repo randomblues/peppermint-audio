@@ -45,10 +45,11 @@ export async function POST(request: Request) {
   if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 });
   if (!result.data) return NextResponse.json({ error: "Booking could not be found." }, { status: 404 });
   const hireLineItems = lineItemsForBooking(result.data);
-  const hireAmountCents = lineItemsTotalCents(hireLineItems);
+  const nights = rentalDays(result.data.pickup_date, result.data.dropoff_date);
+  if (nights === null) return NextResponse.json({ error: "The booking dates are invalid." }, { status: 400 });
+  const hireAmountCents = lineItemsTotalCents(hireLineItems, nights);
   if (!hireAmountCents) return NextResponse.json({ error: "Add at least one priced hire item before creating an invoice." }, { status: 400 });
   if (!["submitted", "confirmed"].includes(result.data.status)) return NextResponse.json({ error: "Only submitted or confirmed bookings can receive a payment request." }, { status: 400 });
-  if (rentalDays(result.data.pickup_date, result.data.dropoff_date) === null) return NextResponse.json({ error: "The booking dates are invalid." }, { status: 400 });
   if (result.data.payment_method === "stripe_card_hold") {
     return NextResponse.json({ error: "This booking is already configured for Stripe. Do not create a second payment method." }, { status: 409 });
   }

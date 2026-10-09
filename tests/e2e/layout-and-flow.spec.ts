@@ -50,15 +50,24 @@ test.describe("critical public flow functionality", () => {
         "peppermint-audio-cart",
         JSON.stringify([
           {
-            id: "package:test-package",
-            name: "Test Package",
+            id: "package:standard-party-events",
+            name: "Standard Party & Events Package",
             kind: "package",
-            price: 250,
+            price: 160,
             quantity: 1,
           },
         ]),
       );
       window.localStorage.removeItem("peppermint-audio-booking-draft");
+      const start = new Date();
+      start.setDate(start.getDate() + 14);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 3);
+      const dateValue = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+      window.localStorage.setItem("peppermint-audio-hire-dates", JSON.stringify({
+        pickupDate: dateValue(start),
+        dropoffDate: dateValue(end),
+      }));
     });
 
     await page.goto("/cart", { waitUntil: "domcontentloaded" });

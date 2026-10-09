@@ -23,14 +23,14 @@ describe("EquipmentDetail", () => {
       </CartProvider>,
     );
 
-    expect(screen.getByRole("radio", { name: "Pair (2 speakers) $95" })).toHaveAttribute(
+    expect(screen.getByRole("radio", { name: "Pair (2 speakers) $95 / night" })).toHaveAttribute(
       "aria-checked",
       "true",
     );
     expect(screen.getByText(/Power cables & Speaker stands included/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("radio", { name: "Single speaker $55" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Single speaker $55 / night" }));
 
-    expect(screen.getByRole("radio", { name: "Single speaker $55" })).toHaveAttribute(
+    expect(screen.getByRole("radio", { name: "Single speaker $55 / night" })).toHaveAttribute(
       "aria-checked",
       "true",
     );

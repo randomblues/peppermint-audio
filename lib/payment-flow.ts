@@ -11,9 +11,11 @@ export function canSwitchPendingBankTransfer(paymentMethod: string | null | unde
 }
 
 function dateValue(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return Number.NaN;
   const [year, month, day] = value.split("-").map(Number);
   if (!year || !month || !day) return Number.NaN;
-  return Date.UTC(year, month - 1, day);
+  const timestamp = Date.UTC(year, month - 1, day);
+  return new Date(timestamp).toISOString().slice(0, 10) === value ? timestamp : Number.NaN;
 }
 
 export function rentalDays(pickupDate: string, dropoffDate: string) {

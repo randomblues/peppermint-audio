@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminConsole } from "./admin-console";
+import { catalogLineItemFromKey } from "@/lib/booking-line-items";
 
 const { replace } = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -55,6 +56,18 @@ beforeEach(async () => {
 });
 
 describe("AdminConsole", () => {
+  it("shows full multi-night catalogue totals in saved hire details", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ bookings: [{
+      ...booking, dropoff_date: "2026-10-04",
+      hire_line_items: [catalogLineItemFromKey("equipment:bose-s1-pro:Single speaker")],
+    }] })));
+    render(<AdminConsole />);
+    fireEvent.click(await screen.findByText("Alex Smith"));
+    expect(screen.getByLabelText("Hire items total")).toHaveTextContent("$110.00");
+    expect(screen.getByText(/Current items saved to this booking.*3 nights/)).toBeInTheDocument();
+    expect(screen.getByText("Quantity: 1 · $55.00 each / night")).toBeInTheDocument();
+  });
+
   it("loads bookings and shows the loading state", async () => {
     let resolve!: (response: unknown) => void;
     const fetchMock = vi.fn(() => new Promise((resolvePromise) => { resolve = resolvePromise; }));

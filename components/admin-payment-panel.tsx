@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { BankTransferOption } from "@/lib/bank-transfer";
 import { catalogLineItemGroups, catalogLineItemOptions, customBookingLineItem, lineItemsForBooking, lineItemsTotalCents, type BookingLineItem } from "@/lib/booking-line-items";
+import { hirePricing } from "@/lib/site-content";
 import { formatAudCents, MAX_STRIPE_HIRE_DAYS, paymentMethodForRental, rentalDays, type PaymentMethod } from "@/lib/payment-flow";
 
 type PaymentBooking = {
@@ -80,7 +81,7 @@ export function AdminPaymentPanel({ booking, onChanged, collapsible = true }: { 
 
   const existingPaymentUrl = useMemo(() => paymentUrl || (booking.payment_token && typeof window !== "undefined" ? `${window.location.origin}/pay/${booking.payment_token}` : ""), [booking.payment_token, paymentUrl]);
   const showExistingPaymentLink = Boolean(existingPaymentUrl && selectedMethod === "stripe_card_hold" && (existingMethod === "stripe_card_hold" || paymentUrl));
-  const hireTotalCents = lineItemsTotalCents(lineItems);
+  const hireTotalCents = days === null ? 0 : lineItemsTotalCents(lineItems, days);
   const depositAmountCents = Number.isFinite(Number(depositAmount)) ? Math.max(0, Math.round(Number(depositAmount) * 100)) : 0;
   const totalWithDepositCents = hireTotalCents + depositAmountCents;
   const lineItemsChanged = JSON.stringify(lineItems) !== JSON.stringify(savedLineItems);
@@ -338,7 +339,7 @@ export function AdminPaymentPanel({ booking, onChanged, collapsible = true }: { 
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{item.name}</p>
                   {item.option ? <p className="text-xs text-muted-foreground">{item.option}</p> : null}
-                  <p className="text-xs text-muted-foreground">{formatAudCents(item.unitPriceCents)} each</p>
+                  <p className="text-xs text-muted-foreground">{formatAudCents(item.unitPriceCents)} each{item.kind === "custom" ? " (flat charge)" : " / night"}</p>
                 </div>
                 <div className="flex min-w-0 items-center justify-between gap-3 sm:contents">
                   <div className="flex items-center gap-1">
@@ -363,7 +364,7 @@ export function AdminPaymentPanel({ booking, onChanged, collapsible = true }: { 
                     <option value="">Add a package or product...</option>
                     {catalogLineItemGroups().map((group) => (
                       <optgroup key={group.label} label={group.label}>
-                        {group.options.map((option) => <option key={option.key} value={option.key}>{option.label} · {option.detail} · {formatAudCents(option.item.unitPriceCents)}</option>)}
+                        {group.options.map((option) => <option key={option.key} value={option.key}>{option.label} · {option.detail} · {formatAudCents(option.item.unitPriceCents)} / night</option>)}
                       </optgroup>
                     ))}
                   </select>
@@ -380,9 +381,10 @@ export function AdminPaymentPanel({ booking, onChanged, collapsible = true }: { 
         </section>
         <section aria-labelledby="payment-summary-title" className="space-y-3 rounded-lg border p-3">
           <h3 id="payment-summary-title" className="text-sm font-medium">Payment summary</h3>
+          <p className="text-xs text-muted-foreground">{days === null ? "The booking dates are invalid." : `${days} ${days === 1 ? "night" : "nights"}. ${hirePricing.summary}`} Custom items are flat charges.</p>
           <div className="flex items-center justify-between border-b pb-3">
             <span className="text-sm text-muted-foreground">Calculated hire total</span>
-            <span className="text-lg font-semibold">{formatAudCents(hireTotalCents)}</span>
+            <span className="text-lg font-semibold">{days === null ? "Invalid dates" : formatAudCents(hireTotalCents)}</span>
           </div>
           <label className="flex items-center justify-between gap-4 text-sm font-medium">
             <span>Security deposit (AUD)</span>

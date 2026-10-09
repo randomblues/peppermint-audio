@@ -276,6 +276,13 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Prevention:** Verify `innerWidth` at capture time. If screenshot helpers alter the viewport, use a CDP device-metrics override and direct `Page.captureScreenshot` on the same integrated-browser tab. Inspect the captured images as well as rendered bounds.
 - **Next action:** Use a dedicated QA tab, capture evidence at every required width, and wait for cart hydration and the actual end of the page before checking footer clearance.
 
+### 2026-10-09 — Raw patch arguments rejected by tool hook
+
+- **Symptom:** The browser-lock hook blocked calendar edits and the patch to repair the hook itself.
+- **Root cause:** The hook attempted to JSON-parse every string-valued tool argument, including raw `apply_patch` text.
+- **Prevention:** Parse tool arguments according to the tool's input format. Decode JSON-encoded parallel arguments for lock inspection, but preserve raw patch text and keep browser/terminal ownership checks intact.
+- **Next action:** Add regression coverage for raw patch arguments alongside existing JSON-encoded parallel payload tests before extending tool hooks.
+
 # Agent working rules
 
 These rules are mandatory. Safety, preservation of existing work, bounded execution, and truthful verification take priority over speed.

@@ -11,7 +11,7 @@ import { createPageMetadata } from "@/lib/seo";
 export const metadata = createPageMetadata({
   title: "Packages",
   description:
-    "Melbourne PA hire packages from $65 for parties, presentations, weddings, and live events. Ready-to-use audio systems with speakers, microphones, and cables.",
+    "Melbourne PA hire packages from $65 per night for parties, presentations, weddings, and live events. Additional nights half price.",
   path: "/packages",
 });
 
@@ -30,7 +30,7 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
       eyebrow="Pricing"
       title="Choose your complete PA package"
       headingAs="h1"
-      description="Melbourne PA hire packages from $65. Every package is ready to plug in and use. Weekend dates can fill quickly — send your event date and we&apos;ll check availability."
+      description="Melbourne PA hire packages from $65 per night. Additional nights half price. Every package is ready to plug in and use. Weekend dates can fill quickly — send your event date and we&apos;ll check availability."
     >
       <Tabs defaultValue={selectedPackage} className="w-full">
         <TabsList
@@ -51,7 +51,7 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
                   <span>{pkg.name}</span>
                 </span>
                 <span className="shrink-0 text-xs text-muted-foreground group-data-[active]:font-medium group-data-[active]:text-primary">
-                  {pkg.capacity} · ${pkg.price}
+                  {pkg.capacity} · ${pkg.price} / night
                 </span>
               </span>
             </TabsTrigger>

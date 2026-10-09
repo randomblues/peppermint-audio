@@ -1,16 +1,62 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { StrictMode } from "react";
 
 import { BookingForm } from "./booking-form";
 
-vi.mock("@/components/cart-provider", () => ({
-  useCart: () => ({
+const mockCart = vi.hoisted(() => ({
     items: [{ id: "equipment:bose-s1-pro:Single speaker", name: "Bose S1 Pro", kind: "equipment", price: 55, quantity: 1 }],
+    hireDates: { pickupDate: "2026-10-20", dropoffDate: "2026-10-23" },
     clearCart: vi.fn(),
-  }),
 }));
 
+vi.mock("@/components/cart-provider", () => ({ useCart: () => mockCart }));
+vi.mock("@/lib/date-utils", () => ({ getMelbourneToday: () => "2026-10-09" }));
+
 describe("BookingForm", () => {
+  beforeEach(() => {
+    mockCart.hireDates = { pickupDate: "2026-10-20", dropoffDate: "2026-10-23" };
+    mockCart.clearCart.mockClear();
+  });
+
+  it("restores contact details under Strict Mode and uses only cart dates", () => {
+    window.localStorage.setItem("peppermint-audio-booking-draft", JSON.stringify({
+      firstName: "Pricing", lastName: "Test", email: "pricing@example.com", mobile: "0400000000",
+      pickupDate: "2026-10-01", dropoffDate: "2026-10-02",
+    }));
+    render(<StrictMode><BookingForm /></StrictMode>);
+    expect(screen.getByLabelText("First name")).toHaveValue("Pricing");
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("Hire total · 3 nights")).toBeInTheDocument();
+    const draft = JSON.parse(window.localStorage.getItem("peppermint-audio-booking-draft")!);
+    expect(draft.firstName).toBe("Pricing");
+    expect(draft).not.toHaveProperty("pickupDate");
+    expect(draft).not.toHaveProperty("dropoffDate");
+  });
+
+  it("uses cart dates for totals and offers date changes only through the cart", () => {
+    window.localStorage.setItem("peppermint-audio-booking-draft", JSON.stringify({
+      firstName: "Alex", lastName: "Smith", email: "alex@example.com", mobile: "0412345678",
+      eventType: "Party", eventAddress: "1 Example Street", pickupDate: "2026-10-20",
+      dropoffDate: "2026-10-23", pickupTime: "10:00", dropoffTime: "12:00",
+    }));
+    const { rerender } = render(<BookingForm />);
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("Hire total · 3 nights")).toBeInTheDocument();
+    expect(screen.getByText("$110.00")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "23 October 2026" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Change dates" })).toHaveAttribute("href", "/cart");
+    expect(screen.getByText(/Pickup: 20 October 2026/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Pickup time/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Drop-off time/ })).toBeInTheDocument();
+    mockCart.hireDates.dropoffDate = "2026-10-21";
+    rerender(<BookingForm />);
+    expect(screen.getByText("Hire total · 1 night")).toBeInTheDocument();
+    expect(screen.getByText("$55.00")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("$55.00 each / night")).toBeInTheDocument();
+  });
+
   afterEach(() => {
     window.localStorage.clear();
   });
@@ -37,31 +83,12 @@ describe("BookingForm", () => {
     expect(screen.queryByText(/Bose S1 Pro PA Speaker/)).not.toBeInTheDocument();
   });
 
-  it("clears drop-off date and time when pickup date is moved later", () => {
-    window.localStorage.setItem(
-      "peppermint-audio-booking-draft",
-      JSON.stringify({
-        firstName: "Alex",
-        lastName: "Smith",
-        email: "alex@example.com",
-        mobile: "0412345678",
-        pickupDate: "2026-10-15",
-        dropoffDate: "2026-10-16",
-        dropoffTime: "14:00",
-      }),
-    );
-
+  it("sends direct visits without dates back to the cart", () => {
+    mockCart.hireDates = { pickupDate: "", dropoffDate: "" };
     render(<BookingForm />);
-    fireEvent.click(screen.getByRole("button", { name: "Next" }));
-
-    expect(screen.getByRole("button", { name: "16 October 2026" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Drop-off time/ })).toHaveTextContent("2:00 PM");
-
-    fireEvent.click(screen.getByRole("button", { name: "15 October 2026" }));
-    fireEvent.click(screen.getByRole("button", { name: "20/10/2026" }));
-
-    expect(screen.getByRole("button", { name: "Select a date" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Drop-off time/ })).toHaveTextContent("Choose a time");
+    expect(screen.getByText("Choose your hire dates")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Return to cart" })).toHaveAttribute("href", "/cart");
+    expect(screen.queryByLabelText("First name")).not.toBeInTheDocument();
   });
 
   it("does not show step 4 red validation messages before submit", () => {

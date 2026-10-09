@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import Link from "next/link";
 import { FileImage, Upload, X } from "lucide-react";
 
 import { useCart } from "@/components/cart-provider";
-import { DatePicker } from "@/components/date-picker";
 import { TimePicker } from "@/components/time-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,23 +13,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { bookingReferenceForId } from "@/lib/booking-reference";
-import { lineItemsFromCart, type BookingLineItem } from "@/lib/booking-line-items";
+import { lineItemHireTotalCents, lineItemsFromCart, lineItemsTotalCents, type BookingLineItem } from "@/lib/booking-line-items";
 import { getMelbourneToday } from "@/lib/date-utils";
 import { hireTerms } from "@/lib/site-content";
+import { formatAudCents, rentalDays } from "@/lib/payment-flow";
 import { bookingSchema, type BookingInputValues } from "@/lib/validation/booking";
 
 const draftKey = "peppermint-audio-booking-draft";
 const maxPhotoIdSize = 1.5 * 1024 * 1024;
 
-const initialValues: BookingInputValues = {
+const initialValues: Omit<BookingInputValues, "pickupDate" | "dropoffDate"> = {
   email: "",
   firstName: "",
   lastName: "",
   mobile: "",
   eventType: "",
   eventAddress: "",
-  pickupDate: "",
-  dropoffDate: "",
   pickupTime: "",
   dropoffTime: "",
   hireLineItems: "",
@@ -64,7 +62,7 @@ const stepFields: Array<Array<keyof BookingInputValues | "idFiles">> = [
   ["idFiles", "termsAccepted"],
 ];
 
-type FormState = BookingInputValues & { idFiles: File[] };
+type FormState = typeof initialValues & { idFiles: File[] };
 
 async function prepareFile(file: File) {
   if (file.size <= maxPhotoIdSize) return file;
@@ -98,8 +96,10 @@ function Field({
 }
 
 export function BookingForm() {
-  const { items, clearCart } = useCart();
-  const [values, setValues] = useState<FormState>({ ...initialValues, idFiles: [] });
+  const { items, hireDates, clearCart } = useCart();
+  const [formValues, setValues] = useState<FormState>({ ...initialValues, idFiles: [] });
+  const values = { ...formValues, ...hireDates };
+  const [draftLoaded, setDraftLoaded] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -112,31 +112,32 @@ export function BookingForm() {
 
   const cartJson = JSON.stringify(items);
   const lineItems: BookingLineItem[] = lineItemsFromCart(cartJson);
+  const nights = rentalDays(values.pickupDate, values.dropoffDate);
 
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(draftKey);
-      if (!saved) return;
-      const parsed = JSON.parse(saved) as Partial<BookingInputValues>;
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setValues((current) => ({ ...current, ...parsed, idFiles: [] }));
+      const parsed = saved ? JSON.parse(saved) as Partial<BookingInputValues> : {};
+      delete parsed.pickupDate;
+      delete parsed.dropoffDate;
+      startTransition(() => {
+        setValues((current) => ({ ...current, ...parsed, idFiles: [] }));
+        setDraftLoaded(true);
+      });
     } catch {
       window.localStorage.removeItem(draftKey);
+      startTransition(() => setDraftLoaded(true));
     }
   }, []);
 
   useEffect(() => {
-    const draft = Object.fromEntries(Object.entries(values).filter(([key]) => key !== "idFiles"));
+    if (!draftLoaded) return;
+    const draft = Object.fromEntries(Object.entries(formValues).filter(([key]) => key !== "idFiles"));
     window.localStorage.setItem(draftKey, JSON.stringify(draft));
-  }, [values]);
+  }, [draftLoaded, formValues]);
 
-  function update(name: keyof BookingInputValues, value: string) {
-    setValues((current) => {
-      if (name === "pickupDate" && current.dropoffDate && value && current.dropoffDate < value) {
-        return { ...current, pickupDate: value, dropoffDate: "", dropoffTime: "" };
-      }
-      return { ...current, [name]: value };
-    });
+  function update(name: keyof typeof initialValues, value: string) {
+    setValues((current) => ({ ...current, [name]: value }));
     if (name === "termsAccepted") {
       setTermsTouched(true);
     }
@@ -255,6 +256,18 @@ export function BookingForm() {
     );
   }
 
+  if (nights === null || values.pickupDate < getMelbourneToday()) {
+    return (
+      <Card className="mx-auto max-w-3xl">
+        <CardHeader><CardTitle>Choose your hire dates</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">Select your dates in the cart to see your hire total before continuing with your booking request.</p>
+          <Button nativeButton={false} render={<Link href="/cart" />}>Return to cart</Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="mx-auto max-w-4xl overflow-visible">
       <CardHeader>
@@ -291,24 +304,12 @@ export function BookingForm() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Event type" name="eventType" value={values.eventType} onChange={(value) => update("eventType", value)} error={errors.eventType} placeholder="Wedding, party, presentation..." />
                 <Field label="Event address" name="eventAddress" value={values.eventAddress} onChange={(value) => update("eventAddress", value)} error={errors.eventAddress} />
-                <div className="space-y-1.5">
-                  <Label>Pickup date</Label>
-                  <DatePicker id="pickup-date" value={values.pickupDate} onChange={(value) => update("pickupDate", value)} onBlur={() => undefined} minDate={getMelbourneToday()} invalid={Boolean(errors.pickupDate)} />
-                  {errors.pickupDate ? <p className="text-xs text-destructive">{errors.pickupDate}</p> : null}
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Drop-off date</Label>
-                  <DatePicker
-                    id="dropoff-date"
-                    value={values.dropoffDate}
-                    onChange={(value) => update("dropoffDate", value)}
-                    onBlur={() => undefined}
-                    minDate={values.pickupDate || getMelbourneToday()}
-                    invalid={Boolean(errors.dropoffDate)}
-                    rangeStart={values.pickupDate}
-                    rangeEnd={values.dropoffDate}
-                  />
-                  {errors.dropoffDate ? <p className="text-xs text-destructive">{errors.dropoffDate}</p> : null}
+                <div className="space-y-2 rounded-lg border p-3 sm:col-span-2">
+                  <p className="text-sm font-medium">Hire dates</p>
+                  <div className="flex flex-wrap justify-between gap-3 text-sm">
+                    <p>Pickup: {new Date(`${values.pickupDate}T12:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" })}<br />Drop-off: {new Date(`${values.dropoffDate}T12:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" })}</p>
+                    <Link href="/cart" className="font-medium underline">Change dates</Link>
+                  </div>
                 </div>
                 <TimePicker id="pickup-time" label="Pickup time" value={values.pickupTime} onChange={(value) => update("pickupTime", value)} error={errors.pickupTime} />
                 <TimePicker id="dropoff-time" label="Drop-off time" value={values.dropoffTime} onChange={(value) => update("dropoffTime", value)} error={errors.dropoffTime} />
@@ -321,7 +322,7 @@ export function BookingForm() {
                   <h3 className="text-base font-semibold">Selected hire items</h3>
                   {lineItems.length ? (
                     <ul className="divide-y rounded-lg border">
-                      {lineItems.map((item) => <li key={item.id} className="flex justify-between gap-4 px-4 py-3 text-sm"><span>{item.quantity} × {item.name}{item.option ? <span className="block text-muted-foreground">{item.option}</span> : null}</span><span className="shrink-0 font-medium">${((item.unitPriceCents * item.quantity) / 100).toFixed(2)}</span></li>)}
+                      {lineItems.map((item) => <li key={item.id} className="flex justify-between gap-4 px-4 py-3 text-sm"><span>{item.quantity} × {item.name}{item.option ? <span className="block text-muted-foreground">{item.option}</span> : null}<span className="block text-xs text-muted-foreground">{formatAudCents(item.unitPriceCents)} each / night</span></span><span className="shrink-0 font-medium">{formatAudCents(lineItemHireTotalCents(item, nights))}</span></li>)}
                     </ul>
                   ) : (
                     <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">Your cart is empty. <Link href="/equipment" className="font-medium underline">Browse equipment</Link> before submitting.</p>
@@ -335,6 +336,16 @@ export function BookingForm() {
                   <Textarea id="additionalDetails" value={values.additionalDetails} onChange={(event) => update("additionalDetails", event.target.value)} placeholder="Venue access, setup notes, or special requirements..." className="min-h-28" />
                   {errors.additionalDetails ? <p className="text-xs text-destructive">{errors.additionalDetails}</p> : null}
                 </div>
+              </div>
+            ) : null}
+
+            {lineItems.length && currentStep > 0 ? (
+              <div className="space-y-2 rounded-lg border bg-muted/30 p-4" aria-live="polite">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-sm">Hire total · {nights} {nights === 1 ? "night" : "nights"}</span>
+                  <strong>{formatAudCents(lineItemsTotalCents(lineItems, nights))}</strong>
+                </div>
+                <p className="text-xs text-muted-foreground">Availability, final pricing and any security deposit are confirmed separately.</p>
               </div>
             ) : null}
 

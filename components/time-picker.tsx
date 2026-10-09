@@ -47,6 +47,7 @@ function formatTime(value: string) {
 
 export function TimePicker({ id, label, value, onChange, error }: TimePickerProps) {
   const [open, setOpen] = useState(false);
+  const [popupPosition, setPopupPosition] = useState({ left: 0, width: 0 });
   const [draft, setDraft] = useState(() => parseTime(value));
   const pickerRef = useRef<HTMLDivElement>(null);
 
@@ -96,9 +97,15 @@ export function TimePicker({ id, label, value, onChange, error }: TimePickerProp
           open && "border-primary/45 bg-background shadow-[0_0_0_1px_color-mix(in_oklab,var(--primary)_25%,transparent)]",
           error && "border-destructive ring-3 ring-destructive/20",
         )}
-        onClick={() => {
+        onClick={(event) => {
           if (!open) {
             setDraft(parseTime(value));
+            const bounds = event.currentTarget.getBoundingClientRect();
+            const width = Math.min(416, document.documentElement.clientWidth - 16);
+            setPopupPosition({
+              left: Math.max(8, bounds.right - width) - bounds.left,
+              width,
+            });
           }
           setOpen((current) => !current);
         }}
@@ -127,6 +134,7 @@ export function TimePicker({ id, label, value, onChange, error }: TimePickerProp
         <div
           role="dialog"
           aria-label={`Choose ${label.toLowerCase()}`}
+          style={popupPosition}
           className="absolute right-0 z-30 mt-2 w-[min(26rem,calc(100vw-1rem))] rounded-2xl border border-primary/20 bg-popover/96 p-4 text-popover-foreground shadow-[0_24px_48px_rgb(0_0_0/0.4)] backdrop-blur-xl [@media(pointer:coarse)]:hidden"
         >
           <div className="flex items-start justify-between gap-3">
@@ -154,7 +162,7 @@ export function TimePicker({ id, label, value, onChange, error }: TimePickerProp
           </div>
 
           <div className="mt-4 rounded-xl border border-border/80 bg-background/55 p-3">
-            <div className="grid grid-cols-[1fr_auto_1fr_auto] items-end gap-2">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2 sm:grid-cols-[1fr_auto_1fr_auto]">
             <label className="space-y-1 text-xs font-medium text-muted-foreground">
               Hour
                 <span className="relative block">
@@ -184,14 +192,14 @@ export function TimePicker({ id, label, value, onChange, error }: TimePickerProp
                   <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 </span>
             </label>
-            <div className="flex h-12 overflow-hidden rounded-xl border border-border/90 bg-background/60 p-0.5">
+            <div className="col-span-3 flex h-12 overflow-hidden rounded-xl border border-border/90 bg-background/60 p-0.5 sm:col-span-1">
               {(["AM", "PM"] as const).map((meridiem) => (
                 <button
                   key={meridiem}
                   type="button"
                   aria-pressed={draft.meridiem === meridiem}
                   className={cn(
-                    "w-14 rounded-[0.625rem] text-sm font-semibold tracking-wide text-muted-foreground transition-colors hover:bg-muted",
+                    "w-14 flex-1 rounded-[0.625rem] text-sm font-semibold tracking-wide text-muted-foreground transition-colors hover:bg-muted sm:flex-none",
                     draft.meridiem === meridiem && "bg-primary text-primary-foreground shadow-[0_8px_20px_color-mix(in_oklab,var(--primary)_35%,transparent)] hover:bg-primary/90",
                   )}
                   onClick={() => updateDraft({ meridiem })}

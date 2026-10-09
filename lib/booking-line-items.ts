@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-import { addOnCatalog, equipmentCatalog, packageTiers } from "@/lib/site-content";
+import { addOnCatalog, equipmentCatalog, hirePricing, packageTiers } from "@/lib/site-content";
+import { rentalDays } from "@/lib/payment-flow";
 
 export const bookingLineItemSchema = z.object({
   id: z.string().min(1).max(180),
@@ -107,8 +108,20 @@ export function customBookingLineItem(name: string, unitPriceCents: number, id =
   };
 }
 
-export function lineItemsTotalCents(items: BookingLineItem[]) {
-  return items.reduce((total, item) => total + item.unitPriceCents * item.quantity, 0);
+export function lineItemHireTotalCents(item: BookingLineItem, nights = 1) {
+  if (!Number.isSafeInteger(nights) || nights < 1) throw new Error("Hire duration must be at least one whole night.");
+  const multiplier = item.kind === "custom" ? 1 : 1 + hirePricing.additionalNightRate * (nights - 1);
+  return Math.round(item.unitPriceCents * multiplier) * item.quantity;
+}
+
+export function lineItemsTotalCents(items: BookingLineItem[], nights = 1) {
+  return items.reduce((total, item) => total + lineItemHireTotalCents(item, nights), 0);
+}
+
+export function bookingHireTotalCents(items: BookingLineItem[], pickupDate: string, dropoffDate: string) {
+  const nights = rentalDays(pickupDate, dropoffDate);
+  if (nights === null) throw new Error("The booking dates are invalid.");
+  return lineItemsTotalCents(items, nights);
 }
 
 export function formatBookingLineItem(item: BookingLineItem) {

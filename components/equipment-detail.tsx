@@ -5,7 +5,7 @@ import { ShoppingCart } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { EquipmentItem } from "@/lib/site-content";
+import { hirePricing, type EquipmentItem } from "@/lib/site-content";
 import { useCart } from "@/components/cart-provider";
 
 type EquipmentDetailProps = {
@@ -36,18 +36,19 @@ export function EquipmentDetail({ item }: EquipmentDetailProps) {
                 role="radio"
                 aria-checked={selected}
                 onClick={() => setSelectedOption(option)}
-                className={`flex min-h-14 items-center justify-between rounded-xl border px-4 text-left transition-colors ${
+                className={`flex min-h-14 items-center justify-between gap-3 rounded-xl border px-4 text-left transition-colors ${
                   selected
                     ? "border-primary bg-primary/5 ring-1 ring-primary"
                     : "hover:border-primary/50"
                 }`}
               >
                 <span className="font-medium">{option.label}</span>
-                <span className="font-semibold">${option.price}</span>
+                <span className="shrink-0 font-semibold">${option.price} / night</span>
               </button>
             );
           })}
         </div>
+        <p className="mt-3 text-sm text-muted-foreground">{hirePricing.summary}</p>
         <ul className="mt-6 space-y-3 border-t pt-5 text-sm text-muted-foreground">
           {item.details.map((detail) => (
             <li key={detail}>- {detail}</li>

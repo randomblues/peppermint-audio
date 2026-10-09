@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getMelbourneToday } from "@/lib/date-utils";
+import { rentalDays } from "@/lib/payment-flow";
 
 export const bookingSchema = z.object({
   email: z.string().email("Please enter a valid email"),
@@ -31,6 +32,11 @@ export const bookingSchema = z.object({
     "Please confirm that you have read and agree to the terms",
   ),
 }).superRefine((values, context) => {
+  for (const field of ["pickupDate", "dropoffDate"] as const) {
+    if (rentalDays(values[field], values[field]) === null) {
+      context.addIssue({ code: "custom", path: [field], message: "Please select a valid date" });
+    }
+  }
   if (values.dropoffDate < values.pickupDate) {
     context.addIssue({
       code: "custom",

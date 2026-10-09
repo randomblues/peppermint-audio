@@ -15,6 +15,25 @@ vi.mock("@stripe/stripe-js", () => ({
 }));
 
 describe("PaymentCheckout", () => {
+  it("shows full-period item totals consistent with the multi-night payment amount", async () => {
+    vi.stubEnv("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", "pk_test_placeholder");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        customerName: "Pricing Test", email: "pricing@example.com", eventType: "Party",
+        pickupDate: "2026-10-09", dropoffDate: "2026-10-12",
+        hireLineItems: [{ id: "speaker", kind: "equipment", name: "Test speaker", quantity: 2, unitPriceCents: 5500 }],
+        hireAmountCents: 22000, securityDepositCents: 10000,
+        hirePaymentStatus: "paid", depositPaymentStatus: "authorized",
+        hireClientSecret: null, depositClientSecret: null,
+      }),
+    }));
+    render(<PaymentCheckout token="pricing-test" />);
+    expect(await screen.findByText(/3 nights.*additional nights half price/)).toBeInTheDocument();
+    expect(screen.getAllByText("$220.00")).toHaveLength(2);
+    expect(screen.getByText("$320.00")).toBeInTheDocument();
+  });
+
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
