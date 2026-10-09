@@ -286,6 +286,8 @@ export const hireTerms = [
   },
 ];
 
+const heroHeadingLines = ["Good sound.", "Less stress."];
+
 export const business = {
   name: "Peppermint Audio",
   abn: "44 506 480 694",
@@ -296,13 +298,29 @@ export const business = {
   phone: "0452 316 823",
   email: "contactus@peppermintaudio.com.au",
   googleReviewsUrl: "https://share.google/cZGs5Tv7JAHs5oQOi",
-  heroHeading: "Audio Rental for Melbourne Events",
+  heroHeading: heroHeadingLines.join(" "),
+  heroHeadingLines,
   heroSubheading:
-    "Reliable audio system packages with speakers, microphones, mixers, and cables for parties, weddings, small corporate events, live gigs, and private functions.",
-  heroImage: "/hero-mixer.jpg",
+    "Speakers and microphones for parties, weddings and live events. Choose a complete package or just the gear you need. We'll help you get set up.",
+  heroImage: "/home-live-sound.jpg",
   ctaImage:
     "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=1600&h=700&fit=crop",
 };
+
+export const homeHireSteps = [
+  {
+    title: "Find your sound.",
+    detail: "Pick a package or just the gear you need. Add it to your cart, choose your dates, and send us a booking request.",
+  },
+  {
+    title: "We'll sort the details.",
+    detail: "We'll check availability and get back to you about pricing, payment, and pickup. Your request isn't a confirmed hire just yet.",
+  },
+  {
+    title: "Plug in. Enjoy.",
+    detail: "Once your hire is confirmed, collect from Abbotsford. We'll walk you through the setup, then you're off. Return the gear at the agreed time.",
+  },
+];
 
 export const packageTiers: PackageTier[] = [
   {
@@ -470,64 +488,58 @@ export const howItWorks = [
   },
 ];
 
-export const faqs = [
+export const faqs: {
+  question: string;
+  answer: string;
+  links?: { label: string; href: string }[];
+}[] = [
   {
-    question: "How does pricing work for multiple nights?",
-    answer: `${hirePricing.summary} ${hirePricing.details} Security deposits and separately quoted services are not included in this discount.`,
+    question: "I just want to play Spotify and say a few words. Which package do I need?",
+    answer:
+      `Honestly, you can do both with every package! Connect your phone through AUX or Bluetooth, put on your playlist, and use the mic when you need it.\n\nIf speeches are the main thing, with some light music in the background, go for our ${packageTiers[0].name}. Want a fuller sound for a nice backyard party? The ${packageTiers[2].name} is a great fit.\n\nGot a bigger crowd and want wireless microphones, more bass, and room for y'all to have a boogie? Go for the ${packageTiers[4].name}.\n\nFor a smaller gathering, there's also the ${packageTiers[1].name}, or ${packageTiers[3].name} if you'd like extra bass without the bigger setup.`,
+    links: [{ label: "Have a look at the packages", href: "/packages" }],
   },
   {
-    question: "Why hire Peppermint Audio?",
+    question: "How early should I book?",
     answer:
-      "Most rental companies hand you a pair of speakers and leave you to work out the rest. We make it simple with complete, ready-to-go systems for your event. But hey, if two speakers is all you need, we've got your back too ;)",
+      "We take bookings anywhere from six months ahead to last-minute requests, subject to availability.\n\nWeekend slots often get booked out quickly, so the sooner you get in, the better! If your event is coming up soon, still reach out and we'll see what we can do.",
   },
   {
-    question: "What packages are available?",
+    question: "I have absolutely NO technical experience. Can I set this up myself?",
     answer:
-      `Our complete, ready-to-use packages include ${packageTiers.map((pkg) => `${pkg.name} for ${pkg.capacity} at $${pkg.price} per night`).join(", ")}. ${hirePricing.summary}`,
+      "Yes, absolutely! You don't need to be a sound engineer to use these speakers.\n\nWe'll give you a simple walkthrough when you collect the gear, and you can always call us later if you need a hand. We barely get any setup calls because most people get it right themselves!\n\nGive yourself a few hours before the event to set up and try everything out. That way you're not worrying about it at the last minute, and you can have a sound experience (no pun intended).",
+    links: [{ label: "Take a look at the setup guide", href: "/get-started" }],
   },
   {
-    question: "Which package is right for my event?",
+    question: "I've got a very specific requirement though. Can you help?",
     answer:
-      "Choose based on your guest count and event type. Speech & Presentation is best for smaller speeches and presentations when you need a wireless microphone. Small Budget Event is suited to small parties and presentations with a mixer and wired microphone. Budget With A Boom is for smaller parties that want extra bass. Standard Party & Events is the all-rounder for parties and private functions. Big Celebration is for weddings and larger events. Individual equipment is available when you only need specific items.",
+      "Maybe Joe mama's neighbour's third kid has been learning the clarinet and wants to play one song at your event. Or you've got a super niche underground alien-tech instrument you want to plug into the speakers. Let us know what you're bringing and we'll help work out what you need!\n\nFor something small like a cable or an adapter, it's usually on the house, subject to what we have available. Check the add-ons for your package too, in case your requirement is already covered there.\n\nYou can also hire individual equipment, or combine it with a package in the same cart.",
+    links: [
+      { label: "Browse packages & add-ons", href: "/packages" },
+      { label: "Ask us about your setup", href: "/contact" },
+      { label: "Browse individual equipment", href: "/equipment" },
+    ],
   },
   {
-    question: "Can I hire individual equipment?",
+    question: "I just need a couple of speakers, not a whole package. Can I do that?",
     answer:
-      "Yes. Browse the individual equipment catalogue to hire specific speakers, microphones, mixers, DI boxes, lighting, and accessories without choosing a package.",
+      "Absolutely! Whether you're a DJ who already has the rest sorted, or you just need two speakers for your event, you don't have to hire a whole package.\n\nBefore you message us saying \"How much for just two speakers?\", have a quick browse of our individual equipment! The prices are all there, so you can pick what you need and add it straight to your cart.\n\nAnd if you're not sure which speakers to go for, or what you'll need to connect them, reach out. We've got you.",
+    links: [{ label: "Have a browse of the individual gear", href: "/equipment" }],
   },
   {
-    question: "Can I combine a package with individual equipment?",
-    answer:
-      "Yes. Add a package and any extra equipment you need to your cart, then submit one booking request for the complete selection.",
+    question: "What if I need the gear for more than one night?",
+    answer: `${hirePricing.summary}\n\n${hirePricing.details} Security deposits and separately quoted services are not included in this discount.`,
+    links: [{ label: "See your hire total in the cart", href: "/cart" }],
   },
   {
-    question: "What is included in every package?",
+    question: "Where do I pick up and return the gear? What about delivery?",
     answer:
-      "Every package is a complete setup rather than just a pair of speakers. Depending on the package, you get speakers, stands, microphones, a mixer, subwoofers, power cables, AUX or Bluetooth phone connection, extension leads, and XLR audio cables.",
+      `Pickup and return are in ${business.pickupSuburb} ${business.pickupPostcode}. We'll agree on the times with you when your booking is confirmed.\n\nOur standard service is pickup. If you need delivery or hands-on setup, mention it in your enquiry and we'll let you know what's possible for your event.`,
   },
   {
-    question: "Do I need sound or event experience?",
+    question: "I'm ready. How do I book?",
     answer:
-      "No. The packages are designed to be simple and plug-and-play.",
-  },
-  {
-    question: "Can I connect my phone or music device?",
-    answer:
-      "Yes. Each package includes an AUX or Bluetooth connection for playing audio from a phone or other compatible device.",
-  },
-  {
-    question: "Where do I collect the equipment?",
-    answer:
-      "Equipment is collected from Abbotsford 3067. We confirm the exact pickup and return window when your booking is confirmed.",
-  },
-  {
-    question: "Do you deliver or set everything up for me?",
-    answer:
-      "The standard service is pickup from Abbotsford. If you need delivery or hands-on setup, mention it in your enquiry and we can confirm what is possible for your event.",
-  },
-  {
-    question: "How do I book a package?",
-    answer:
-      "Choose a package, add any individual equipment you need, and continue to booking from your cart. Submit your event date, guest count, and details, and we will review availability before confirming the request and pickup arrangements with you.",
+      "Add your package and any extra equipment to the cart, choose your hire dates, and continue to the booking request.\n\nSend us your event details and we'll get back to you about availability, final pricing, payment, and pickup arrangements. Sending the request doesn't confirm the hire just yet.",
+    links: [{ label: "Browse packages", href: "/packages" }],
   },
 ];
