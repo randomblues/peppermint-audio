@@ -44,6 +44,8 @@ describe("BookingForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByText("Hire total · 3 nights")).toBeInTheDocument();
     expect(screen.getByText("$110.00")).toBeInTheDocument();
+    expect(screen.getByText("$165.00").tagName).toBe("S");
+    expect(screen.getByText("You save $55.00")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "23 October 2026" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Change dates" })).toHaveAttribute("href", "/cart");
     expect(screen.getByText(/Pickup: 20 October 2026/)).toBeInTheDocument();
@@ -53,6 +55,7 @@ describe("BookingForm", () => {
     rerender(<BookingForm />);
     expect(screen.getByText("Hire total · 1 night")).toBeInTheDocument();
     expect(screen.getByText("$55.00")).toBeInTheDocument();
+    expect(screen.queryByText(/You save/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByText("$55.00 each / night")).toBeInTheDocument();
   });

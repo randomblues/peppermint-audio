@@ -35,6 +35,8 @@ describe("CartView", () => {
     expect(screen.getByText("Hire total")).toBeInTheDocument();
     expect(screen.getByText("$55 each / night")).toBeInTheDocument();
     expect(screen.getByText("$110.00")).toBeInTheDocument();
+    expect(screen.getByText("$165.00").tagName).toBe("S");
+    expect(screen.getByText("You save $55.00")).toBeInTheDocument();
     expect(screen.getByText(/Every extra night is 50% off/)).toBeInTheDocument();
     expect(screen.getByText("Your hire dates").closest('[data-slot="card"]')).toHaveClass("overflow-visible");
     expect(screen.getByRole("button", { name: "Submit a Booking Request" })).toHaveAttribute("href", "/booking");
@@ -54,6 +56,7 @@ describe("CartView", () => {
     const { rerender } = render(<CartView />);
     expect(screen.getByText("$55.00")).toBeInTheDocument();
     expect(screen.getByText("1-night rate")).toBeInTheDocument();
+    expect(screen.queryByText(/You save/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Submit a Booking Request" })).toBeDisabled();
     mockCart.hireDates = { pickupDate: "2026-10-01", dropoffDate: "2026-10-03" };
     rerender(<CartView />);
@@ -73,6 +76,7 @@ describe("CartView", () => {
     rerender(<CartView />);
     expect(screen.getByText("1 night · Same-day hire")).toBeInTheDocument();
     expect(screen.getByText("$110.00")).toBeInTheDocument();
+    expect(screen.queryByText(/You save/)).not.toBeInTheDocument();
   });
 
   it("clears an earlier end date when the start date moves later", () => {
@@ -114,6 +118,7 @@ describe("CartView", () => {
     mockCart.items[0].id = "equipment:removed";
     render(<CartView />);
     expect(screen.getByRole("alert")).toHaveTextContent("Some selected items are no longer available");
+    expect(screen.queryByText(/You save/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Submit a Booking Request" })).toBeDisabled();
   });
 

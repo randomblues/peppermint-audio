@@ -5,6 +5,7 @@ import Link from "next/link";
 import { FileImage, Upload, X } from "lucide-react";
 
 import { useCart } from "@/components/cart-provider";
+import { HirePriceSummary } from "@/components/hire-price-summary";
 import { TimePicker } from "@/components/time-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { bookingReferenceForId } from "@/lib/booking-reference";
-import { lineItemHireTotalCents, lineItemsFromCart, lineItemsTotalCents, type BookingLineItem } from "@/lib/booking-line-items";
+import { lineItemHireTotalCents, lineItemsFromCart, type BookingLineItem } from "@/lib/booking-line-items";
 import { getMelbourneToday } from "@/lib/date-utils";
 import { hireTerms } from "@/lib/site-content";
 import { formatAudCents, rentalDays } from "@/lib/payment-flow";
@@ -341,10 +342,7 @@ export function BookingForm() {
 
             {lineItems.length && currentStep > 0 ? (
               <div className="space-y-2 rounded-lg border bg-muted/30 p-4" aria-live="polite">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-sm">Hire total · {nights} {nights === 1 ? "night" : "nights"}</span>
-                  <strong>{formatAudCents(lineItemsTotalCents(lineItems, nights))}</strong>
-                </div>
+                <HirePriceSummary items={lineItems} nights={nights} label={`Hire total · ${nights} ${nights === 1 ? "night" : "nights"}`} />
                 <p className="text-xs text-muted-foreground">Availability, final pricing and any security deposit are confirmed separately.</p>
               </div>
             ) : null}

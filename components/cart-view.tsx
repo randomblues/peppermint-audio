@@ -4,12 +4,13 @@ import Link from "next/link";
 
 import { useCart } from "@/components/cart-provider";
 import { DatePicker } from "@/components/date-picker";
+import { HirePriceSummary } from "@/components/hire-price-summary";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { lineItemsFromCart, lineItemsTotalCents } from "@/lib/booking-line-items";
+import { lineItemsFromCart } from "@/lib/booking-line-items";
 import { getMelbourneToday } from "@/lib/date-utils";
-import { formatAudCents, rentalDays } from "@/lib/payment-flow";
+import { rentalDays } from "@/lib/payment-flow";
 import { hirePricing } from "@/lib/site-content";
 import { ArrowUpRight, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -160,12 +161,12 @@ export function CartView() {
               <DatePicker id="hire-end-date" value={hireDates.dropoffDate} minDate={hireDates.pickupDate > today ? hireDates.pickupDate : today} rangeStart={hireDates.pickupDate} rangeEnd={hireDates.dropoffDate} onBlur={() => undefined} onChange={(dropoffDate) => setHireDates({ ...hireDates, dropoffDate })} />
             </div>
           </div>
-          <div className="site-cart-total flex flex-wrap items-center justify-between gap-3 border-t pt-4" aria-live="polite">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Hire total</p>
-              <p className="mt-1 text-xs text-muted-foreground">{datesValid ? `${nights} ${nights === 1 ? "night" : "nights"}${hireDates.pickupDate === hireDates.dropoffDate ? " · Same-day hire" : ""}` : "1-night rate"}</p>
-            </div>
-            <span className="text-2xl font-semibold tracking-tight">{formatAudCents(lineItemsTotalCents(lineItems, datesValid ? nights : 1))}</span>
+          <div className="site-cart-total border-t pt-4">
+            <HirePriceSummary
+              items={lineItems}
+              nights={datesValid && itemsValid ? nights : 1}
+              detail={datesValid ? `${nights} ${nights === 1 ? "night" : "nights"}${hireDates.pickupDate === hireDates.dropoffDate ? " · Same-day hire" : ""}` : "1-night rate"}
+            />
           </div>
           {!itemsValid ? <p role="alert" className="text-sm text-destructive">Some selected items are no longer available. Remove them before continuing.</p> : null}
           {hireDates.pickupDate && hireDates.pickupDate < today ? <p role="alert" className="text-sm text-destructive">Start date must be today or later.</p> : null}
