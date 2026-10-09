@@ -127,6 +127,8 @@ describe("Footer", () => {
     render(<Footer />);
 
     const footer = screen.getByRole("contentinfo");
+    expect(footer).toHaveClass("pb-[calc(3.5rem+env(safe-area-inset-bottom))]");
+    expect(footer).not.toHaveClass("md:pb-0");
     expect(within(footer).getByText("Pickup: Abbotsford 3067")).toBeInTheDocument();
     expect(within(footer).getByText("Servicing Melbourne")).toBeInTheDocument();
     expect(within(footer).getByText("Email: contactus@peppermintaudio.com.au")).toBeInTheDocument();
@@ -389,6 +391,49 @@ describe("WhatsAppButton", () => {
 
   describe("MobileContactBar", () => {
     beforeEach(() => usePathname.mockReset());
+
+    it("emphasises the mobile prompt while keeping the desktop treatment", () => {
+      usePathname.mockReturnValue("/cart");
+      render(<MobileContactBar />);
+
+      const availabilityButton = screen.getByRole("button", { name: "Check availability" });
+      expect(availabilityButton).toHaveClass(
+        "min-h-14",
+        "bg-background/95",
+        "text-foreground",
+        "border-primary/65",
+        "md:border-primary/45",
+      );
+      expect(within(availabilityButton).getByText("Check availability")).toHaveClass("text-sm");
+      expect(within(availabilityButton).getByText("We'll help you find the right setup")).toHaveClass(
+        "block",
+        "text-muted-foreground",
+      );
+    });
+
+    it("uses the desktop icon treatment and staggered pulse at every viewport", () => {
+      usePathname.mockReturnValue("/cart");
+      render(<MobileContactBar />);
+
+      const button = screen.getByRole("button", { name: "Check availability" });
+      const iconShell = button.querySelector(".availability-cta-icon-shell");
+      expect(iconShell).toHaveClass(
+        "size-9",
+        "bg-primary/18",
+        "text-primary",
+        "ring-1",
+        "ring-primary/35",
+      );
+      expect(iconShell?.className).not.toMatch(/(?:^|\s)(?:sm|md|lg|xl|2xl):/);
+      expect(button.querySelector(".availability-cta-icon")).toHaveClass("size-4");
+      const pulses = button.querySelectorAll(".availability-cta-pulse");
+      expect(pulses).toHaveLength(2);
+      for (const pulse of pulses) {
+        expect(pulse).toHaveAttribute("aria-hidden", "true");
+        expect(pulse).toHaveClass("bg-primary/40", "opacity-0");
+      }
+      expect(pulses[1]).toHaveClass("availability-cta-pulse-delay");
+    });
 
     it("opens a unified availability contact sheet on public pages", () => {
       usePathname.mockReturnValue("/packages");

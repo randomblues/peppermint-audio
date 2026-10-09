@@ -35,11 +35,11 @@ export function MobileContactBar() {
             <button
               type="button"
               aria-label="Check availability"
-              className="group flex min-h-11 w-full items-center gap-2.5 rounded-full border border-primary/45 bg-background/95 px-3 text-left text-foreground shadow-[0_8px_24px_rgb(0_0_0/0.2)] backdrop-blur-xl transition hover:border-primary/70 hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99] md:min-h-14 md:gap-3 md:rounded-xl md:px-4"
+              className="group flex min-h-14 w-full items-center gap-3 rounded-2xl border border-primary/65 bg-background/95 px-3 py-2 text-left text-foreground shadow-[0_8px_24px_rgb(0_0_0/0.2)] backdrop-blur-xl transition hover:border-primary/70 hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99] md:rounded-xl md:border-primary/45 md:px-4 md:py-0"
             />
           }
         >
-          <span className="availability-cta-icon-shell relative flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/18 text-primary ring-1 ring-primary/35 md:size-9">
+          <span className="availability-cta-icon-shell relative flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/18 text-primary ring-1 ring-primary/35">
             <span aria-hidden="true" className="availability-cta-pulse absolute inset-0 rounded-full bg-primary/40 opacity-0" />
             <span
               aria-hidden="true"
@@ -51,12 +51,12 @@ export function MobileContactBar() {
             />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-xs leading-tight font-semibold md:text-sm">Check availability</span>
-            <span className="mt-0.5 hidden text-[0.68rem] leading-tight text-muted-foreground md:block">
+            <span className="block text-sm leading-tight font-semibold">Check availability</span>
+            <span className="mt-0.5 block text-[0.68rem] leading-tight text-muted-foreground">
               We&apos;ll help you find the right setup
             </span>
           </span>
-          <ChevronUp className="size-4 shrink-0 text-muted-foreground transition-transform group-data-open:-rotate-180 md:size-5" aria-hidden="true" />
+          <ChevronUp className="size-5 shrink-0 text-primary transition-transform group-data-open:-rotate-180 md:text-muted-foreground" aria-hidden="true" />
         </SheetTrigger>
         <SheetContent
           side="bottom"

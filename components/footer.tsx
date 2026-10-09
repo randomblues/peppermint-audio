@@ -8,7 +8,7 @@ import { business } from "@/lib/site-content";
 
 export function Footer() {
   return (
-    <footer className="mt-10 border-t bg-muted/20">
+    <footer className="mt-10 border-t bg-muted/20 pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
       <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary">Pickup: {business.pickupSuburb} {business.pickupPostcode}</Badge>

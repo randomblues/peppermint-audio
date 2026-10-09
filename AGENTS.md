@@ -269,6 +269,13 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Prevention:** Prefer sequential or scripted single-flow interactions for form-heavy checks; when command output is large, inspect saved output files with targeted `rg`/bounded reads; include a concise "Quick lessons learned" section in reports when meaningful.
 - **Next action:** After each substantial run, provide "Quick lessons learned" and explicitly ask the user whether to persist the lessons into this log; update this log only with explicit user approval.
 
+### 2026-10-09 — Integrated browser viewport capture
+
+- **Symptom:** Screenshots showed cropped layouts or a different breakpoint from the requested viewport, delaying responsive validation.
+- **Root cause:** Integrated-browser screenshot helpers reset or rescale emulated viewport dimensions; a successful `setViewportSize()` call alone did not guarantee capture at that width.
+- **Prevention:** Verify `innerWidth` at capture time. If screenshot helpers alter the viewport, use a CDP device-metrics override and direct `Page.captureScreenshot` on the same integrated-browser tab. Inspect the captured images as well as rendered bounds.
+- **Next action:** Use a dedicated QA tab, capture evidence at every required width, and wait for cart hydration and the actual end of the page before checking footer clearance.
+
 # Agent working rules
 
 These rules are mandatory. Safety, preservation of existing work, bounded execution, and truthful verification take priority over speed.
