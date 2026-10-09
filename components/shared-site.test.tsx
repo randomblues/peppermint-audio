@@ -49,12 +49,22 @@ describe("Navbar", () => {
     expect(screen.getByRole("button", { name: "Open menu" })).toBeInTheDocument();
   });
 
-  it("shows the brand logo in the opened mobile menu sheet", () => {
+  it("uses the trimmed logo aligned with the full-width subtitle in the mobile menu", () => {
     render(<Navbar />);
     fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
 
     const dialog = screen.getByRole("dialog", { name: "Peppermint Audio" });
-    expect(within(dialog).getByRole("img", { name: "Peppermint Audio" })).toBeInTheDocument();
+    const logo = within(dialog).getByRole("img", { name: "Peppermint Audio" });
+    expect(logo).toHaveAttribute("src", expect.stringContaining("logo-white-trimmed.png"));
+    expect(logo).toHaveAttribute("width", "472");
+    expect(logo).toHaveAttribute("height", "46");
+    expect(logo.parentElement).toHaveClass("items-center", "min-h-7");
+    const subtitle = within(dialog).getByText("Audio system hire in Melbourne");
+    expect(subtitle.parentElement).toHaveAttribute("data-slot", "sheet-header");
+    expect(screen.getByRole("banner", { hidden: true }).querySelector("img")).toHaveAttribute(
+      "src",
+      expect.stringContaining("logo-white.png"),
+    );
   });
 
   describe("EquipmentCard", () => {

@@ -128,16 +128,15 @@ export function Navbar() {
             >
               <SheetHeader className="border-b border-border/70 p-5">
                 <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
+                  <div className="flex min-h-7 min-w-0 items-center">
                     <SheetTitle className="sr-only">{business.name}</SheetTitle>
                     <Image
-                      src="/logo-white.png"
+                      src="/logo-white-trimmed.png"
                       alt={business.name}
-                      width={266}
-                      height={51}
-                      className="h-auto w-44"
+                      width={472}
+                      height={46}
+                      className="h-auto w-[156px] max-w-full"
                     />
-                    <SheetDescription className="mt-1">Audio system hire in Melbourne</SheetDescription>
                   </div>
                   <SheetClose
                     render={
@@ -152,6 +151,7 @@ export function Navbar() {
                     <X className="size-4" aria-hidden="true" />
                   </SheetClose>
                 </div>
+                <SheetDescription className="mt-1">Audio system hire in Melbourne</SheetDescription>
               </SheetHeader>
               <div className="grid gap-2 p-4">
                 <p className="px-2 pb-1 text-[11px] font-semibold tracking-[0.18em] text-muted-foreground uppercase">
