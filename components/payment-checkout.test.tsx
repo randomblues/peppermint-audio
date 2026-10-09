@@ -15,6 +15,33 @@ vi.mock("@stripe/stripe-js", () => ({
 }));
 
 describe("PaymentCheckout", () => {
+  it.each(["unpaid", "paid"])("shows the white vector Stripe wordmark when hire is %s", async (hirePaymentStatus) => {
+    vi.stubEnv("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", "pk_test_placeholder");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        customerName: "Logo Test", email: "logo@example.com", eventType: "Party",
+        pickupDate: "2026-10-09", dropoffDate: "2026-10-10",
+        hireLineItems: [],
+        hireAmountCents: 10000, securityDepositCents: 10000,
+        hirePaymentStatus, depositPaymentStatus: "authorized",
+        hireClientSecret: null, depositClientSecret: null,
+      }),
+    }));
+
+    render(<PaymentCheckout token="logo-test" />);
+
+    const mark = await screen.findByLabelText("Powered by Stripe");
+    expect(mark).toHaveTextContent("Powered by");
+    const wordmark = mark.querySelector("svg");
+    expect(wordmark).toHaveAttribute("viewBox", "0 0 512 214");
+    expect(wordmark).toHaveAttribute("aria-hidden", "true");
+    expect(wordmark).toHaveAttribute("focusable", "false");
+    expect(wordmark).toHaveClass("fill-white", "shrink-0");
+    expect(wordmark?.querySelector("path")).toBeInTheDocument();
+    expect(mark.querySelector("strong")).not.toBeInTheDocument();
+  });
+
   it("shows full-period item totals consistent with the multi-night payment amount", async () => {
     vi.stubEnv("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", "pk_test_placeholder");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
