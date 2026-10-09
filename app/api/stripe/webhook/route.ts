@@ -28,7 +28,9 @@ export async function POST(request: Request) {
   try {
     if (event.type.startsWith("payment_intent.")) {
       const intent = event.data.object as Stripe.PaymentIntent;
-      if (intent.metadata.paymentType === "hire" && intent.metadata.depositSchedule === "deferred" && intent.metadata.bookingId) {
+      if (intent.metadata.paymentType === "hire"
+        && ["deferred", "immediate"].includes(intent.metadata.depositSchedule ?? "")
+        && intent.metadata.bookingId) {
         const booking = await readDepositBooking(createAdminClient(), intent.metadata.bookingId);
         if (!booking || booking.stripe_hire_payment_intent_id !== intent.id
           || (booking.hire_payment_status === "paid" && event.type !== "payment_intent.succeeded")) {

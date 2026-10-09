@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { canSwitchPendingBankTransfer, depositHoldCoversReturn, depositHoldDate, paymentLinkExpiry, formatAudCents, parseAmountCents, paymentMethodForRental, rentalDays } from "./payment-flow";
+import { canSwitchPendingBankTransfer, depositHoldCoversReturn, depositHoldDate, isImmediateDepositBooking, isMelbourneDateInFuture, paymentLinkExpiry, formatAudCents, parseAmountCents, paymentMethodForRental, rentalDays } from "./payment-flow";
 
 describe("payment flow helpers", () => {
   it("calculates rental days from date-only values without timezone drift", () => {
@@ -23,6 +23,16 @@ describe("payment flow helpers", () => {
     expect(depositHoldDate("2027-01-01")).toBe("2026-12-31");
     expect(depositHoldDate("2026-03-01")).toBe("2026-02-28");
     expect(() => depositHoldDate("2026-02-30")).toThrow();
+  });
+
+  it("uses an immediate deposit checkout only when its hold date is due and pickup has not passed", () => {
+    const now = new Date("2026-10-08T00:00:00Z");
+    expect(isImmediateDepositBooking("2026-10-09", now)).toBe(true);
+    expect(isImmediateDepositBooking("2026-10-08", now)).toBe(true);
+    expect(isImmediateDepositBooking("2026-10-10", now)).toBe(false);
+    expect(isImmediateDepositBooking("2026-10-07", now)).toBe(false);
+    expect(isMelbourneDateInFuture("2026-10-09", now)).toBe(true);
+    expect(isMelbourneDateInFuture("2026-10-08", now)).toBe(false);
   });
 
   it("keeps advance-booking links valid through deposit authentication", () => {

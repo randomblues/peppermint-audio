@@ -19,6 +19,7 @@ import { POST as createCheckout } from "./create-checkout/route";
 import { POST as createBankTransfer } from "./bank-transfer/route";
 import { POST as updateBooking } from "./update-booking/route";
 import { catalogLineItemFromKey } from "@/lib/booking-line-items";
+import { depositHoldDate, melbourneDateKey } from "@/lib/payment-flow";
 
 const hireLineItems = [{
   id: "custom:test-hire",
@@ -54,7 +55,7 @@ describe("admin payment routes", () => {
   it.each(["stripe", "bank", "cash", "update"])("uses multi-night catalogue totals for %s without discounting the deposit", async (method) => {
     const { session, update } = adminSession({
       id: "booking-1", email: "alex@example.com", first_name: "Alex", last_name: "Smith",
-      status: "submitted", pickup_date: "2026-10-09", dropoff_date: "2026-10-12",
+      status: "submitted", pickup_date: "2099-10-09", dropoff_date: "2099-10-12",
       hire_line_items: [catalogLineItemFromKey("package:standard-party-events")],
       payment_method: null, hire_payment_status: "unpaid", deposit_payment_status: "not_required",
     });
@@ -108,8 +109,8 @@ describe("admin payment routes", () => {
     mobile: "0400000000",
     event_type: "Party",
     event_address: "1 Main Street",
-    pickup_date: "2026-10-01",
-    dropoff_date: "2026-10-03",
+    pickup_date: "2099-10-01",
+    dropoff_date: "2099-10-03",
     pickup_time: null,
     dropoff_time: null,
     additional_details: "",
@@ -140,8 +141,8 @@ describe("admin payment routes", () => {
       first_name: "Alex",
       last_name: "Smith",
       status: "submitted",
-      pickup_date: "2026-10-01",
-      dropoff_date: "2026-10-03",
+      pickup_date: "2099-10-01",
+      dropoff_date: "2099-10-03",
       payment_method: null,
       hire_amount_cents: null,
       security_deposit_cents: null,
@@ -170,9 +171,53 @@ describe("admin payment routes", () => {
       stripe_hire_payment_intent_id: "pi_hire",
       stripe_deposit_payment_intent_id: null,
       deposit_payment_status: "scheduled",
-      deposit_hold_date: "2026-09-30",
+      deposit_hold_date: "2099-09-30",
       deposit_consent_at: null,
       payment_method: "stripe_card_hold",
+    }));
+  });
+
+  it("creates hire and deposit intents together for pickup-day checkout", async () => {
+    const pickupDate = melbourneDateKey();
+    const { session, update } = adminSession({
+      id: "booking-last-minute",
+      email: "alex@example.com",
+      first_name: "Alex",
+      last_name: "Smith",
+      status: "submitted",
+      pickup_date: pickupDate,
+      dropoff_date: pickupDate,
+      payment_method: null,
+      hire_amount_cents: null,
+      security_deposit_cents: null,
+      payment_token: null,
+      hire_line_items: hireLineItems,
+    });
+    mocks.requireAdmin.mockResolvedValue({ user: { id: "admin-1" }, admin: session.admin });
+    mocks.paymentIntentCreate.mockResolvedValueOnce({ id: "pi_hire", client_secret: "hire_secret" })
+      .mockResolvedValueOnce({ id: "pi_deposit", client_secret: "deposit_secret" });
+
+    const response = await createCheckout(request("/api/admin/payments/create-checkout", {
+      bookingId: "booking-last-minute",
+      securityDepositAmount: "100",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.paymentIntentCreate).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      amount: 10000,
+      allowed_payment_method_types: ["card"],
+      metadata: { bookingId: "booking-last-minute", invoiceNumber: "PA-BOOKINGLASTM", paymentType: "hire", depositSchedule: "immediate" },
+    }));
+    expect(mocks.paymentIntentCreate).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      amount: 10000,
+      capture_method: "manual",
+      metadata: { bookingId: "booking-last-minute", invoiceNumber: "PA-BOOKINGLASTM", paymentType: "deposit", deferredDeposit: "true" },
+    }));
+    expect(update.update).toHaveBeenCalledWith(expect.objectContaining({
+      stripe_hire_payment_intent_id: "pi_hire",
+      stripe_deposit_payment_intent_id: "pi_deposit",
+      deposit_payment_status: "pending",
+      deposit_hold_date: depositHoldDate(pickupDate),
     }));
   });
 
@@ -540,6 +585,38 @@ describe("admin payment routes", () => {
       metadata: { bookingId: "booking-original", invoiceNumber: "PA-BOOKINGORIGI" },
     }));
     expect(update.update).toHaveBeenCalledWith(expect.objectContaining({ stripe_customer_id: "cus_replacement" }));
+  });
+
+  it("creates both payment intents when an updated Stripe booking is due for pickup", async () => {
+    const pickupDate = melbourneDateKey();
+    const { session, update } = adminSession(revisableBooking({
+      pickup_date: pickupDate,
+      dropoff_date: pickupDate,
+    }));
+    mocks.requireAdmin.mockResolvedValue({ user: { id: "admin-1" }, admin: session.admin });
+    mocks.paymentIntentCreate.mockResolvedValueOnce({ id: "pi_hire", client_secret: "hire_secret" })
+      .mockResolvedValueOnce({ id: "pi_deposit", client_secret: "deposit_secret" });
+
+    const response = await updateBooking(request("/api/admin/payments/update-booking", {
+      bookingId: "booking-original",
+      paymentMethod: "stripe_card_hold",
+      hireLineItems,
+      securityDepositAmount: "100",
+      gstInclusive: true,
+    }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.paymentIntentCreate).toHaveBeenCalledTimes(2);
+    expect(mocks.paymentIntentCreate).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      amount: 10000,
+      capture_method: "manual",
+      metadata: expect.objectContaining({ paymentType: "deposit" }),
+    }));
+    expect(update.update).toHaveBeenCalledWith(expect.objectContaining({
+      stripe_deposit_payment_intent_id: "pi_deposit",
+      deposit_payment_status: "pending",
+      deposit_hold_date: depositHoldDate(pickupDate),
+    }));
   });
 
   it("rejects changes after the hire has been paid", async () => {

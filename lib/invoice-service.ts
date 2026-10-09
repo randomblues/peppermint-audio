@@ -2,7 +2,7 @@ import { Resend } from "resend";
 
 import { emailFooterText } from "@/lib/email-footer";
 import { bookingHireTotalCents, lineItemHireTotalCents, lineItemsForBooking, type BookingLineItem } from "@/lib/booking-line-items";
-import { formatAudCents, rentalDays } from "@/lib/payment-flow";
+import { formatAudCents, isImmediateDepositBooking, isMelbourneDateInFuture, rentalDays } from "@/lib/payment-flow";
 import { emailDetailsTable, emailLayout, emailPanel, escapeEmailHtml } from "@/lib/email-template";
 import { recordCustomerEmail, type CustomerEmailType } from "@/lib/email-log";
 import { buildInvoicePdf, type InvoicePdfDetails, type InvoicePdfLineItem } from "@/lib/invoice-pdf";
@@ -200,7 +200,11 @@ function pdfDetails(documentType: BillingDocumentType, booking: InvoiceBooking, 
     "The security deposit is refundable when all equipment is returned on time and in the agreed condition.",
   ];
   if (invoice.payment_method === "stripe_card_hold" && booking.deposit_hold_date && documentType === "invoice") {
-    notes.unshift(`The hire payment is due now. The ${formatAudCents(deposit)} security deposit is a separate temporary card hold scheduled for ${formatDate(booking.deposit_hold_date)}, or after payment for a last-minute booking. It is not charged with the hire payment.`);
+    notes.unshift(isMelbourneDateInFuture(booking.deposit_hold_date)
+      ? `The hire payment is due now. The ${formatAudCents(deposit)} security deposit is a temporary card hold scheduled for ${formatDate(booking.deposit_hold_date)} (one day before pickup).`
+      : isImmediateDepositBooking(booking.pickup_date)
+        ? `The hire payment is due now. The ${formatAudCents(deposit)} security deposit is a temporary card hold placed as part of checkout.`
+        : `The ${formatAudCents(deposit)} security deposit is a separate temporary card hold, not part of the hire payment.`);
   }
   const bank = invoice.payment_method === "bank_transfer" ? bankTransferDetails() : undefined;
   const bankTransfer = bank
@@ -295,14 +299,15 @@ export async function sendBillingDocument(admin: AdminClient, bookingId: string,
   const gstInclusive = booking.gst_inclusive !== false;
   const emailIntro = billingDocumentIntro(documentType, customerName, gstInclusive, force && claim.record.status === "sent");
   const pdf = await buildInvoicePdf(details);
+  const customerPaymentUrl = documentType === "invoice" ? invoice.payment_url : null;
   const bodyText = [
     "Hello,",
     "",
     emailIntro,
     `Booking Reference: ${invoice.invoice_number}`,
-    invoice.payment_url ? "Having trouble opening the payment page? No worries — copy and paste the link below into your browser." : "",
-    invoice.payment_url ? `Pay securely online: ${invoice.payment_url}` : "",
-    invoice.payment_url ? "Powered by Stripe." : "",
+    customerPaymentUrl ? "Having trouble opening the payment page? No worries — copy and paste the link below into your browser." : "",
+    customerPaymentUrl ? `Pay securely online: ${customerPaymentUrl}` : "",
+    customerPaymentUrl ? "Powered by Stripe." : "",
     `Event: ${booking.event_type}`,
     `Pickup: ${formatDate(booking.pickup_date)} · Return: ${formatDate(booking.dropoff_date)}`,
     booking.event_address ? `Event address: ${booking.event_address}` : "",
@@ -325,11 +330,11 @@ export async function sendBillingDocument(admin: AdminClient, bookingId: string,
         { label: "Return", value: formatDate(booking.dropoff_date) },
         ...(booking.event_address ? [{ label: "Address", value: booking.event_address }] : []),
       ]))}
-      ${invoice.payment_url ? emailPanel(`
+      ${customerPaymentUrl ? emailPanel(`
         <p style="margin:0 0 10px;color:#1d2823;font-size:14px;line-height:1.6"><strong>Pay securely online</strong></p>
-        <a href="${escapeEmailHtml(invoice.payment_url)}" style="display:inline-block;padding:11px 18px;border-radius:7px;background:#2f7056;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none">Continue to secure payment</a>
+        <a href="${escapeEmailHtml(customerPaymentUrl)}" style="display:inline-block;padding:11px 18px;border-radius:7px;background:#2f7056;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none">Continue to secure payment</a>
         <p style="margin:12px 0 0;color:#718078;font-size:12px;line-height:1.5">Having trouble opening the payment page? No worries &mdash; copy and paste the link below into your browser.</p>
-        <p style="margin:12px 0 0;color:#718078;font-size:12px;line-height:1.5;word-break:break-all">${escapeEmailHtml(invoice.payment_url)}</p>
+        <p style="margin:12px 0 0;color:#718078;font-size:12px;line-height:1.5;word-break:break-all">${escapeEmailHtml(customerPaymentUrl)}</p>
         <div style="margin-top:18px;padding-top:14px;border-top:1px solid #cfe5d6">
           <p style="margin:0;color:#1d2823;font-size:13px;font-weight:700">Powered by Stripe</p>
         </div>

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PaymentCheckout } from "./payment-checkout";
+import { depositHoldDate, melbourneDateKey } from "@/lib/payment-flow";
 
 const stripe = vi.hoisted(() => ({
   createPaymentMethod: vi.fn(), confirmCardPayment: vi.fn(), clear: vi.fn(),
@@ -26,11 +27,11 @@ describe("PaymentCheckout", () => {
 
   const scheduled = {
     customerName: "Test Customer", email: "test@example.com", eventType: "Party",
-    pickupDate: "2026-11-09", dropoffDate: "2026-11-12",
+    pickupDate: "2099-11-09", dropoffDate: "2099-11-12",
     hireLineItems: [{ id: "speaker", kind: "equipment", name: "Test speaker", quantity: 1, unitPriceCents: 5500 }],
     hireAmountCents: 11000, securityDepositCents: 10000,
     hirePaymentStatus: "pending", depositPaymentStatus: "scheduled",
-    depositHoldDate: "2026-11-08", depositConsentRecorded: false,
+    depositHoldDate: "2099-11-08", depositConsentRecorded: false,
     hireClientSecret: "hire_secret", depositClientSecret: null,
   };
 
@@ -42,6 +43,12 @@ describe("PaymentCheckout", () => {
     render(<PaymentCheckout token="advance-token" />);
     const pay = await screen.findByRole("button", { name: "Pay $110.00" });
     expect(pay).toBeDisabled();
+    expect(screen.getByText("Hold date: 8 November 2099")).toBeInTheDocument();
+    expect(screen.getByText("The hire payment will be charged at checkout. Your security deposit is a temporary hold scheduled for 8 November 2099 (one day before pickup). The hold is released after all hired equipment is returned in working condition.")).toBeInTheDocument();
+    expect(screen.getByText("Your $100.00 deposit is a temporary card authorisation scheduled for 8 November 2099 (one day before pickup).")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox").parentElement).toHaveTextContent(
+      /deposit hold on 8 November 2099 \(one day before pickup\)\. The hold is released after return unless charges apply under the hire terms\./,
+    );
     fireEvent.click(screen.getByRole("checkbox"));
     expect(pay).toBeEnabled();
     fireEvent.click(pay);
@@ -49,6 +56,49 @@ describe("PaymentCheckout", () => {
     expect(fetch).toHaveBeenLastCalledWith("/api/payment/advance-token", expect.objectContaining({ method: "POST", body: '{"consent":true}' }));
     expect(stripe.confirmCardPayment).toHaveBeenCalledTimes(1);
     expect(stripe.confirmCardPayment).toHaveBeenCalledWith("hire_secret", { payment_method: "pm_test" });
+  });
+
+  it("charges hire and authorises the deposit together for last-minute pickup", async () => {
+    vi.stubEnv("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", "pk_test_placeholder");
+    const today = melbourneDateKey();
+    const tomorrow = new Date(Date.parse(`${today}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+    const immediate = {
+      ...scheduled,
+      pickupDate: today,
+      dropoffDate: tomorrow,
+      hireClientSecret: "hire_secret",
+      depositClientSecret: "deposit_secret",
+      depositHoldDate: depositHoldDate(today),
+      depositPaymentStatus: "pending",
+    };
+    const fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => immediate,
+    }).mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, status: "authorized" }) });
+    vi.stubGlobal("fetch", fetch);
+    stripe.confirmCardPayment.mockResolvedValueOnce({ paymentIntent: { status: "succeeded" } })
+      .mockResolvedValueOnce({ paymentIntent: { status: "requires_capture" } });
+
+    render(<PaymentCheckout token="last-minute-token" />);
+
+    const pay = await screen.findByRole("button", { name: "Pay $210.00" });
+    expect(pay).toBeDisabled();
+    expect(screen.queryByText(/^Hold date:/)).not.toBeInTheDocument();
+    expect(screen.getByText("The hire payment will be charged at checkout, and a temporary $100.00 security-deposit hold will also be placed during checkout. The hold is released after all hired equipment is returned in working condition.")).toBeInTheDocument();
+    expect(screen.getByText("Your $100.00 deposit is a temporary card authorisation that will be placed as part of today's checkout.")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox").parentElement).toHaveTextContent(
+      /charge the hire and place a temporary \$100\.00 security-deposit hold as part of this checkout\./,
+    );
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(pay);
+    expect(await screen.findByText(/hire payment is complete and your refundable security deposit has been authorised/)).toBeInTheDocument();
+    expect(stripe.confirmCardPayment).toHaveBeenNthCalledWith(1, "hire_secret", { payment_method: "pm_test" });
+    expect(stripe.confirmCardPayment).toHaveBeenNthCalledWith(2, "deposit_secret", { payment_method: "pm_test" });
+    expect(fetch).toHaveBeenLastCalledWith("/api/payment/last-minute-token", expect.objectContaining({
+      method: "POST",
+      body: '{"verifyDeposit":true}',
+    }));
   });
 
   it("does not charge when consent persistence fails", async () => {

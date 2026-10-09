@@ -7,6 +7,7 @@ vi.mock("@/lib/email-log", () => ({ recordCustomerEmail: vi.fn() }));
 
 import { billingDocumentIntro, ensureInvoice, sendBillingDocument } from "./invoice-service";
 import { catalogLineItemFromKey } from "./booking-line-items";
+import { depositHoldDate, melbourneDateKey } from "./payment-flow";
 
 afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks(); });
 
@@ -18,14 +19,15 @@ describe("billing document email copy", () => {
     mocks.send.mockResolvedValue({ data: { id: "test-email" }, error: null });
     const booking = {
       id: "booking-1", email: "test@example.com", first_name: "Test", last_name: "Customer", event_type: "Party",
-      pickup_date: "2026-11-09", dropoff_date: "2026-11-10", hire_line_items: [catalogLineItemFromKey("package:standard-party-events")],
+      pickup_date: "2099-11-09", dropoff_date: "2099-11-10", hire_line_items: [catalogLineItemFromKey("package:standard-party-events")],
       hire_amount_cents: 16000, security_deposit_cents: 10000, gst_inclusive: gstInclusive,
-      payment_method: "stripe_card_hold", deposit_payment_status: "scheduled", deposit_hold_date: "2026-11-08",
+      payment_method: "stripe_card_hold", deposit_payment_status: "scheduled", deposit_hold_date: "2099-11-08",
+      event_address: "Customer-provided event address",
     };
     const invoice = {
       id: "invoice-1", booking_id: booking.id, invoice_number: "PA-TEST", payment_method: "stripe_card_hold",
       hire_amount_cents: 16000, security_deposit_cents: 10000, total_amount_cents: 26000, gst_inclusive: gstInclusive,
-      bank_transfer_option: "both", status: "issued",
+      bank_transfer_option: "both", status: "issued", payment_url: "https://example.com/pay/token",
     };
     const query = (data: unknown) => ({
       select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), update: vi.fn().mockReturnThis(),
@@ -33,15 +35,59 @@ describe("billing document email copy", () => {
     });
     const admin = { from: vi.fn((table: string) => query(table === "bookings" ? booking : table === "invoices" ? invoice : { id: "doc-1", status: "pending" })) };
     await sendBillingDocument(admin as never, booking.id, "payment_receipt");
+    expect(mocks.send.mock.lastCall?.[0].text).not.toContain("https://example.com/pay/token");
     expect(mocks.pdf).toHaveBeenCalledWith(expect.objectContaining({
       totalCents: 16000,
       notes: expect.arrayContaining(["This receipt confirms the hire payment only. The security deposit has not yet been authorised."]),
     }));
     await sendBillingDocument(admin as never, booking.id, "invoice");
+    expect(mocks.send.mock.lastCall?.[0].text).toContain("https://example.com/pay/token");
     expect(mocks.pdf).toHaveBeenLastCalledWith(expect.objectContaining({
-      notes: expect.arrayContaining([expect.stringContaining("It is not charged with the hire payment.")]),
+      notes: expect.arrayContaining([
+        expect.stringContaining("The $100.00 security deposit is a temporary card hold scheduled for 8 November 2099 (one day before pickup)."),
+      ]),
+    }));
+    await sendBillingDocument(admin as never, booking.id, "deposit_release");
+    const releaseEmail = mocks.send.mock.lastCall?.[0];
+    expect(releaseEmail.text).not.toContain("https://example.com/pay/token");
+    expect(releaseEmail.html).not.toContain("Continue to secure payment");
+    expect(releaseEmail.html).not.toContain("https://example.com/pay/token");
+    expect(releaseEmail.html).toContain("Customer-provided event address");
+  });
+
+  it("describes a last-minute deposit hold as part of checkout on the invoice", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test_placeholder");
+    vi.stubEnv("ENQUIRY_FROM_EMAIL", "test@example.com");
+    mocks.pdf.mockResolvedValue(Buffer.from("test-pdf"));
+    mocks.send.mockResolvedValue({ data: { id: "test-email" }, error: null });
+    const pickupDate = melbourneDateKey();
+    const booking = {
+      id: "booking-1", email: "test@example.com", first_name: "Test", last_name: "Customer", event_type: "Party",
+      pickup_date: pickupDate, dropoff_date: pickupDate, hire_line_items: [catalogLineItemFromKey("package:standard-party-events")],
+      hire_amount_cents: 16000, security_deposit_cents: 10000, gst_inclusive: true,
+      payment_method: "stripe_card_hold", deposit_payment_status: "pending", deposit_hold_date: depositHoldDate(pickupDate),
+    };
+    const invoice = {
+      id: "invoice-1", booking_id: booking.id, invoice_number: "PA-TEST", payment_method: "stripe_card_hold",
+      hire_amount_cents: 16000, security_deposit_cents: 10000, total_amount_cents: 26000, gst_inclusive: true,
+      bank_transfer_option: "both", status: "issued", payment_url: "https://example.com/pay/token",
+    };
+    const query = (data: unknown) => ({
+      select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), update: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data, error: null }), maybeSingle: vi.fn().mockResolvedValue({ data, error: null }),
+    });
+    const admin = { from: vi.fn((table: string) => query(table === "bookings" ? booking : table === "invoices" ? invoice : { id: "doc-1", status: "pending" })) };
+
+    await sendBillingDocument(admin as never, booking.id, "invoice");
+
+    expect(mocks.pdf).toHaveBeenCalledWith(expect.objectContaining({
+      totalCents: 26000,
+      notes: expect.arrayContaining([
+        "The hire payment is due now. The $100.00 security deposit is a temporary card hold placed as part of checkout.",
+      ]),
     }));
   });
+
   it.each([true, false])("keeps multi-night invoice and receipt line amounts consistent (GST %s)", async (gstInclusive) => {
     vi.stubEnv("RESEND_API_KEY", "re_test_placeholder");
     vi.stubEnv("ENQUIRY_FROM_EMAIL", "test@example.com");

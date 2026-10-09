@@ -7,7 +7,7 @@ import { CheckCircle2, ChevronDown, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { lineItemHireTotalCents, type BookingLineItem } from "@/lib/booking-line-items";
-import { formatAudCents, rentalDays } from "@/lib/payment-flow";
+import { formatAudCents, isImmediateDepositBooking, isMelbourneDateInFuture, rentalDays } from "@/lib/payment-flow";
 import { business } from "@/lib/site-content";
 
 function StripeTrustMark() {
@@ -19,6 +19,19 @@ function StripeTrustMark() {
       </svg>
     </div>
   );
+}
+
+function isScheduledHoldDate(date: string | null | undefined) {
+  return Boolean(date && isMelbourneDateInFuture(date));
+}
+
+function formatMelbourneDate(date: string) {
+  return new Intl.DateTimeFormat("en-AU", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Australia/Melbourne",
+  }).format(new Date(`${date}T00:00:00`));
 }
 
 type PaymentData = {
@@ -41,7 +54,11 @@ type PaymentData = {
 function HireSummary({ data }: { data: PaymentData }) {
   const nights = rentalDays(data.pickupDate, data.dropoffDate);
   const itemCount = data.hireLineItems.reduce((total, item) => total + item.quantity, 0);
-  const totalDueCents = data.hirePaymentStatus === "paid" ? 0 : data.hireAmountCents;
+  const showScheduledHoldDate = isScheduledHoldDate(data.depositHoldDate);
+  const immediateDeposit = Boolean(data.depositHoldDate && isImmediateDepositBooking(data.pickupDate));
+  const totalDueCents = data.hirePaymentStatus === "paid"
+    ? 0
+    : data.hireAmountCents + (immediateDeposit ? data.securityDepositCents : 0);
 
   return (
     <div className="rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
@@ -69,7 +86,14 @@ function HireSummary({ data }: { data: PaymentData }) {
           <span>{formatAudCents(data.hireAmountCents)}</span>
         </div>
         <div className="flex items-center justify-between gap-4">
-          <span className="text-muted-foreground">Refundable security deposit</span>
+          <span className="text-muted-foreground">
+            Refundable security deposit
+            {showScheduledHoldDate ? (
+              <span className="block text-xs">
+                Hold date: {formatMelbourneDate(data.depositHoldDate!)}
+              </span>
+            ) : null}
+          </span>
           <span>{formatAudCents(data.securityDepositCents)}</span>
         </div>
         <div className="flex items-center justify-between gap-4 border-t pt-3 text-base font-semibold">
@@ -77,12 +101,20 @@ function HireSummary({ data }: { data: PaymentData }) {
           <span>{formatAudCents(totalDueCents)}</span>
         </div>
       </div>
-      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{data.depositHoldDate ? `The security deposit is a separate temporary card hold, scheduled for ${data.depositHoldDate}, one day before pickup. If you pay after that date, we attempt the hold after your hire payment.` : "The security deposit is a separate temporary card hold, not part of the hire charge."}</p>
+      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+        {showScheduledHoldDate
+          ? `The hire payment will be charged at checkout. Your security deposit is a temporary hold scheduled for ${formatMelbourneDate(data.depositHoldDate!)} (one day before pickup). The hold is released after all hired equipment is returned in working condition.`
+          : immediateDeposit
+            ? `The hire payment will be charged at checkout, and a temporary ${formatAudCents(data.securityDepositCents)} security-deposit hold will also be placed during checkout. The hold is released after all hired equipment is returned in working condition.`
+            : "The security deposit is a separate temporary card hold, not part of the hire charge."}
+      </p>
     </div>
   );
 }
 
 function DepositConfidencePanel({ data }: { data: PaymentData }) {
+  const showScheduledHoldDate = isScheduledHoldDate(data.depositHoldDate);
+  const immediateDeposit = Boolean(data.depositHoldDate && isImmediateDepositBooking(data.pickupDate));
   return (
     <details className="group overflow-hidden rounded-2xl border border-primary/20 bg-primary/[0.04] shadow-sm">
       <summary className="flex cursor-pointer list-none items-start gap-3 px-4 py-4 marker:hidden sm:px-5 [&::-webkit-details-marker]:hidden">
@@ -92,14 +124,14 @@ function DepositConfidencePanel({ data }: { data: PaymentData }) {
         <div className="min-w-0 flex-1">
           <h3 className="font-heading text-base font-semibold">How your deposit works</h3>
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-            Your {formatAudCents(data.securityDepositCents)} deposit is a temporary card authorisation, not a second hire charge.
+            Your {formatAudCents(data.securityDepositCents)} deposit is a temporary card authorisation {showScheduledHoldDate ? `scheduled for ${formatMelbourneDate(data.depositHoldDate!)} (one day before pickup).` : immediateDeposit ? "that will be placed as part of today's checkout." : "that will be released after return."}
           </p>
         </div>
         <ChevronDown className="mt-1 size-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
       </summary>
       <div className="grid gap-4 border-t border-primary/10 px-4 py-4 sm:grid-cols-3 sm:px-5">
         {[
-          ["1", data.depositHoldDate ? "Held before pickup" : "Card authorisation", data.depositHoldDate ? "We attempt the hold one day before pickup, or after payment for last-minute bookings. We will contact you if your card needs attention." : "Your bank may show the amount as pending. It is not captured as a purchase."],
+          ["1", showScheduledHoldDate ? "Held before pickup" : immediateDeposit ? "Authorised today" : "Card authorisation", showScheduledHoldDate ? `We place the temporary hold on ${formatMelbourneDate(data.depositHoldDate!)}. Your bank may show it as pending; it is not a purchase.` : "The temporary hold will be placed during checkout. Your bank may show it as pending; it is not a purchase."],
           ["2", "Equipment returned", "We check the equipment back in against the agreed return time and condition."],
           ["3", "Released after check-in", "If everything is returned on time and complete, the full authorisation is released."],
         ].map(([step, title, detail]) => (
@@ -137,12 +169,16 @@ function PaymentForm({ data, token, onComplete }: { data: PaymentData; token: st
   const [hirePaid, setHirePaid] = useState(data.hirePaymentStatus === "paid");
   const [depositAuthorized, setDepositAuthorized] = useState(data.depositPaymentStatus === "authorized");
   const [consent, setConsent] = useState(Boolean(data.depositConsentRecorded));
-  const deferred = Boolean(data.depositHoldDate);
+  const requiresDepositConsent = Boolean(data.depositHoldDate);
+  const immediateDeposit = Boolean(data.depositHoldDate && isImmediateDepositBooking(data.pickupDate));
+  const showScheduledHoldDate = isScheduledHoldDate(data.depositHoldDate);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (deferred && data.securityDepositCents > 0 && !consent) {
-      setError("Please agree to the card-saving and security-deposit authorisation before continuing.");
+    if (requiresDepositConsent && data.securityDepositCents > 0 && !consent) {
+      setError(immediateDeposit
+        ? "Please agree to the hire payment and temporary security-deposit hold before continuing."
+        : "Please agree to the card-saving and security-deposit authorisation before continuing.");
       return;
     }
     if (!stripe || !elements) {
@@ -157,12 +193,14 @@ function PaymentForm({ data, token, onComplete }: { data: PaymentData; token: st
     setError("");
     setProcessing(true);
     try {
-      if (deferred && data.securityDepositCents > 0 && !data.depositConsentRecorded) {
+      if (requiresDepositConsent && data.securityDepositCents > 0 && !data.depositConsentRecorded) {
         const response = await fetch(`/api/payment/${encodeURIComponent(token)}`, {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ consent: true }),
         });
         const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error ?? "Your card-saving consent could not be recorded.");
+        if (!response.ok) throw new Error(payload.error ?? (immediateDeposit
+          ? "Your checkout consent could not be recorded."
+          : "Your card-saving consent could not be recorded."));
       }
       const paymentMethod = await stripe.createPaymentMethod({
         type: "card",
@@ -188,7 +226,7 @@ function PaymentForm({ data, token, onComplete }: { data: PaymentData; token: st
         });
         if (depositResult.error) throw new Error(depositResult.error.message);
         if (depositResult.paymentIntent?.status !== "requires_capture") throw new Error("The security deposit could not be authorised.");
-        if (deferred) {
+        if (requiresDepositConsent) {
           const response = await fetch(`/api/payment/${encodeURIComponent(token)}`, {
             method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ verifyDeposit: true }),
           });
@@ -208,7 +246,7 @@ function PaymentForm({ data, token, onComplete }: { data: PaymentData; token: st
     }
   }
 
-  if (hirePaid && (data.securityDepositCents === 0 || depositAuthorized || (deferred && ["scheduled", "authorizing"].includes(data.depositPaymentStatus)))) {
+  if (hirePaid && (data.securityDepositCents === 0 || depositAuthorized || (requiresDepositConsent && ["scheduled", "authorizing"].includes(data.depositPaymentStatus)))) {
     return (
       <div className="space-y-4">
         <HireSummary data={data} />
@@ -229,13 +267,23 @@ function PaymentForm({ data, token, onComplete }: { data: PaymentData; token: st
         <div className="mt-3 rounded-lg border bg-background p-3">
           <CardElement options={{ hidePostalCode: false }} />
         </div>
-        {deferred && data.securityDepositCents > 0 && !hirePaid ? <label className="flex items-start gap-3 rounded-xl border p-4 text-sm leading-relaxed"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-1 shrink-0" /><span>I authorise Peppermint Audio to save my card securely with Stripe and place a temporary {formatAudCents(data.securityDepositCents)} security-deposit hold one day before pickup, or after payment if I book later. Any amount captured from the deposit will be limited to costs covered by the hire terms.</span></label> : null}
+        {requiresDepositConsent && data.securityDepositCents > 0 && !hirePaid ? <label className="flex items-start gap-3 rounded-xl border p-4 text-sm leading-relaxed"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-1 shrink-0" /><span>{immediateDeposit
+          ? `I authorise Peppermint Audio to charge the hire and place a temporary ${formatAudCents(data.securityDepositCents)} security-deposit hold as part of this checkout. The hold is released after return unless charges apply under the hire terms.`
+          : `I authorise Peppermint Audio to save my card, charge the hire, and place a temporary ${formatAudCents(data.securityDepositCents)} deposit hold on ${formatMelbourneDate(data.depositHoldDate!)} (one day before pickup). The hold is released after return unless charges apply under the hire terms.`}</span></label> : null}
       </div>
       {error ? <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">{error}</p> : null}
-      <Button type="submit" className="w-full" disabled={processing || !stripe || !elements || (deferred && !hirePaid && !consent && data.securityDepositCents > 0) || (!data.hireClientSecret && !data.depositClientSecret)}>
-        {processing ? "Processing securely…" : hirePaid ? `Authorise ${formatAudCents(data.securityDepositCents)} deposit hold` : `Pay ${formatAudCents(data.hireAmountCents)}`}
+      <Button type="submit" className="w-full" disabled={processing || !stripe || !elements || (requiresDepositConsent && !hirePaid && !consent && data.securityDepositCents > 0) || (!data.hireClientSecret && !data.depositClientSecret)}>
+        {processing ? "Processing securely…" : hirePaid ? `Authorise ${formatAudCents(data.securityDepositCents)} deposit hold` : `Pay ${formatAudCents(data.hireAmountCents + (immediateDeposit ? data.securityDepositCents : 0))}`}
       </Button>
-      <p className="text-center text-xs text-muted-foreground">Your hire payment is taken now. Your refundable security deposit is released after the equipment is returned.</p>
+      <p className="text-center text-xs text-muted-foreground">
+        {hirePaid
+          ? "Your hire payment has been received. Complete the security-deposit hold above."
+          : showScheduledHoldDate
+            ? "Your hire payment is taken now. The deposit hold is scheduled for one day before pickup."
+            : immediateDeposit
+              ? "Your hire payment will be charged and the temporary security-deposit hold placed together during checkout."
+              : "Your hire payment is taken now. Your refundable security deposit is released after the equipment is returned."}
+      </p>
       <StripeTrustMark />
     </form>
   );

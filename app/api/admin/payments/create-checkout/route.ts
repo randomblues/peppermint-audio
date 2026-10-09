@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdmin } from "@/lib/admin-auth";
 import { lineItemsForBooking, lineItemsTotalCents } from "@/lib/booking-line-items";
-import { MAX_STRIPE_HIRE_DAYS, depositHoldDate, paymentLinkExpiry, parseAmountCents, rentalDays } from "@/lib/payment-flow";
+import { MAX_STRIPE_HIRE_DAYS, depositHoldDate, isImmediateDepositBooking, paymentLinkExpiry, parseAmountCents, rentalDays } from "@/lib/payment-flow";
 import { sendInvoiceEmail } from "@/lib/invoice-service";
 import { invoiceNumberForBooking } from "@/lib/invoice-reference";
 import { parseInvoiceRecipient } from "@/lib/invoice-recipient";
@@ -119,6 +119,10 @@ export async function POST(request: Request) {
   }
 
   try {
+    const holdDate = securityDepositCents > 0 ? depositHoldDate(result.data.pickup_date) : null;
+    const immediateDeposit = Boolean(holdDate && isImmediateDepositBooking(result.data.pickup_date));
+    const depositSchedule = securityDepositCents === 0 ? "none" : immediateDeposit ? "immediate" : "deferred";
+    const depositStatus = securityDepositCents === 0 ? "not_required" : immediateDeposit ? "pending" : "scheduled";
     const stripe = getStripe();
     if (result.data.payment_method === "stripe_card_hold") {
       await cancelPendingIntent(stripe, result.data.stripe_hire_payment_intent_id);
@@ -133,10 +137,22 @@ export async function POST(request: Request) {
       currency: "aud",
       customer: customerId,
       allowed_payment_method_types: ["card"],
-      ...(securityDepositCents > 0 ? { setup_future_usage: "off_session" as const } : {}),
+      ...(securityDepositCents > 0 && !immediateDeposit ? { setup_future_usage: "off_session" as const } : {}),
       description: `Peppermint Audio hire · ${invoiceNumber}`,
-      metadata: { bookingId, invoiceNumber, paymentType: "hire", depositSchedule: securityDepositCents > 0 ? "deferred" : "none" },
+      metadata: { bookingId, invoiceNumber, paymentType: "hire", depositSchedule },
     });
+    const depositPaymentIntent = immediateDeposit
+      ? await stripe.paymentIntents.create({
+        amount: securityDepositCents,
+        currency: "aud",
+        customer: customerId,
+        allowed_payment_method_types: ["card"],
+        capture_method: "manual",
+        description: `Refundable security deposit · ${invoiceNumber}`,
+        metadata: { bookingId, invoiceNumber, paymentType: "deposit", deferredDeposit: "true" },
+      })
+      : null;
+
     const update = await session.admin.from("bookings").update({
       payment_method: "stripe_card_hold",
       hire_line_items: hireLineItems,
@@ -144,15 +160,15 @@ export async function POST(request: Request) {
       security_deposit_cents: securityDepositCents,
       gst_inclusive: gstInclusive,
       hire_payment_status: "pending",
-      deposit_payment_status: securityDepositCents > 0 ? "scheduled" : "not_required",
-      deposit_hold_date: securityDepositCents > 0 ? depositHoldDate(result.data.pickup_date) : null,
+      deposit_payment_status: depositStatus,
+      deposit_hold_date: holdDate,
       deposit_consent_at: null,
       deposit_capture_before: null,
       deposit_error: null,
       deposit_attention_sent_at: null,
       stripe_customer_id: customerId,
       stripe_hire_payment_intent_id: hirePaymentIntent.id,
-      stripe_deposit_payment_intent_id: null,
+      stripe_deposit_payment_intent_id: depositPaymentIntent?.id ?? null,
       payment_token: paymentToken,
       payment_token_expires_at: paymentTokenExpiresAt,
       bank_transfer_reference: null,

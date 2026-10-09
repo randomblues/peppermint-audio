@@ -73,7 +73,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
   const verifyingDeposit = body?.verifyDeposit === true;
-  if (body?.consent !== true && !verifyingDeposit) return NextResponse.json({ error: "Consent to save your card and place the deposit hold is required." }, { status: 400 });
+  if (body?.consent !== true && !verifyingDeposit) return NextResponse.json({ error: "Consent to charge the hire and place the security-deposit hold is required." }, { status: 400 });
   const { token } = await params;
   if (!token) return NextResponse.json({ error: "Payment link is invalid." }, { status: 400 });
   try {

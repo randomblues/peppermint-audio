@@ -87,13 +87,13 @@ describe("Stripe webhook", () => {
     expect(mocks.syncDeferredDeposit).not.toHaveBeenCalled();
   });
 
-  it("ignores a delayed hire failure after its payment has succeeded", async () => {
+  it.each(["deferred", "immediate"])("ignores a delayed %s hire failure after its payment has succeeded", async (depositSchedule) => {
     mocks.readDepositBooking.mockResolvedValue({ id: "booking-1", stripe_hire_payment_intent_id: "pi_hire", hire_payment_status: "paid" });
     const admin = adminClient();
     mocks.createAdminClient.mockReturnValue(admin);
     mocks.getStripe.mockReturnValue({ webhooks: { constructEvent: vi.fn().mockReturnValue({
       type: "payment_intent.payment_failed",
-      data: { object: { id: "pi_hire", metadata: { bookingId: "booking-1", paymentType: "hire", depositSchedule: "deferred" } } },
+      data: { object: { id: "pi_hire", metadata: { bookingId: "booking-1", paymentType: "hire", depositSchedule } } },
     }) } });
     expect((await POST(request())).status).toBe(200);
     expect(admin.update).not.toHaveBeenCalled();

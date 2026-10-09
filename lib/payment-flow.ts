@@ -6,6 +6,26 @@ export function depositHoldDate(pickupDate: string) {
   return new Date(Date.parse(`${pickupDate}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
 }
 
+export function melbourneDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-AU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "Australia/Melbourne",
+  }).formatToParts(date);
+  const part = (type: "year" | "month" | "day") => parts.find((entry) => entry.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+export function isMelbourneDateInFuture(value: string, now = new Date()) {
+  return value > melbourneDateKey(now);
+}
+
+export function isImmediateDepositBooking(pickupDate: string, now = new Date()) {
+  const today = melbourneDateKey(now);
+  return pickupDate >= today && depositHoldDate(pickupDate) <= today;
+}
+
 export function paymentLinkExpiry(dropoffDate: string, now = Date.now()) {
   if (rentalDays(dropoffDate, dropoffDate) === null) throw new Error("Invalid return date.");
   return new Date(Math.max(now + PAYMENT_LINK_VALIDITY_DAYS * 86_400_000, Date.parse(`${dropoffDate}T00:00:00Z`) + 3 * 86_400_000)).toISOString();

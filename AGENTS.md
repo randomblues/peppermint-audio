@@ -323,6 +323,7 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Symptom:** Screenshots showed cropped layouts or a different breakpoint from the requested viewport, delaying responsive validation.
 - **Root cause:** Integrated-browser screenshot helpers reset or rescale emulated viewport dimensions; a successful `setViewportSize()` call alone did not guarantee capture at that width.
 - **Prevention:** Verify `innerWidth` at capture time. If screenshot helpers alter the viewport, use a CDP device-metrics override and direct `Page.captureScreenshot` on the same integrated-browser tab. Inspect the captured images as well as rendered bounds.
+- **Additional observation:** Hidden or concurrently controlled tabs can return stale rendered frames even when `innerWidth` matches the requested width. Inspect an actual breakpoint-dependent layout and confirm the frame has updated before trusting the screenshot. If viewport, frame, or input evidence remains inconsistent after a bounded diagnostic attempt, stop retries and report responsive validation as incomplete rather than marking it passed.
 - **Next action:** Use a dedicated QA tab, capture evidence at every required width, and wait for cart hydration and the actual end of the page before checking footer clearance.
 
 ### 2026-10-09 — Raw patch arguments rejected by tool hook
