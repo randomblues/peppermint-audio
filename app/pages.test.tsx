@@ -75,6 +75,15 @@ describe("static site pages", () => {
     expect(screen.getByRole("link", { name: "The pickup-to-party details" })).toHaveAttribute("href", "/how-it-works");
   });
 
+  it("home page reserves the hero photograph for the desktop layout", () => {
+    render(<Home />);
+
+    const photo = screen.getByRole("img", { name: "Microphones and a PA speaker set up on an outdoor stage" });
+    expect(photo.parentElement).toHaveClass("hidden", "lg:block");
+    expect(screen.getByRole("heading", { level: 1, name: business.heroHeading })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Find my setup" })).toBeInTheDocument();
+  });
+
   it("packages page selects a valid requested package and offers custom enquiries", async () => {
     render(await PackagesPage({ searchParams: Promise.resolve({ package: "big-celebration" }) }));
 
@@ -107,12 +116,11 @@ describe("static site pages", () => {
     expect(screen.getByText("Pickup from Abbotsford 3067. We confirm the exact window after booking.")).toBeInTheDocument();
   });
 
-  it("keeps the payment page focused on the customer action", async () => {
+  it("delegates the payment and confirmation screens to the token-aware checkout", async () => {
     const PaymentPage = (await import("./pay/[token]/page")).default;
     render(await PaymentPage({ params: Promise.resolve({ token: "test-token" }) }));
 
-    expect(screen.getByRole("heading", { name: "Pay for your hire" })).toBeInTheDocument();
-    expect(screen.getByText("Review your hire and deposit details, then complete your payment securely.")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Pay for your hire" })).not.toBeInTheDocument();
     expect(screen.queryByText(/deposit hold may expire/i)).not.toBeInTheDocument();
     expect(screen.getByLabelText("Payment checkout")).toHaveTextContent("Payment form for test-token");
   });

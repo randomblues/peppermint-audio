@@ -23,7 +23,7 @@ Marketing website for a Melbourne PA equipment hire business, built with:
 - `/booking` (booking request form)
 - `/pay/[token]` (time-limited customer payment link)
 
-The homepage leads with "Good sound. Less stress.", a real stage photograph, and direct paths to packages and individual gear. Its introductory strip highlights hire options, Abbotsford pickup, and the included setup walkthrough. It keeps the existing package/cart interactions and customer reviews, with a three-step hire overview from `homeHireSteps` in `lib/site-content.ts`. Booking requests still require availability review before confirmation.
+The homepage leads with "Good sound. Less stress.", a real stage photograph shown only at desktop widths (1024px and above), and direct paths to packages and individual gear. Mobile and portrait-tablet layouts keep the introduction focused on text and hire options without reserving space for the photo. Its introductory strip highlights hire options, Abbotsford pickup, and the included setup walkthrough. It keeps the existing package/cart interactions and customer reviews, with a three-step hire overview from `homeHireSteps` in `lib/site-content.ts`. Booking requests still require availability review before confirmation.
 
 The locally served homepage photo, `public/home-live-sound.jpg`, is [A Stage with Microphones and a Bar Stool by Caio](https://www.pexels.com/photo/a-stage-with-microphones-and-a-bar-stool-13061474/), used under the [Pexels License](https://www.pexels.com/license/). It is stock photography, not a photograph of Peppermint Audio's own inventory or an event serviced by the business.
 
@@ -142,11 +142,15 @@ The rule and public explanation live in `lib/site-content.ts`; shared calculatio
 
 ## Deferred security-deposit holds
 
-For Stripe hires of up to **three nights**, the customer pays the hire now and
-explicitly consents to saving their card with Stripe for a separate temporary
-deposit hold. The hold is attempted on the calendar day before pickup in Melbourne.
-Last-minute paid bookings are attempted through the hire-payment webhook.
-Four-night and longer hires use the existing bank-transfer flow.
+For Stripe hires of up to **three nights**, the customer pays the hire now.
+For pickup today or tomorrow in Melbourne, checkout also places the temporary
+deposit hold, using a separate payment method for each PaymentIntent so a
+single-use card method is not reused. For later pickup, the customer explicitly
+consents to saving their card with Stripe; the deposit hold is attempted on the
+calendar day before pickup. The hire-payment webhook also resumes due holds.
+Four-night and longer hires use bank transfer or cash on pickup.
+An explicitly configured zero deposit creates no hold and shows no deposit-hold
+instructions. A failed deposit can be retried without charging the paid hire again.
 
 `/api/cron/deposit-holds` runs daily at 20:00 UTC (06:00/07:00 Melbourne), protected
 by `CRON_SECRET`. It resumes saved intents rather than creating duplicate holds,
@@ -170,9 +174,11 @@ mode, run `npm run test:deposit:integration` (Node 20.6+). It requires a running
 local stack and test-mode Stripe credentials in `.env.local`; it rejects live
 keys and blocks application email delivery. It charges a disposable test hire,
 checks that unpaid/not-yet-due bookings cannot create a hold, saves the card,
-authorises the due deposit, verifies retries do not duplicate it, and releases
-the hold on cancellation. It then refunds the test hire and removes its own
-local booking and Stripe customer. Normal unit runs skip this external check.
+authorises the due deposit, and verifies retries do not duplicate it. Separate
+cases exercise release on cancellation, partial capture, and full capture.
+Cleanup refunds test hire and captured-deposit charges, releases active holds,
+and removes each local booking and Stripe customer. Normal unit runs skip this
+external check.
 
 ## Pickup reminders
 

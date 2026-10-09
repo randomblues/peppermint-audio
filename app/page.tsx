@@ -31,7 +31,7 @@ export default function Home() {
               Not sure what you need? Ask us.
             </Link>
           </div>
-          <div className="mx-auto w-full max-w-xs sm:max-w-sm lg:max-w-none">
+          <div className="hidden w-full lg:block">
             <Image
               src={business.heroImage}
               alt="Microphones and a PA speaker set up on an outdoor stage"

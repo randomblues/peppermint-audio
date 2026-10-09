@@ -9,7 +9,7 @@ Peppermint Audio collects:
 1. The equipment-hire amount, which is charged immediately once the customer completes payment.
 2. A refundable security deposit, which is authorised on the customer's card but not captured immediately.
 
-The customer experiences this as one payment page. Internally, the page confirms two separate Stripe PaymentIntents:
+The customer experiences this as one payment page. Hire and deposit use separate Stripe PaymentIntents, but their timing depends on the pickup date:
 
 | PaymentIntent | Amount | Capture behavior | Purpose |
 | --- | --- | --- | --- |
@@ -20,14 +20,14 @@ The deposit is not implemented as a captured charge followed by a refund. When t
 
 ## Rental-length rule
 
-Stripe card authorisations are used only for hires of seven days or less.
+Stripe card authorisations are used only for hires of three nights or less.
 
-- `1–7` rental days: Stripe card payment plus deposit authorisation.
-- More than `7` rental days: bank transfer.
+- `1–3` hire nights: Stripe card payment plus deposit authorisation is available.
+- Four or more hire nights: bank transfer or cash on pickup.
 
-The rule is defined in [`lib/payment-flow.ts`](../lib/payment-flow.ts) as `MAX_STRIPE_HIRE_DAYS = 7`. It is enforced again by the server when an admin creates or updates a payment request; changing only the admin UI is not sufficient.
+The rule is defined in [`lib/payment-flow.ts`](../lib/payment-flow.ts) as `MAX_STRIPE_HIRE_DAYS = 3`. Nights are the date difference between pickup and return, with a one-night minimum for same-day hire. It is enforced again by the server when an admin creates or updates a payment request; changing only the admin UI is not sufficient.
 
-The seven-day limit exists because card authorisations have expiry and operational timing constraints. Bank transfer avoids depending on an authorisation remaining valid throughout a longer hire.
+The three-night limit leaves time for return and check-in within the actual card-hold expiry. Bank transfer avoids depending on an authorisation remaining valid throughout a longer hire.
 
 ## Customer payment flow
 
@@ -46,9 +46,9 @@ For an eligible short hire, the server:
 2. Creates or recovers the Stripe Customer.
 3. Cancels any still-pending PaymentIntents from a previous payment request.
 4. Creates the hire PaymentIntent with automatic capture.
-5. Creates the deposit PaymentIntent with `capture_method: "manual"` when the deposit is greater than zero.
+5. For pickup today or tomorrow in Melbourne, creates the deposit PaymentIntent with `capture_method: "manual"` when the deposit is greater than zero. For later pickup, configures the hire intent to save the card for off-session use and schedules the deposit hold for the day before pickup instead of creating it immediately.
 6. Stores the Stripe IDs and payment state in Supabase.
-7. Generates a random payment token that expires after 30 days.
+7. Generates a random payment token valid for at least 30 days and through return plus three days.
 8. Sends the customer a secure payment link.
 
 The implementation is in [`app/api/admin/payments/create-checkout/route.ts`](../app/api/admin/payments/create-checkout/route.ts).
@@ -69,12 +69,18 @@ The lookup route is [`app/api/payment/[token]/route.ts`](../app/api/payment/[tok
 
 ### 3. Customer submits one card form
 
-[`components/payment-checkout.tsx`](../components/payment-checkout.tsx) renders one Stripe Elements card form. On submit it confirms:
+[`components/payment-checkout.tsx`](../components/payment-checkout.tsx) renders one Stripe Elements card form. It records the applicable deposit consent before confirming:
 
 - the hire PaymentIntent;
-- the deposit PaymentIntent, if a deposit exists.
+- the deposit PaymentIntent immediately for pickup today or tomorrow, if a deposit exists.
 
-The customer sees one total consisting of hire plus deposit, while the payment statuses remain separate internally. A successful result means the hire is paid and the deposit is authorised, not captured.
+Immediate checkout creates a fresh Stripe PaymentMethod from the same card entry for each intent. A method consumed by a hire intent without future-use setup must not be reused for the deposit. If the deposit fails after the hire succeeds, retry only confirms the deposit; it does not charge hire again.
+
+For advance bookings, checkout charges only hire and saves the card with consent. The due hold is attempted by the daily deposit cron or hire-payment webhook. A successful hire payment does not mean that a scheduled deposit is already authorised. The actual hold expiry must cover return plus the check-in margin.
+
+The customer sees hire plus deposit due during immediate checkout, or hire only for advance checkout. A configured zero deposit creates no hold and does not show deposit instructions. Paid hire and authorised deposits are removed from the remaining total. Stripe Elements stays mounted while confirmation and verification run, then unmounts on success; checkout does not call `clear()` immediately before destroying the Element.
+
+Successful checkout replaces the payment form with a distinct **Payment received** screen on the same payment-link URL. It shows the appropriate security-deposit outcome and a collapsed hire summary, without card entry or a payment button. The summary shows the hire payment received rather than a zero remaining-balance total. Reopening a completed payment link shows this screen directly. A failed or unverified immediate deposit keeps the retry form visible. Payment receipt is separate from booking confirmation and does not change the booking status.
 
 ## Deposit lifecycle
 
@@ -103,11 +109,11 @@ For an approved damage/loss claim:
 5. `deposit_captured_cents` and `deposit_captured_at` are recorded.
 6. A deposit-capture billing document/email is generated.
 
-Partial capture is supported. The remaining uncaptured amount is not automatically released by this route, so the admin workflow should ensure the final deposit outcome is deliberately completed.
+Partial capture is supported. The capture is final: Stripe releases the remaining uncaptured amount, and the application records the captured amount. Capture is rejected after the recorded hold expiry.
 
 ## Bank-transfer flow for long hires
 
-For a hire longer than seven days, the admin must use bank transfer. The server rejects attempts to create a Stripe card authorisation for an ineligible rental.
+For a hire longer than three nights, the admin uses bank transfer or cash on pickup. Bank transfer is also available for short hires. The server rejects attempts to create a Stripe card authorisation for an ineligible rental.
 
 The bank-transfer flow:
 
@@ -253,10 +259,10 @@ The admin UI is implemented in [`components/admin-payment-panel.tsx`](../compone
 
 - Review availability before requesting payment.
 - Confirm the hire line items and amount before creating a payment request.
-- Do not create Stripe payment requests for hires longer than seven days.
+- Do not create Stripe payment requests for hires longer than three nights.
 - Do not manually refund a deposit that is still an uncaptured Stripe authorisation; release it by cancelling the PaymentIntent.
 - Capture only the amount justified by the approved claim, and never above the authorised amount.
-- Treat a payment link as expired after 30 days and issue a new one when required.
+- Respect the stored payment-link expiry (at least 30 days and through return plus three days), and issue a new link when it expires.
 - Do not silently replace a bank-transfer invoice when its amounts differ; resolve the booking configuration explicitly.
 - If Stripe succeeds but database persistence or billing-email delivery fails, inspect the admin record and Stripe Dashboard before retrying.
 - Apply the Supabase migration before using newly added payment, invoice, or billing-document fields in production.
@@ -299,7 +305,7 @@ Check that Stripe is sending the raw request body, the `stripe-signature` header
 
 ### A payment link is expired
 
-Payment tokens are intentionally limited to 30 days. Have an admin create a new payment request rather than extending a token manually.
+Payment tokens remain valid for at least 30 days and through return plus three days. If the stored expiry has passed, have an admin create a new payment request rather than extending a token manually.
 
 ### A deposit should be returned
 

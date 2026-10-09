@@ -6,6 +6,7 @@ import { loadStripe } from "@stripe/stripe-js";
 import { CheckCircle2, ChevronDown, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Section } from "@/components/section";
 import { lineItemHireTotalCents, type BookingLineItem } from "@/lib/booking-line-items";
 import { formatAudCents, isImmediateDepositBooking, isMelbourneDateInFuture, rentalDays } from "@/lib/payment-flow";
 import { business } from "@/lib/site-content";
@@ -31,7 +32,7 @@ function formatMelbourneDate(date: string) {
     month: "long",
     year: "numeric",
     timeZone: "Australia/Melbourne",
-  }).format(new Date(`${date}T00:00:00`));
+  }).format(new Date(`${date}T00:00:00`)).replace(/ /g, "\u00a0");
 }
 
 type PaymentData = {
@@ -51,14 +52,70 @@ type PaymentData = {
   depositConsentRecorded?: boolean;
 };
 
-function HireSummary({ data }: { data: PaymentData }) {
+function isPaymentComplete(data: PaymentData) {
+  return data.hirePaymentStatus === "paid" && (
+    data.securityDepositCents === 0
+    || ["authorized", "captured", "released"].includes(data.depositPaymentStatus)
+    || Boolean(data.depositHoldDate && ["scheduled", "authorizing"].includes(data.depositPaymentStatus))
+  );
+}
+
+function PaymentConfirmation({ data }: { data: PaymentData }) {
+  const depositAuthorized = data.depositPaymentStatus === "authorized";
+  const depositScheduled = ["scheduled", "authorizing"].includes(data.depositPaymentStatus);
+  const message = data.securityDepositCents === 0
+    ? "Payment complete. Your hire payment has been received. No security deposit is required."
+    : depositAuthorized
+      ? "Payment complete. Your hire payment is complete and your refundable security deposit has been authorised."
+      : depositScheduled
+        ? "Your hire payment has been received. Your security deposit hold is scheduled before pickup; it has not been authorised yet."
+        : "Payment complete. Your hire payment has been received.";
+
+  return (
+    <section className="mx-auto w-full max-w-2xl px-4 py-12 sm:px-6 sm:py-16">
+      <div role="status" className="mb-8 text-center">
+        <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/20">
+          <CheckCircle2 className="size-8" aria-hidden="true" />
+        </div>
+        <h1 className="font-heading text-2xl font-semibold tracking-tight sm:text-3xl">Payment received</h1>
+        <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-muted-foreground">{message}</p>
+      </div>
+      <div className="space-y-4">
+        <DepositConfidencePanel data={data} />
+        <details className="group rounded-2xl border bg-card">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-medium marker:hidden sm:p-5 [&::-webkit-details-marker]:hidden">
+            View hire summary
+            <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
+          </summary>
+          <div className="border-t p-3">
+            <HireSummary data={data} receipt />
+          </div>
+        </details>
+        <StripeTrustMark />
+      </div>
+    </section>
+  );
+}
+
+function HireSummary({ data, receipt = false }: { data: PaymentData; receipt?: boolean }) {
   const nights = rentalDays(data.pickupDate, data.dropoffDate);
   const itemCount = data.hireLineItems.reduce((total, item) => total + item.quantity, 0);
-  const showScheduledHoldDate = isScheduledHoldDate(data.depositHoldDate);
-  const immediateDeposit = Boolean(data.depositHoldDate && isImmediateDepositBooking(data.pickupDate));
-  const totalDueCents = data.hirePaymentStatus === "paid"
-    ? 0
-    : data.hireAmountCents + (immediateDeposit ? data.securityDepositCents : 0);
+  const immediateDeposit = Boolean(data.securityDepositCents > 0 && data.depositHoldDate && isImmediateDepositBooking(data.pickupDate));
+  const depositSecured = ["authorized", "captured", "released"].includes(data.depositPaymentStatus);
+  const hirePaid = data.hirePaymentStatus === "paid";
+  const totalDueCents = (hirePaid ? 0 : data.hireAmountCents)
+    + (immediateDeposit && !depositSecured ? data.securityDepositCents : 0);
+  const securityDepositLabel = data.securityDepositCents === 0
+    ? "Not required"
+    : data.depositPaymentStatus === "authorized"
+      ? "Card hold authorised"
+      : data.depositPaymentStatus === "released"
+        ? "Card hold released"
+        : data.depositPaymentStatus === "captured"
+          ? "Captured"
+          : ["scheduled", "authorizing"].includes(data.depositPaymentStatus)
+            ? "Card hold scheduled before pickup"
+            : "Temporary card hold";
 
   return (
     <div className="rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
@@ -80,41 +137,35 @@ function HireSummary({ data }: { data: PaymentData }) {
         ))}
       </div>
       <p className="mt-3 text-xs text-muted-foreground">{nights === null ? "Please contact us to check your hire dates." : `${nights} ${nights === 1 ? "night" : "nights"} · Standard first-night rate, additional nights half price.`}</p>
-      <div className="mt-4 space-y-2 border-t pt-4 text-sm">
-        <div className="flex items-center justify-between gap-4">
-          <span className="text-muted-foreground">Hire subtotal</span>
-          <span>{formatAudCents(data.hireAmountCents)}</span>
+      <div className="mt-4 space-y-3 border-t pt-4">
+        {!receipt ? <div className="flex items-center justify-between gap-4 text-sm">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="text-muted-foreground">Hire subtotal</span>
+            {hirePaid ? <span className="inline-flex items-center gap-1 text-xs text-primary"><CheckCircle2 className="size-3.5" aria-hidden="true" />Paid</span> : null}
+          </div>
+          <span className="shrink-0 tabular-nums">{formatAudCents(data.hireAmountCents)}</span>
+        </div> : null}
+        <div className="flex items-center justify-between gap-4 pb-1">
+          <span className="text-sm font-semibold sm:text-base">{receipt ? "Hire payment received" : "Total due today"}</span>
+          <span className="shrink-0 text-xl font-bold tabular-nums sm:text-2xl">{formatAudCents(receipt ? data.hireAmountCents : totalDueCents)}</span>
         </div>
-        <div className="flex items-center justify-between gap-4">
-          <span className="text-muted-foreground">
-            Refundable security deposit
-            {showScheduledHoldDate ? (
-              <span className="block text-xs">
-                Hold date: {formatMelbourneDate(data.depositHoldDate!)}
-              </span>
-            ) : null}
-          </span>
-          <span>{formatAudCents(data.securityDepositCents)}</span>
-        </div>
-        <div className="flex items-center justify-between gap-4 border-t pt-3 text-base font-semibold">
-          <span>Total due today</span>
-          <span>{formatAudCents(totalDueCents)}</span>
+        <div className="flex items-start justify-between gap-4 border-t border-dashed pt-3 text-xs text-muted-foreground">
+          <div className="min-w-0 space-y-1">
+            <span className="block leading-5">Refundable security deposit</span>
+            <span className="block text-[11px] leading-relaxed">{securityDepositLabel}</span>
+          </div>
+          <span className="shrink-0 leading-5 tabular-nums">{formatAudCents(data.securityDepositCents)}</span>
         </div>
       </div>
-      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-        {showScheduledHoldDate
-          ? `The hire payment will be charged at checkout. Your security deposit is a temporary hold scheduled for ${formatMelbourneDate(data.depositHoldDate!)} (one day before pickup). The hold is released after all hired equipment is returned in working condition.`
-          : immediateDeposit
-            ? `The hire payment will be charged at checkout, and a temporary ${formatAudCents(data.securityDepositCents)} security-deposit hold will also be placed during checkout. The hold is released after all hired equipment is returned in working condition.`
-            : "The security deposit is a separate temporary card hold, not part of the hire charge."}
-      </p>
     </div>
   );
 }
 
 function DepositConfidencePanel({ data }: { data: PaymentData }) {
+  if (data.securityDepositCents === 0) return null;
   const showScheduledHoldDate = isScheduledHoldDate(data.depositHoldDate);
   const immediateDeposit = Boolean(data.depositHoldDate && isImmediateDepositBooking(data.pickupDate));
+  const depositAuthorized = data.depositPaymentStatus === "authorized";
   return (
     <details className="group overflow-hidden rounded-2xl border border-primary/20 bg-primary/[0.04] shadow-sm">
       <summary className="flex cursor-pointer list-none items-start gap-3 px-4 py-4 marker:hidden sm:px-5 [&::-webkit-details-marker]:hidden">
@@ -122,16 +173,16 @@ function DepositConfidencePanel({ data }: { data: PaymentData }) {
           <ShieldCheck className="size-5" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
-          <h3 className="font-heading text-base font-semibold">How your deposit works</h3>
+          <h3 className="font-heading text-base font-semibold">How your security deposit works</h3>
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-            Your {formatAudCents(data.securityDepositCents)} deposit is a temporary card authorisation {showScheduledHoldDate ? `scheduled for ${formatMelbourneDate(data.depositHoldDate!)} (one day before pickup).` : immediateDeposit ? "that will be placed as part of today's checkout." : "that will be released after return."}
+            Your {formatAudCents(data.securityDepositCents)} security deposit is a temporary card authorisation {depositAuthorized ? "that has been placed and will be released after return." : showScheduledHoldDate ? `scheduled for ${formatMelbourneDate(data.depositHoldDate!)}.` : immediateDeposit ? "that will be placed as part of today's checkout." : "that will be released after return."}
           </p>
         </div>
         <ChevronDown className="mt-1 size-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
       </summary>
       <div className="grid gap-4 border-t border-primary/10 px-4 py-4 sm:grid-cols-3 sm:px-5">
         {[
-          ["1", showScheduledHoldDate ? "Held before pickup" : immediateDeposit ? "Authorised today" : "Card authorisation", showScheduledHoldDate ? `We place the temporary hold on ${formatMelbourneDate(data.depositHoldDate!)}. Your bank may show it as pending; it is not a purchase.` : "The temporary hold will be placed during checkout. Your bank may show it as pending; it is not a purchase."],
+          ["1", depositAuthorized ? "Card authorised" : showScheduledHoldDate ? "Held before pickup" : immediateDeposit ? "Authorised today" : "Card authorisation", depositAuthorized ? "The temporary hold has been placed. Your bank may show it as pending; it is not a purchase." : showScheduledHoldDate ? `We place the temporary hold on ${formatMelbourneDate(data.depositHoldDate!)}. Your bank may show it as pending; it is not a purchase.` : "The temporary hold will be placed during checkout. Your bank may show it as pending; it is not a purchase."],
           ["2", "Equipment returned", "We check the equipment back in against the agreed return time and condition."],
           ["3", "Released after check-in", "If everything is returned on time and complete, the full authorisation is released."],
         ].map(([step, title, detail]) => (
@@ -147,7 +198,7 @@ function DepositConfidencePanel({ data }: { data: PaymentData }) {
       <div className="flex items-start gap-2 border-t border-primary/10 bg-background/35 px-4 py-3 text-xs leading-relaxed text-muted-foreground sm:px-5">
         <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
         <div className="min-w-0">
-          <p>The deposit only covers matters set out in the hire terms, such as damage, missing equipment, or late return.</p>
+          <p>The security deposit only covers matters set out in the hire terms, such as damage, missing equipment, or late return.</p>
           <p className="mt-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/80">Questions?</p>
           <div className="mt-1 flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2">
             <a className="break-all font-medium text-foreground underline underline-offset-2" href={`mailto:${business.email}`}>{business.email}</a>
@@ -169,16 +220,22 @@ function PaymentForm({ data, token, onComplete }: { data: PaymentData; token: st
   const [hirePaid, setHirePaid] = useState(data.hirePaymentStatus === "paid");
   const [depositAuthorized, setDepositAuthorized] = useState(data.depositPaymentStatus === "authorized");
   const [consent, setConsent] = useState(Boolean(data.depositConsentRecorded));
+  const [consentRecorded, setConsentRecorded] = useState(Boolean(data.depositConsentRecorded));
   const requiresDepositConsent = Boolean(data.depositHoldDate);
   const immediateDeposit = Boolean(data.depositHoldDate && isImmediateDepositBooking(data.pickupDate));
   const showScheduledHoldDate = isScheduledHoldDate(data.depositHoldDate);
+  const currentData = {
+    ...data,
+    hirePaymentStatus: hirePaid ? "paid" : data.hirePaymentStatus,
+    depositPaymentStatus: depositAuthorized ? "authorized" : data.depositPaymentStatus,
+  };
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (requiresDepositConsent && data.securityDepositCents > 0 && !consent) {
       setError(immediateDeposit
-        ? "Please agree to the hire payment and temporary security-deposit hold before continuing."
-        : "Please agree to the card-saving and security-deposit authorisation before continuing.");
+        ? "Please agree to the hire payment and temporary security deposit hold before continuing."
+        : "Please agree to the card-saving and security deposit authorisation before continuing.");
       return;
     }
     if (!stripe || !elements) {
@@ -193,7 +250,7 @@ function PaymentForm({ data, token, onComplete }: { data: PaymentData; token: st
     setError("");
     setProcessing(true);
     try {
-      if (requiresDepositConsent && data.securityDepositCents > 0 && !data.depositConsentRecorded) {
+      if (requiresDepositConsent && data.securityDepositCents > 0 && !consentRecorded) {
         const response = await fetch(`/api/payment/${encodeURIComponent(token)}`, {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ consent: true }),
         });
@@ -201,19 +258,23 @@ function PaymentForm({ data, token, onComplete }: { data: PaymentData; token: st
         if (!response.ok) throw new Error(payload.error ?? (immediateDeposit
           ? "Your checkout consent could not be recorded."
           : "Your card-saving consent could not be recorded."));
+        setConsentRecorded(true);
       }
-      const paymentMethod = await stripe.createPaymentMethod({
-        type: "card",
-        card,
-        billing_details: { name: data.customerName, email: data.email },
-      });
-      if (paymentMethod.error || !paymentMethod.paymentMethod) {
-        throw new Error(paymentMethod.error?.message ?? "Your card could not be prepared.");
-      }
+      const preparePaymentMethod = async () => {
+        const result = await stripe.createPaymentMethod({
+          type: "card",
+          card,
+          billing_details: { name: data.customerName, email: data.email },
+        });
+        if (result.error || !result.paymentMethod) {
+          throw new Error(result.error?.message ?? "Your card could not be prepared.");
+        }
+        return result.paymentMethod.id;
+      };
 
       if (!hirePaid && data.hireClientSecret) {
         const hireResult = await stripe.confirmCardPayment(data.hireClientSecret, {
-          payment_method: paymentMethod.paymentMethod.id,
+          payment_method: await preparePaymentMethod(),
         });
         if (hireResult.error) throw new Error(hireResult.error.message);
         if (hireResult.paymentIntent?.status !== "succeeded") throw new Error("The hire payment did not complete.");
@@ -222,7 +283,7 @@ function PaymentForm({ data, token, onComplete }: { data: PaymentData; token: st
 
       if (!depositAuthorized && data.depositClientSecret) {
         const depositResult = await stripe.confirmCardPayment(data.depositClientSecret, {
-          payment_method: paymentMethod.paymentMethod.id,
+          payment_method: await preparePaymentMethod(),
         });
         if (depositResult.error) throw new Error(depositResult.error.message);
         if (depositResult.paymentIntent?.status !== "requires_capture") throw new Error("The security deposit could not be authorised.");
@@ -232,12 +293,11 @@ function PaymentForm({ data, token, onComplete }: { data: PaymentData; token: st
           });
           const payload = await response.json();
           if (!response.ok || payload.status !== "authorized") {
-            throw new Error(payload.error ?? "Your deposit could not be verified. Please contact Peppermint Audio.");
+            throw new Error(payload.error ?? "Your security deposit could not be verified. Please contact Peppermint Audio.");
           }
         }
         setDepositAuthorized(true);
       }
-      card.clear();
       onComplete();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Payment could not be completed.");
@@ -246,21 +306,10 @@ function PaymentForm({ data, token, onComplete }: { data: PaymentData; token: st
     }
   }
 
-  if (hirePaid && (data.securityDepositCents === 0 || depositAuthorized || (requiresDepositConsent && ["scheduled", "authorizing"].includes(data.depositPaymentStatus)))) {
-    return (
-      <div className="space-y-4">
-        <HireSummary data={data} />
-        <DepositConfidencePanel data={data} />
-        <div className="rounded-xl border border-primary/20 bg-primary/5 p-5 text-sm text-primary">{data.securityDepositCents === 0 ? "Payment complete. Your hire payment has been received. No security deposit is required." : depositAuthorized ? "Payment complete. Your hire payment is complete and your refundable security deposit has been authorised." : "Your hire payment has been received. Your security-deposit hold is scheduled before pickup; it has not been authorised yet."}</div>
-        <StripeTrustMark />
-      </div>
-    );
-  }
-
   return (
     <form onSubmit={submit} className="space-y-5">
-      <HireSummary data={data} />
-      <DepositConfidencePanel data={data} />
+      <HireSummary data={currentData} />
+      <DepositConfidencePanel data={currentData} />
       {["hold_too_short", "expired"].includes(data.depositPaymentStatus) ? <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm">Your hire payment has been received. Please contact Peppermint Audio before pickup to arrange your security deposit.</p> : null}
       <div className="rounded-xl border bg-muted/20 p-4">
         <p className="text-sm font-semibold">Card details</p>
@@ -268,20 +317,22 @@ function PaymentForm({ data, token, onComplete }: { data: PaymentData; token: st
           <CardElement options={{ hidePostalCode: false }} />
         </div>
         {requiresDepositConsent && data.securityDepositCents > 0 && !hirePaid ? <label className="flex items-start gap-3 rounded-xl border p-4 text-sm leading-relaxed"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-1 shrink-0" /><span>{immediateDeposit
-          ? `I authorise Peppermint Audio to charge the hire and place a temporary ${formatAudCents(data.securityDepositCents)} security-deposit hold as part of this checkout. The hold is released after return unless charges apply under the hire terms.`
-          : `I authorise Peppermint Audio to save my card, charge the hire, and place a temporary ${formatAudCents(data.securityDepositCents)} deposit hold on ${formatMelbourneDate(data.depositHoldDate!)} (one day before pickup). The hold is released after return unless charges apply under the hire terms.`}</span></label> : null}
+          ? `I authorise Peppermint Audio to charge the hire and place a temporary ${formatAudCents(data.securityDepositCents)} security deposit hold as part of this checkout. The hold is released after return unless charges apply under the hire terms.`
+          : `I authorise Peppermint Audio to save my card, charge the hire, and place a temporary ${formatAudCents(data.securityDepositCents)} security deposit hold on ${formatMelbourneDate(data.depositHoldDate!)} (one day before pickup). The hold is released after return unless charges apply under the hire terms.`}</span></label> : null}
       </div>
       {error ? <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">{error}</p> : null}
       <Button type="submit" className="w-full" disabled={processing || !stripe || !elements || (requiresDepositConsent && !hirePaid && !consent && data.securityDepositCents > 0) || (!data.hireClientSecret && !data.depositClientSecret)}>
-        {processing ? "Processing securely…" : hirePaid ? `Authorise ${formatAudCents(data.securityDepositCents)} deposit hold` : `Pay ${formatAudCents(data.hireAmountCents + (immediateDeposit ? data.securityDepositCents : 0))}`}
+        {processing ? "Processing securely…" : hirePaid ? `Authorise ${formatAudCents(data.securityDepositCents)} security deposit hold` : `Pay ${formatAudCents(data.hireAmountCents + (immediateDeposit ? data.securityDepositCents : 0))}`}
       </Button>
       <p className="text-center text-xs text-muted-foreground">
-        {hirePaid
-          ? "Your hire payment has been received. Complete the security-deposit hold above."
+        {data.securityDepositCents === 0
+          ? "Your hire payment is taken now. No security deposit is required for this booking."
+          : hirePaid
+          ? "Your hire payment has been received. Complete the security deposit hold above."
           : showScheduledHoldDate
-            ? "Your hire payment is taken now. The deposit hold is scheduled for one day before pickup."
+            ? "Your hire payment is taken now. The security deposit hold is scheduled for one day before pickup."
             : immediateDeposit
-              ? "Your hire payment will be charged and the temporary security-deposit hold placed together during checkout."
+              ? "Your hire payment will be charged and the temporary security deposit hold placed together during checkout."
               : "Your hire payment is taken now. Your refundable security deposit is released after the equipment is returned."}
       </p>
       <StripeTrustMark />
@@ -307,13 +358,21 @@ export function PaymentCheckout({ token }: { token: string }) {
       .catch((cause) => setError(cause instanceof Error ? cause.message : "Payment link could not be loaded."));
   }, [token]);
 
-  if (error) return <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">{error}</p>;
-  if (!data) return <p className="rounded-lg border bg-card p-6 text-sm text-muted-foreground">Loading secure payment details…</p>;
-  if (!stripePromise) return <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">Payments are not configured yet. Please contact Peppermint Audio.</p>;
+  if (data && !error && isPaymentComplete(data)) return <PaymentConfirmation data={data} />;
 
   return (
-    <Elements stripe={stripePromise}>
-      <PaymentForm data={data} token={token} onComplete={() => setData((current) => current ? { ...current, hirePaymentStatus: "paid", depositConsentRecorded: true, depositPaymentStatus: current.securityDepositCents ? current.depositClientSecret ? "authorized" : "scheduled" : "not_required" } : current)} />
-    </Elements>
+    <Section eyebrow="Secure payment" title="Pay for your hire" headingAs="h1" description="Review your hire and security deposit details, then complete your payment securely.">
+      <div className="mx-auto max-w-xl">
+        {error
+          ? <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">{error}</p>
+          : !data
+            ? <p className="rounded-lg border bg-card p-6 text-sm text-muted-foreground">Loading secure payment details…</p>
+            : !stripePromise
+              ? <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">Payments are not configured yet. Please contact Peppermint Audio.</p>
+              : <Elements stripe={stripePromise}>
+                <PaymentForm data={data} token={token} onComplete={() => setData((current) => current ? { ...current, hirePaymentStatus: "paid", depositConsentRecorded: true, depositPaymentStatus: current.securityDepositCents ? current.depositClientSecret ? "authorized" : "scheduled" : "not_required" } : current)} />
+              </Elements>}
+      </div>
+    </Section>
   );
 }

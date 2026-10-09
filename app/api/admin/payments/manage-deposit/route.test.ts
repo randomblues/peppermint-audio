@@ -11,8 +11,8 @@ vi.mock("@/lib/invoice-service", () => ({ sendBillingDocument: mocks.document, m
 
 import { POST } from "./route";
 
-const request = (action: string) => new Request("http://localhost/api/admin/payments/manage-deposit", {
-  method: "POST", body: JSON.stringify({ bookingId: "booking-1", action, amount: "10" }),
+const request = (action: string, amount: unknown = "10") => new Request("http://localhost/api/admin/payments/manage-deposit", {
+  method: "POST", body: JSON.stringify({ bookingId: "booking-1", action, amount }),
 });
 
 function session(captureBefore: string | null = null) {
@@ -35,6 +35,12 @@ beforeEach(() => {
 });
 
 describe("deferred-deposit admin actions", () => {
+  it("rejects unauthenticated deposit actions before calling Stripe", async () => {
+    mocks.requireAdmin.mockResolvedValue(null);
+    expect((await POST(request("capture"))).status).toBe(401);
+    expect(mocks.capture).not.toHaveBeenCalled();
+  });
+
   it("marks an intentional release before cancelling so the webhook cannot call it an expiry", async () => {
     expect((await POST(request("release"))).status).toBe(200);
     expect(mocks.updateIntent).toHaveBeenCalledWith("pi_deposit", { metadata: { releaseRequested: "true" } });
@@ -45,5 +51,33 @@ describe("deferred-deposit admin actions", () => {
     mocks.requireAdmin.mockResolvedValue(session("2020-01-01T00:00:00Z"));
     expect((await POST(request("capture"))).status).toBe(409);
     expect(mocks.capture).not.toHaveBeenCalled();
+  });
+
+  it.each(["0", "-1", "100.01", "1.001", "invalid", null])("rejects invalid or excessive capture amount %s", async amount => {
+    expect((await POST(request("capture", amount))).status).toBe(400);
+    expect(mocks.capture).not.toHaveBeenCalled();
+    expect(mocks.document).not.toHaveBeenCalled();
+  });
+
+  it.each([["0.01", 1], ["25", 2500], ["100", 10000]])("captures exactly %s dollars and sends a capture document", async (amount, cents) => {
+    expect((await POST(request("capture", amount))).status).toBe(200);
+    expect(mocks.capture).toHaveBeenCalledWith("pi_deposit", { amount_to_capture: cents });
+    expect(mocks.document).toHaveBeenCalledWith(expect.anything(), "booking-1", "deposit_capture");
+  });
+
+  it("surfaces a provider failure without sending a success document", async () => {
+    mocks.capture.mockRejectedValueOnce(new Error("Stripe unavailable"));
+    const response = await POST(request("capture"));
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "Stripe unavailable" });
+    expect(mocks.document).not.toHaveBeenCalled();
+  });
+
+  it("does not report success when the capture document fails", async () => {
+    mocks.document.mockRejectedValueOnce(new Error("Receipt delivery failed"));
+    const response = await POST(request("capture"));
+    expect(response.status).toBe(502);
+    expect(mocks.capture).toHaveBeenCalledTimes(1);
+    expect(await response.json()).toEqual({ error: "Receipt delivery failed" });
   });
 });

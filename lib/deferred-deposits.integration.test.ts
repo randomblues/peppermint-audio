@@ -13,12 +13,16 @@ vi.mock("resend", () => ({
   },
 }));
 
-import { attemptDeferredDeposit, readDepositBooking, releaseCancelledDeferredDeposit } from "./deferred-deposits";
+import { attemptDeferredDeposit, readDepositBooking, releaseCancelledDeferredDeposit, syncDeferredDeposit } from "./deferred-deposits";
 import { depositHoldDate } from "./payment-flow";
 import { getMelbourneTomorrow } from "./pickup-reminders";
 
 describe.skipIf(process.env.RUN_STRIPE_DEPOSIT_INTEGRATION !== "1")("local Stripe deferred-deposit integration", () => {
-  it("charges hire once, saves the card, waits for the due day, authorises and releases the deposit", async () => {
+  it.each([
+    { action: "release", captureCents: 0 },
+    { action: "partial capture", captureCents: 2500 },
+    { action: "full capture", captureCents: 10000 },
+  ])("charges hire once, waits for the due day and completes deposit $action", async ({ captureCents }) => {
     if (!/^sk_test_|^rk_test_/.test(process.env.STRIPE_SECRET_KEY ?? "")) {
       throw new Error("This integration check requires a Stripe test-mode secret key.");
     }
@@ -74,21 +78,37 @@ describe.skipIf(process.env.RUN_STRIPE_DEPOSIT_INTEGRATION !== "1")("local Strip
       const intent = await stripe.paymentIntents.retrieve(depositId!);
       expect(intent.status).toBe("requires_capture");
       expect(intent.amount_received).toBe(0);
+      expect(intent.amount_capturable).toBe(10000);
       await attemptDeferredDeposit(admin, bookingId);
       expect((await readDepositBooking(admin, bookingId))?.stripe_deposit_payment_intent_id).toBe(depositId);
       expect((await stripe.paymentIntents.retrieve(hire.id)).amount_received).toBe(10000);
 
-      const cancelled = await admin.from("bookings").update({ status: "cancelled" }).eq("id", bookingId);
-      if (cancelled.error) throw cancelled.error;
-      await releaseCancelledDeferredDeposit(admin, bookingId);
-      expect((await stripe.paymentIntents.retrieve(depositId!)).status).toBe("canceled");
-      expect((await readDepositBooking(admin, bookingId))?.deposit_payment_status).toBe("released");
+      if (captureCents) {
+        const captured = await stripe.paymentIntents.capture(depositId!, { amount_to_capture: captureCents });
+        expect(captured.status).toBe("succeeded");
+        expect(captured.amount_received).toBe(captureCents);
+        expect(captured.amount_capturable).toBe(0);
+        expect(await syncDeferredDeposit(admin, secured!, captured)).toBe("captured");
+        const persisted = await admin.from("bookings").select("deposit_captured_cents").eq("id", bookingId).single();
+        if (persisted.error) throw persisted.error;
+        expect(persisted.data.deposit_captured_cents).toBe(captureCents);
+        await attemptDeferredDeposit(admin, bookingId);
+        expect((await readDepositBooking(admin, bookingId))?.stripe_deposit_payment_intent_id).toBe(depositId);
+      } else {
+        const cancelled = await admin.from("bookings").update({ status: "cancelled" }).eq("id", bookingId);
+        if (cancelled.error) throw cancelled.error;
+        await releaseCancelledDeferredDeposit(admin, bookingId);
+        expect((await stripe.paymentIntents.retrieve(depositId!)).status).toBe("canceled");
+        expect((await readDepositBooking(admin, bookingId))?.deposit_payment_status).toBe("released");
+      }
+      expect((await stripe.paymentIntents.retrieve(hire.id)).amount_received).toBe(10000);
     } finally {
       const booking = await readDepositBooking(admin, bookingId);
       depositId ??= booking?.stripe_deposit_payment_intent_id ?? null;
       if (depositId) {
         const intent = await stripe.paymentIntents.retrieve(depositId);
-        if (!["canceled", "succeeded"].includes(intent.status)) await stripe.paymentIntents.cancel(depositId);
+        if (intent.status === "succeeded") await stripe.refunds.create({ payment_intent: depositId });
+        else if (intent.status !== "canceled") await stripe.paymentIntents.cancel(depositId);
       }
       if (hire) {
         const intent = await stripe.paymentIntents.retrieve(hire.id);

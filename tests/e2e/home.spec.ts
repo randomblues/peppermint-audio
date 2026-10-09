@@ -15,8 +15,14 @@ for (const width of [360, 390, 412, 540, 768, 1024, 1280, 1920]) {
     // Keep the development-only badge out of product screenshots and mobile controls.
     await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
     await expect(page.getByRole("heading", { level: 1, name: business.heroHeading })).toBeVisible();
-    const setup = page.getByRole("img", { name: "Microphones and a PA speaker set up on an outdoor stage" });
-    await expect.poll(() => setup.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+    const setup = page.getByAltText("Microphones and a PA speaker set up on an outdoor stage");
+    if (width >= 1024) {
+      await expect(setup).toBeVisible();
+      await expect.poll(() => setup.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+    } else {
+      await expect(setup).toBeHidden();
+      await expect(setup.locator("..")).toHaveCSS("display", "none");
+    }
     await expect(page.getByText("Packages or individual gear", { exact: true })).toBeVisible();
     await expect(page.getByText("Pickup in Abbotsford 3067", { exact: true })).toBeVisible();
     await expect(page.getByText("Setup walkthrough included", { exact: true })).toBeVisible();
