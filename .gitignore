@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+/.copilot-dev-session.json
 
 # next.js
 /.next/

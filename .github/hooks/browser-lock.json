@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "type": "command",
+        "command": "node .github/hooks/browser-lock.mjs pre",
+        "cwd": ".",
+        "timeoutSec": 5
+      }
+    ],
+    "agentStop": [
+      {
+        "type": "command",
+        "command": "node .github/hooks/browser-lock.mjs release",
+        "cwd": ".",
+        "timeoutSec": 5
+      }
+    ],
+    "sessionEnd": [
+      {
+        "type": "command",
+        "command": "node .github/hooks/browser-lock.mjs release",
+        "cwd": ".",
+        "timeoutSec": 5
+      }
+    ]
+  }
+}
