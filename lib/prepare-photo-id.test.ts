@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { maxPhotoIdUploadSize, preparePhotoId } from "./prepare-photo-id";
 
 const convert = vi.hoisted(() => vi.fn());
-vi.mock("heic2any", () => ({ default: convert }));
+vi.mock("heic-to/csp", () => ({ heicTo: convert }));
 
 describe("preparePhotoId", () => {
   const decode = vi.fn();
@@ -57,7 +57,13 @@ describe("preparePhotoId", () => {
   it("converts HEIC even below the upload limit", async () => {
     const file = new File(["heic"], "front.heic");
     expect((await preparePhotoId(file)).type).toBe("image/jpeg");
-    expect(convert).toHaveBeenCalledWith({ blob: file, toType: "image/jpeg", quality: 0.9 });
+    expect(convert).toHaveBeenCalledWith({ blob: file, type: "image/jpeg", quality: 0.9 });
+  });
+
+  it("converts HEIF photos identified by MIME type without an extension", async () => {
+    const file = new File(["heif"], "photo", { type: "image/heif" });
+    expect((await preparePhotoId(file)).type).toBe("image/jpeg");
+    expect(convert).toHaveBeenCalledWith({ blob: file, type: "image/jpeg", quality: 0.9 });
   });
 
   it("reduces quality until the encoded file fits", async () => {
@@ -74,8 +80,10 @@ describe("preparePhotoId", () => {
   });
 
   it("reports conversion and decoding failures", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
     convert.mockRejectedValueOnce(new Error("invalid"));
     await expect(preparePhotoId(new File(["heic"], "id.heic"))).rejects.toThrow("export it as JPEG");
+    expect(log).toHaveBeenCalledWith("Photo ID HEIC conversion failed:", expect.any(Error));
     decode.mockRejectedValueOnce(new Error("invalid"));
     await expect(preparePhotoId(new File([new Uint8Array(2 * 1024 * 1024)], "id.jpg"))).rejects.toThrow("could not read");
     expect(URL.revokeObjectURL).toHaveBeenCalled();

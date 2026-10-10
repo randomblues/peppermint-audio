@@ -14,10 +14,10 @@ export async function preparePhotoId(file: File): Promise<File> {
   let source: Blob = file;
   if (isHeic) {
     try {
-      const { default: heic2any } = await import("heic2any");
-      const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
-      source = Array.isArray(converted) ? converted[0] : converted;
-    } catch {
+      const { heicTo } = await import("heic-to/csp");
+      source = await heicTo({ blob: file, type: "image/jpeg", quality: 0.9 });
+    } catch (error) {
+      console.error("Photo ID HEIC conversion failed:", error);
       throw new Error("We could not read this HEIC photo. Please export it as JPEG and try again.");
     }
   }

@@ -287,6 +287,15 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Additional observation:** Hidden or concurrently controlled tabs can return stale rendered frames even when `innerWidth` matches the requested width. Inspect an actual breakpoint-dependent layout and confirm the frame has updated before trusting the screenshot. If viewport, frame, or input evidence remains inconsistent after a bounded diagnostic attempt, stop retries and report responsive validation as incomplete rather than marking it passed.
 - **Next action:** Use a dedicated QA tab, capture evidence at every required width, and wait for cart hydration and the actual end of the page before checking footer clearance.
 
+### 2026-10-10 — Integrated browser pointer-coordinate drift
+
+- **Symptom:** Visible, stable buttons timed out with unrelated elements intercepting pointer events. The DOM and Playwright agreed on the button bounds, but a pointer requested at (446, 30) arrived near (295, 20).
+- **Root cause:** The existing integrated-browser session had an input-coordinate scaling mismatch. Hidden-tab status alone did not explain it: the mismatch persisted while visible and after zoom reset, clearing CDP emulation and reloading. The underlying VS Code defect and its original trigger are not established.
+- **Verified recovery:** Close the affected integrated-browser tab and reopen the same localhost URL, replacing rather than duplicating the tab. Acquire the replacement page ID. The new session delivered matching pointer coordinates and real menu clicks passed.
+- **Mandatory prevention:** Before UI validation, and after changing viewport size or capture/emulation settings, wait for two animation frames, verify `innerWidth`, compare one `page.mouse.move()` request with the actual `pointermove` client coordinates (within 1 CSS pixel), and perform one real semantic-control click. Use a temporary event listener and remove it after the probe. A correct DOM hit test or screenshot alone does not establish correct pointer input.
+- **Bounded recovery:** If coordinates remain mismatched after the render wait, replace the tab once and repeat preflight before continuing. Request user assistance if the tool cannot close the tab. Do not repeatedly retry clicks, force clicks, dispatch DOM clicks, apply compensating coordinate multipliers or change website CSS to hide a browser-tool failure. If replacement fails, stop and report integrated-browser validation as incomplete; independent Playwright does not replace it.
+- **Next action:** Use this preflight before the eight-width responsive checks. Keep the same localhost server throughout; resetting the browser session does not require restarting the app or database.
+
 ### 2026-10-09 — Local Supabase email login and signup flags
 
 - **Symptom:** A local email user could be created, but signing in failed with "Email logins are disabled".
@@ -300,6 +309,13 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Root cause:** Text selectors matched a hidden responsive copy; client-side navigation also exposed the initial loading state before booking controls were ready.
 - **Prevention:** Select visible semantic controls rather than the first duplicated text label. For data-access smoke checks, sign in through the same Playwright context's request API, navigate to `/admin`, and wait for the actual booking control. Test the login form separately when its behavior is in scope.
 - **Next action:** Use a booking button's accessible name and wait for loaded controls when a disposable local admin account is available; preserve the separate integrated-browser validation requirement.
+
+### 2026-10-10 — Mocked photo conversion missed HEIC compatibility
+
+- **Symptom:** Photo-ID uploads passed unit tests, but a customer's HEIC image failed conversion in the browser.
+- **Root cause:** Conversion tests mocked the decoder and therefore verified the wrapper without exercising real HEIC decoding or browser-bundle compatibility.
+- **Prevention:** Keep wrapper unit tests, but also test the actual decoder with a generated, private-data-free HEIC fixture through the booking form. Check the submitted JPEG MIME type, signature and upload-size limit.
+- **Next action:** Run `tests/e2e/photo-id.spec.ts` on desktop and mobile after decoder changes, then complete the separate mandatory integrated-browser responsive checks. Do not claim compatibility with a particular customer file based only on a synthetic fixture.
 
 ### 2026-10-10 — Hung Docker container starts and unbounded local startup
 
