@@ -62,6 +62,40 @@ describe("BookingForm", () => {
 
   afterEach(() => {
     window.localStorage.clear();
+    vi.unstubAllGlobals();
+  });
+
+  it("shows the request receipt, reference and next steps without confirming the booking", async () => {
+    window.localStorage.setItem("peppermint-audio-booking-draft", JSON.stringify({
+      firstName: "Alex", lastName: "Smith", email: "alex@example.com", mobile: "0412345678",
+      eventType: "Wedding", eventAddress: "1 Example Street", pickupTime: "10:00", dropoffTime: "12:00",
+    }));
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true, json: async () => ({ bookingReference: "PA-123456789012" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<BookingForm />);
+    for (let step = 0; step < 3; step++) fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.drop(screen.getByTestId("photo-id-dropzone"), {
+      dataTransfer: { files: [
+        new File(["front"], "front.png", { type: "image/png" }),
+        new File(["back"], "back.png", { type: "image/png" }),
+      ] },
+    });
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Submit a Booking Request" }));
+
+    expect(await screen.findByRole("heading", { name: "Thanks — we have received your request" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Your request is not confirmed yet.");
+    expect(screen.getByText("PA-123456789012")).toBeInTheDocument();
+    expect(screen.getByRole("list")).toHaveTextContent("Request received");
+    expect(screen.getByRole("list")).toHaveTextContent("Availability review");
+    expect(screen.getByRole("list")).toHaveTextContent("We will be in touch");
+    expect(screen.getByRole("link", { name: "Contact us" })).toHaveAttribute("href", "/contact");
+    expect(screen.getByRole("link", { name: "Back to home" })).toHaveAttribute("href", "/");
+    expect(mockCart.clearCart).toHaveBeenCalledOnce();
+    expect(window.localStorage.getItem("peppermint-audio-booking-draft")).toBeNull();
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 
   it("uses a step-by-step flow and moves from your details to event details", () => {

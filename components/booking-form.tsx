@@ -2,13 +2,13 @@
 
 import { startTransition, useEffect, useState } from "react";
 import Link from "next/link";
-import { FileImage, Upload, X } from "lucide-react";
+import { ArrowRight, Check, CircleCheck, Clock3, FileImage, MessageCircle, Upload, X } from "lucide-react";
 
 import { useCart } from "@/components/cart-provider";
 import { HirePriceSummary } from "@/components/hire-price-summary";
 import { TimePicker } from "@/components/time-picker";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -239,14 +239,49 @@ export function BookingForm() {
 
   if (submitted) {
     return (
-      <Card className="mx-auto max-w-3xl">
-        <CardHeader>
-          <Badge variant="secondary" className="w-fit">Request submitted</Badge>
-          <CardTitle>Thanks — we have received your request</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm text-muted-foreground">
-          <p className="font-semibold text-foreground">Booking reference: {submitted}</p>
-          <p>Your request is not confirmed yet. We will review availability and contact you shortly.</p>
+      <Card className="relative mx-auto max-w-3xl gap-0 rounded-3xl border border-primary/20 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklab,var(--primary)_12%,transparent),transparent_65%)] py-0 shadow-[0_24px_80px_rgb(0_0_0/0.18)]">
+        <div aria-hidden="true" className="h-px bg-linear-to-r from-transparent via-primary/70 to-transparent" />
+        <CardContent className="px-5 py-8 sm:px-10 sm:py-10">
+          <div role="status" className="text-center">
+            <div className="mx-auto mb-5 flex size-20 items-center justify-center rounded-full border border-primary/25 bg-primary/10 shadow-[0_0_45px_color-mix(in_oklab,var(--primary)_18%,transparent)]">
+              <CircleCheck aria-hidden="true" className="size-10 text-primary" strokeWidth={1.5} />
+            </div>
+            <Badge variant="secondary" className="border border-primary/20 bg-primary/10 px-3 py-1 text-primary">Request submitted</Badge>
+            <h2 className="mt-4 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Thanks — we have received your request</h2>
+            <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-muted-foreground sm:text-base">Your request is not confirmed yet. We will review availability and contact you shortly.</p>
+          </div>
+
+          <div className="mt-7 rounded-2xl border border-primary/20 bg-background/50 px-4 py-5 text-center">
+            <p className="text-xs font-medium tracking-[0.16em] text-muted-foreground uppercase">Booking reference</p>
+            <p className="mt-2 break-all font-mono text-lg font-semibold text-foreground sm:text-2xl sm:tracking-wide">{submitted}</p>
+            <p className="mt-2 text-xs text-muted-foreground">Keep this handy when contacting us about your request.</p>
+          </div>
+
+          <div className="mt-8">
+            <h3 className="text-sm font-semibold text-foreground">What happens next</h3>
+            <ol className="mt-4 grid gap-4 sm:grid-cols-3 sm:gap-5">
+              {[
+                { icon: Check, title: "Request received", description: "Your hire details are with our team.", active: true },
+                { icon: Clock3, title: "Availability review", description: "We will check your dates and equipment.", active: false },
+                { icon: MessageCircle, title: "We will be in touch", description: "We will contact you about the next steps.", active: false },
+              ].map(({ icon: Icon, title, description, active }) => (
+                <li key={title} className="flex gap-3 sm:flex-col">
+                  <span className={`flex size-9 shrink-0 items-center justify-center rounded-xl border ${active ? "border-primary/25 bg-primary/10 text-primary" : "border-border bg-background/40 text-muted-foreground"}`}>
+                    <Icon aria-hidden="true" className="size-4" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{title}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          <div className="mt-8 flex flex-col gap-3 border-t border-border/60 pt-6 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">Have a question? <Link href="/contact" className="font-medium text-primary underline-offset-4 hover:underline">Contact us</Link></p>
+            <Link href="/" className={buttonVariants({ className: "h-11 gap-2 px-5" })}>Back to home <ArrowRight aria-hidden="true" className="size-4" /></Link>
+          </div>
         </CardContent>
       </Card>
     );
