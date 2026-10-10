@@ -42,19 +42,24 @@ Install Docker (with its CLI available on PATH), then run:
 
 ```bash
 npm install
-npm run dev
+scripts/dev-detached.sh
 ```
 
-`npm run dev` automatically starts or reuses the local services, applies the
-canonical database migration, and starts Next.js. For an existing build, use
-`npm start`.
+The detached launcher returns immediately and writes startup output to
+`/tmp/dev-3000.log` by default. Set `PORT` to choose another port. Check whether
+that port is already in use before starting; inspect the matching log file to
+check startup and run `scripts/dev-stop.sh <port>` to stop the server. The
+underlying `npm run dev` launcher automatically starts or reuses the local
+services, applies the canonical database migration, and starts Next.js.
+For an existing build, use the appropriate production-serving workflow.
 
 For local Stripe webhook testing, install and authenticate the Stripe CLI once
-with `stripe login`, then set `LOCAL_STRIPE_WEBHOOKS=true` in `.env.local`.
-`npm run dev` (and `npm run dev:resend`) then starts Stripe's test-mode listener
-alongside the app and supplies its signing secret to the local server process.
-The generated secret is not written to a file. Leave it unset to run without
-Stripe CLI forwarding.
+with `stripe login`, then run `scripts/dev-stripe-detached.sh`. It starts the
+app and Stripe's test-mode listener together, forwards supported payment events
+to the local webhook route, and supplies the listener's signing secret to the
+app without writing it to a file. The combined output is in
+`/tmp/dev-3000.log`; use `PORT` to select a different port. Leave Stripe
+forwarding disabled by using `scripts/dev-detached.sh` when it is not needed.
 Both launchers, including `npm run dev:resend`, reuse any responding configured
 Docker engine. If no engine responds on macOS, they launch an already installed
 Docker Desktop from `/Applications` or `~/Applications`. Engine readiness is
@@ -118,18 +123,10 @@ mode also prints this worktree's inbox URL; Resend mode warns about quota usage.
 For deliberately controlled Resend testing, set `LOCAL_EMAIL_MODE=resend`,
 `LOCAL_EMAIL_TEST_RECIPIENT` to one plain email address, and configure
 `RESEND_API_KEY` and a verified `ENQUIRY_FROM_EMAIL` through your secure local
-environment. Restart the local app after changing configuration.
-Alternatively, stop the running app and use the hands-free shortcut below:
-
-```bash
-npm run dev:resend
-```
-
-The shortcut defaults all recipients to `shanedsouza6823@gmail.com`. An optional
-override is `npm run dev:resend -- you@example.com`; empty, invalid or multiple
-addresses are rejected. It enables Resend only for that run and uses your
-Resend quota. Stop it and run `npm run dev` to return to
-capture (unless you separately configured Resend mode in your environment).
+environment. Stop the running server with `scripts/dev-stop.sh <port>`, then
+restart it with `scripts/dev-detached.sh` so the selected mode is applied. This
+uses Resend quota; stop it and restart with the default environment to return to
+capture mode.
 
 **Every application email is redirected to that one inbox**: original `to`
 recipients are replaced; `cc`, `bcc`, `replyTo` and custom headers are removed.
