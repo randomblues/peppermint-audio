@@ -218,7 +218,7 @@ The focused test command is preferred while iterating; the full suite and build 
 - Vercel Cron invocation may be difficult to verify from the dashboard; use the authorized route and inspect logs carefully.
 - `after()` moves calendar/email work after the booking response; do not assume those side effects have completed when the HTTP response returns.
 - Use one localhost server per task. Before browser validation, check which process owns the target port, stop stale task-owned servers by PID, start one current server, and use one browser tab/URL consistently. Do not alternate between stale `localhost:3000`, `localhost:3001`, `localhost:3002`, or `localhost:3003` tabs.
-- Before starting a development server, check whether its requested port already has a listener. Use `npm run dev` as the standard launcher; use `scripts/dev-detached.sh` only when a detached server is specifically needed. Check startup from the launcher output or `/tmp/dev-<port>.log` for detached servers, and stop detached servers with `scripts/dev-stop.sh <port>`. Do not interrupt a server you do not own.
+- Before starting a development server, check whether its requested port already has a listener. Use `npm run dev` as the standard launcher. For agent-run long-lived servers, use `scripts/dev-detached.sh` to run it in the background. Check startup from the launcher output or `/tmp/dev-<port>.log` for detached servers, and stop detached servers with `scripts/dev-stop.sh <port>`. Do not interrupt a server you do not own.
 - Never start a long-running process (including development servers, watchers, or `stripe listen`) in a way that keeps a shell attached. Run it detached with output redirected to a log file. For local Stripe forwarding, use `scripts/dev-stripe-detached.sh`; it starts the app and listener together so the generated signing secret is passed directly to the app.
 - **Reuse an existing browser tab when the required site or tool is already open. Do not open duplicate tabs or keep piling up browser tabs.**
 - If a browser tab does not reflect an edit, reload it and verify its URL, port, process, and rendered source before changing code again. Do not assume a stale tab proves the implementation is broken.
@@ -232,8 +232,8 @@ Every new agent session must use the local-only Supabase stack when working
 locally. Never use the hosted database, production admin credentials or real
 customer data for local validation.
 
-- Start the app with `npm run dev`; use `scripts/dev-detached.sh` when a detached
-  task server is specifically needed. The launcher starts or reuses this worktree's
+- Start the app with `npm run dev`; for agent-run long-lived servers, use
+  `scripts/dev-detached.sh`, which runs the same launcher in the background. It starts or reuses this worktree's
   local stack and injects its credentials into Next.js. Read `/tmp/dev-<port>.log` to check startup and use
   `scripts/dev-stop.sh <port>` to stop it. Keep one task server on the agreed
   port and do not interrupt another agent's server without approval.
