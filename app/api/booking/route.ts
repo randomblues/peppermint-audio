@@ -9,8 +9,8 @@ import { bookingHireTotalCents, parseBookingLineItems, summarizeBookingLineItems
 import { formatAudCents, rentalDays } from "@/lib/payment-flow";
 import { createAdminClient, PHOTO_ID_BUCKET } from "@/lib/supabase";
 import { bookingSchema } from "@/lib/validation/booking";
+import { maxPhotoIdUploadSize } from "@/lib/prepare-photo-id";
 
-const maxFileSize = 1.5 * 1024 * 1024;
 function formatEmailDate(value: string) {
   return new Intl.DateTimeFormat("en-AU", {
     day: "numeric",
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     const payload = Object.fromEntries(Array.from(formData.entries()).filter(([, value]) => typeof value === "string"));
     const parsed = bookingSchema.safeParse(payload);
     const files = formData.getAll("idFiles").filter((value): value is File => value instanceof File);
-    if (!parsed.success || files.length !== 2 || files.some((file) => file.size === 0 || file.size > maxFileSize)) {
+    if (!parsed.success || files.length !== 2 || files.some((file) => file.size === 0 || file.size > maxPhotoIdUploadSize)) {
       return NextResponse.json({ error: "Please check all booking details and upload the front and back of your photo ID." }, { status: 400 });
     }
     if (!resendApiKey || !fromEmail || !toEmail) {

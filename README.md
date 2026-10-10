@@ -191,6 +191,14 @@ keys in local tests. Use Stripe test-mode keys and keep calendar disabled.
 
 ## Booking and payment management
 
+Booking photo-ID images may be up to 10 MB each. The browser converts HEIC/HEIF
+using `heic2any` and resizes larger images to JPEG with a longest edge of 2400px
+and an encoded size of at most 1.5 MB per file. Processing stays in the browser;
+no third-party upload service receives the ID. PDFs are not compressed and remain
+limited to 1.5 MB each. The API retains the 1.5 MB per-file cap so two IDs and the
+booking fields fit within Vercel's request-body limit. If conversion or compression
+fails, the form explains how to retry rather than submitting an oversized file.
+
 Run `supabase/001_booking_management.sql` in the Supabase SQL editor, then create administrator users under Supabase Authentication > Users. Rerun the migration after schema changes so existing databases receive the pickup/drop-off time columns and email-history table. Customer hire selections are built in the cart and carried into the booking request form at `/booking`; requests are managed at `/admin` and changed to `confirmed` only after availability is reviewed. The customer automatically receives a confirmation email when the request is confirmed. Customer-facing email delivery metadata appears in each admin booking's **Email history** card and is automatically deleted after 30 days by the Supabase `pg_cron` job. Photo IDs remain in the private `booking-photo-ids` bucket and are only available through short-lived signed links.
 
 The admin bookings view includes a **Send Email** menu with booking confirmation, pickup reminder, custom email, and invoice options. New Stripe payment links remain valid for at least 30 days and through return plus three days. Bank-transfer and cash-on-pickup invoices do not expose customer payment secrets.

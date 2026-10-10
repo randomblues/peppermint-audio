@@ -145,6 +145,8 @@ describe("BookingForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     const frontFile = new File(["front"], "front-id.png", { type: "image/png" });
+    expect(screen.getByText("Upload clear photos of the front and back of your valid photo ID.")).toBeInTheDocument();
+    expect(screen.queryByText(/automatically resized|PDF files must/)).not.toBeInTheDocument();
     const backFile = new File(["back"], "back-id.png", { type: "image/png" });
     fireEvent.drop(screen.getByTestId("photo-id-dropzone"), {
       dataTransfer: { files: [frontFile, backFile] },

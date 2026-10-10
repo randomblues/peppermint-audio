@@ -19,9 +19,9 @@ import { getMelbourneToday } from "@/lib/date-utils";
 import { hireTerms } from "@/lib/site-content";
 import { formatAudCents, rentalDays } from "@/lib/payment-flow";
 import { bookingSchema, type BookingInputValues } from "@/lib/validation/booking";
+import { preparePhotoId } from "@/lib/prepare-photo-id";
 
 const draftKey = "peppermint-audio-booking-draft";
-const maxPhotoIdSize = 1.5 * 1024 * 1024;
 
 const initialValues: Omit<BookingInputValues, "pickupDate" | "dropoffDate"> = {
   email: "",
@@ -64,11 +64,6 @@ const stepFields: Array<Array<keyof BookingInputValues | "idFiles">> = [
 ];
 
 type FormState = typeof initialValues & { idFiles: File[] };
-
-async function prepareFile(file: File) {
-  if (file.size <= maxPhotoIdSize) return file;
-  throw new Error("Each photo ID file must be smaller than 1.5 MB.");
-}
 
 function Field({
   label,
@@ -226,7 +221,7 @@ export function BookingForm() {
       if (name !== "idFiles") formData.append(name, String(value));
     });
     try {
-      for (const file of values.idFiles) formData.append("idFiles", await prepareFile(file));
+      for (const file of values.idFiles) formData.append("idFiles", await preparePhotoId(file));
       const response = await fetch("/api/booking", { method: "POST", body: formData });
       const payload = await response.json().catch(() => null) as { error?: string; bookingId?: string; bookingReference?: string } | null;
       if (!response.ok) throw new Error(payload?.error ?? "Could not submit your booking request.");
@@ -349,7 +344,7 @@ export function BookingForm() {
 
             {currentStep === 3 ? (
               <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">Upload clear images of the front and back of your valid photo ID. Each file must be 1.5 MB or smaller.</p>
+                <p className="text-sm text-muted-foreground">Upload clear photos of the front and back of your valid photo ID.</p>
                 <div
                   data-testid="photo-id-dropzone"
                   className={`rounded-xl border border-dashed p-5 transition-all duration-200 ${isDragOver ? "border-primary bg-primary/8 ring-4 ring-primary/20 shadow-[0_0_0_1px_color-mix(in_oklab,var(--primary)_45%,transparent),0_16px_40px_rgb(0_0_0/0.25)]" : "border-input bg-muted/30 hover:border-primary/35 hover:bg-primary/5"}`}
