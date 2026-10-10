@@ -15,8 +15,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:deposit:integration": "RUN_STRIPE_DEPOSIT_INTEGRATION=1 node --env-file=.env.local node_modules/vitest/vitest.mjs run lib/deferred-deposits.integration.test.ts",
-    "test:e2e": "playwright test",
-    "test:coverage": "vitest run --coverage"
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

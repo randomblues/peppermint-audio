@@ -280,7 +280,7 @@ The deployed preview at `https://peppermint-audio.vercel.app/` may be used for s
 npm run lint
 npm run build
 npm test
-npm run test:coverage
+npm test -- --coverage
 npm run test:e2e
 ```
 
