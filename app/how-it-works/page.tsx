@@ -1,10 +1,6 @@
 import Link from "next/link";
 
-import { Section } from "@/components/section";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { business, howItWorks } from "@/lib/site-content";
+import { HireJourney } from "@/components/hire-journey";
 import { createPageMetadata } from "@/lib/seo";
 
 export const metadata = createPageMetadata({
@@ -15,36 +11,30 @@ export const metadata = createPageMetadata({
 
 export default function HowItWorksPage() {
   return (
-    <Section
-      eyebrow="Booking Flow"
-      title="How It Works"
-      headingAs="h1"
-      description="Choose your equipment, send a booking request, and let us confirm availability before you collect from Abbotsford."
-    >
-      <div className="grid gap-4">
-        {howItWorks.map((step, index) => (
-          <Card key={step.title} className="border">
-            <CardHeader>
-              <Badge variant="secondary" className="w-fit">Step {index + 1}</Badge>
-              <CardTitle>{step.title}</CardTitle>
-            </CardHeader>
-            <CardContent className="text-muted-foreground">{step.detail}</CardContent>
-          </Card>
-        ))}
+    <section aria-labelledby="hire-heading">
+      <header className="mx-auto max-w-6xl px-5 pt-14 pb-12 sm:px-8 sm:pt-20 sm:pb-16">
+        <h1 id="hire-heading" className="font-heading text-4xl leading-tight font-semibold tracking-tight sm:text-5xl">How It Works</h1>
+        <p className="mt-5 max-w-lg text-base leading-7 text-muted-foreground sm:text-lg">
+          You bring the plans. We&apos;ll help with the sound. Here&apos;s how to get the gear from us to your event.
+        </p>
+      </header>
+      <HireJourney />
+      <div className="mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-16">
+      <div>
+        <h2 className="font-heading text-xl font-medium">Still got a question?</h2>
+        <p className="mt-3 text-base leading-7 text-muted-foreground">
+          Not sure what you need? <Link href="/faq" className="text-primary underline underline-offset-4">The FAQ is a good place to start.</Link> Or <Link href="/contact" className="text-primary underline underline-offset-4">get in touch</Link> and we&apos;ll help you work it out.
+        </p>
       </div>
-
-      <div className="mt-8 rounded-xl border bg-muted/30 p-5 text-sm text-muted-foreground">
-        Pickup location: {business.pickupSuburb} {business.pickupPostcode}. Please bring photo ID and arrive during your confirmed collection window.
-      </div>
-
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-        <Button nativeButton={false} render={<Link href="/packages" />}>
+      <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+        <Link href="/packages" className="inline-flex min-h-12 items-center rounded-xl bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">
           Browse packages
-        </Button>
-        <Button variant="outline" nativeButton={false} render={<Link href="/equipment" />}>
+        </Link>
+        <Link href="/equipment" className="inline-flex min-h-11 items-center rounded-sm text-sm text-primary underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">
           Hire individual equipment
-        </Button>
+        </Link>
       </div>
-    </Section>
+      </div>
+    </section>
   );
 }

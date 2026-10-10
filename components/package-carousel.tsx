@@ -132,7 +132,7 @@ export function PackageCarousel() {
 
   return (
     <div className="relative">
-      <div className="relative">
+      <div className="mb-6 flex justify-center gap-2" role="group" aria-label="Package navigation">
         <Button
           type="button"
           size="icon"
@@ -141,7 +141,7 @@ export function PackageCarousel() {
           onClick={() => moveBy(-1)}
           disabled={activeIndex === 0}
           title="Previous package"
-          className="absolute top-28 left-3 z-20 size-10 -translate-y-1/2 rounded-full border border-primary/20 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--background)_95%,var(--primary)_10%),color-mix(in_oklab,var(--background)_82%,black))] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_8px_20px_rgb(0_0_0/0.24)] backdrop-blur-sm transition-all hover:scale-105 hover:border-primary/40 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_10px_24px_rgb(0_0_0/0.26),0_0_16px_color-mix(in_oklab,var(--primary)_14%,transparent)] disabled:opacity-45"
+          className="size-11 rounded-full disabled:opacity-45"
         >
           <span aria-hidden="true">←</span>
         </Button>
@@ -153,10 +153,12 @@ export function PackageCarousel() {
           onClick={() => moveBy(1)}
           disabled={activeIndex === packageTiers.length - 1}
           title="Next package"
-          className="absolute top-28 right-3 z-20 size-10 -translate-y-1/2 rounded-full border border-primary/20 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--background)_95%,var(--primary)_10%),color-mix(in_oklab,var(--background)_82%,black))] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_8px_20px_rgb(0_0_0/0.24)] backdrop-blur-sm transition-all hover:scale-105 hover:border-primary/40 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_10px_24px_rgb(0_0_0/0.26),0_0_16px_color-mix(in_oklab,var(--primary)_14%,transparent)] disabled:opacity-45"
+          className="size-11 rounded-full disabled:opacity-45"
         >
           <span aria-hidden="true">→</span>
         </Button>
+      </div>
+      <div className="relative">
         {fadeEdges.left ? (
           <div
             aria-hidden="true"

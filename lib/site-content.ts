@@ -301,7 +301,8 @@ export const business = {
   heroHeading: heroHeadingLines.join(" "),
   heroHeadingLines,
   heroSubheading:
-    "Speakers and microphones for parties, weddings and live events. Choose a complete package or just the gear you need. We'll help you get set up.",
+    "Parties · Weddings · Corporate events · Live gigs",
+  heroSupportingText: "Speaker & PA hire in Melbourne. Packages or individual gear.",
   heroImage: "/home-live-sound.jpg",
   ctaImage:
     "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=1600&h=700&fit=crop",
@@ -457,34 +458,19 @@ export const packageTiers: PackageTier[] = [
 
 export const howItWorks = [
   {
-    title: "Choose your setup",
+    title: "Before your event",
     detail:
-      "Browse complete packages or individual equipment. Add a package, specific items, or both to your cart.",
+      "Choose your package or individual equipment, select your dates and send a request. We'll check availability and finalise the details before confirming your hire.",
   },
   {
-    title: "Send an enquiry",
+    title: "Pickup & setup",
     detail:
-      "Open your cart and send one enquiry for your complete selection. This lets us check availability and discuss the hire details with you.",
+      "Pick up from Abbotsford 3067 with your photo ID. We'll show you the setup. Set up early; we're a phone call away if you need a hand.",
   },
   {
-    title: "We review availability",
+    title: "After your event",
     detail:
-      "We check your date and selected equipment, then contact you to confirm availability, pricing, and the pickup and return window.",
-  },
-  {
-    title: "Collect from Abbotsford",
-    detail:
-      "After your request is confirmed, collect from Abbotsford 3067. Bring photo ID and we will run through the setup with you.",
-  },
-  {
-    title: "Run your event",
-    detail:
-      "Use the system for the hire period. Support is available if you get stuck.",
-  },
-  {
-    title: "Return gear",
-    detail:
-      "Pack down and return at the agreed time. We check everything back in quickly.",
+      "Return the gear, cables and accessories at the agreed time. We'll check everything back in with you.",
   },
 ];
 

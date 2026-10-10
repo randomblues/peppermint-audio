@@ -83,7 +83,9 @@ test.describe("FAQ page", () => {
       await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
       const faq = page.getByRole("region", { name: "Good sound. Less stress." });
       await expect(faq.getByRole("button")).toHaveCount(5);
-      await expect(faq.getByRole("button").first()).toHaveAttribute("aria-expanded", "true");
+      for (const question of await faq.getByRole("button").all()) {
+        await expect(question).toHaveAttribute("aria-expanded", "false");
+      }
       await page.screenshot({ path: testInfo.outputPath(`faq-${width}-initial.png`), fullPage: true });
 
       for (const question of await faq.getByRole("button").all()) {

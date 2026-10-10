@@ -1,0 +1,138 @@
+.journey {
+  isolation: isolate;
+}
+
+.scene {
+  --travel: 0;
+  position: relative;
+  display: grid;
+  align-items: center;
+  min-height: 0;
+  overflow: clip;
+  border-top: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+}
+
+.atmosphere {
+  position: absolute;
+  inset: -20%;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 25% 45%, color-mix(in oklab, var(--primary) 13%, transparent), transparent 55%);
+  transform: translateY(calc(var(--travel) * -8px));
+}
+
+.scene[data-stage="1"] .atmosphere {
+  background: radial-gradient(ellipse at 70% 50%, color-mix(in oklab, var(--primary) 18%, transparent), transparent 60%);
+}
+
+.inner {
+  position: relative;
+  display: grid;
+  width: 100%;
+  max-width: 896px;
+  margin-inline: auto;
+  padding: 40px 20px;
+  gap: 20px;
+}
+
+.visual {
+  position: relative;
+  width: 96px;
+  aspect-ratio: 1;
+  margin-inline: 0;
+  display: grid;
+  place-items: center;
+  transform: translateY(calc(var(--travel) * -6px));
+}
+
+.orbit {
+  position: absolute;
+  inset: 8%;
+  border: 1px solid color-mix(in oklab, var(--primary) 25%, transparent);
+  border-radius: 50%;
+}
+
+.orbit {
+  border-top-color: var(--primary);
+  border-bottom-color: transparent;
+  animation: journey-orbit 48s linear infinite;
+}
+
+.core {
+  display: grid;
+  place-items: center;
+  width: 58%;
+  aspect-ratio: 1;
+  border-radius: 28%;
+  border: 1px solid color-mix(in oklab, var(--primary) 35%, transparent);
+  background: color-mix(in oklab, var(--background) 90%, var(--primary));
+  box-shadow: 0 0 20px color-mix(in oklab, var(--primary) 8%, transparent);
+}
+
+.number {
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--primary);
+}
+
+.progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.progress > span:not(.stageLabel) {
+  width: 24px;
+  height: 2px;
+  background: var(--border);
+}
+
+.progress > span[data-current="true"] {
+  background: var(--primary);
+  box-shadow: 0 0 12px color-mix(in oklab, var(--primary) 35%, transparent);
+}
+
+.stageLabel {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.copy h2 {
+  font-size: clamp(26px, 3vw, 36px);
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
+
+.paragraphs {
+  margin-top: 16px;
+  max-width: 560px;
+  color: var(--muted-foreground);
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.paragraphs p + p { margin-top: 16px; }
+.scene:not([data-active="true"]) .visual * { animation-play-state: paused; }
+
+@keyframes journey-orbit { to { transform: rotate(360deg); } }
+
+@media (min-width: 768px) {
+  .inner { padding: 56px 32px; grid-template-columns: 120px 1fr; gap: 40px; }
+  .visual { width: 120px; }
+}
+
+@media (min-width: 1024px) {
+  .copy { transform: translateY(calc(var(--travel) * 4px)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journey *, .journey *::before, .journey *::after {
+    animation: none !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}

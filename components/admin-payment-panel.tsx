@@ -6,6 +6,7 @@ import { CheckCircle2, ChevronDown, Copy, CreditCard, Landmark, Plus, Send, Tras
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { AdminErrorDialog } from "@/components/admin-error-dialog";
 import type { BankTransferOption } from "@/lib/bank-transfer";
 import { catalogLineItemGroups, catalogLineItemOptions, customBookingLineItem, lineItemsForBooking, lineItemsTotalCents, type BookingLineItem } from "@/lib/booking-line-items";
 import { hirePricing } from "@/lib/site-content";
@@ -454,7 +455,7 @@ export function AdminPaymentPanel({ booking, onChanged, collapsible = true }: { 
             </div>
           </section>
         ) : null}
-        {error ? <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">{error}</p> : null}
+        <AdminErrorDialog message={error} onClose={() => setError("")} />
         {message ? (
           <div role="status" aria-live="polite" className={`fixed inset-x-4 bottom-6 z-50 mx-auto flex max-w-md items-start gap-3 overflow-hidden rounded-2xl border border-primary/25 bg-card/95 px-4 py-3.5 text-sm text-foreground shadow-2xl shadow-black/25 ring-1 ring-black/5 backdrop-blur-md sm:inset-x-auto sm:right-6 sm:mx-0 ${messageClosing ? "animate-toast-exit" : "animate-toast-enter"}`}>
             <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary" aria-hidden="true">

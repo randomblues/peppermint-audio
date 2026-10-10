@@ -23,9 +23,7 @@ for (const width of [360, 390, 412, 540, 768, 1024, 1280, 1920]) {
       await expect(setup).toBeHidden();
       await expect(setup.locator("..")).toHaveCSS("display", "none");
     }
-    await expect(page.getByText("Packages or individual gear", { exact: true })).toBeVisible();
-    await expect(page.getByText("Pickup in Abbotsford 3067", { exact: true })).toBeVisible();
-    await expect(page.getByText("Setup walkthrough included", { exact: true })).toBeVisible();
+    await expect(page.getByRole("group", { name: "Equipment available" })).toHaveCount(0);
     await page.evaluate(() => document.fonts.ready);
     await page.getByRole("region", { name: "Customer reviews", exact: true }).hover();
     await page.evaluate(() => window.scrollTo(0, 0));
@@ -48,11 +46,12 @@ for (const width of [360, 390, 412, 540, 768, 1024, 1280, 1920]) {
     }));
     expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewportWidth);
     expect(layout.clipped).toEqual([]);
-    await expect(page.getByRole("link", { name: "Find my setup" })).toHaveAttribute("href", "/packages");
-    await expect(page.getByRole("link", { name: "Let's talk about your setup" })).toHaveAttribute("href", "/contact?package=custom");
+    await expect(page.getByRole("link", { name: "View packages" })).toHaveAttribute("href", "/packages");
+    await expect(page.getByRole("region", { name: business.heroHeading }).locator('a[href="tel:0452316823"]')).toBeVisible();
+    await expect(page.getByText("Only need a few items?", { exact: true })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "A few questions before the party" })).toHaveAttribute("href", "/faq");
 
-    const packages = page.getByRole("region", { name: "A little speech. A proper boogie." });
+    const packages = page.getByRole("region", { name: "Explore our sound packages." });
     await packages.getByRole("button", { name: "Next package", exact: true }).click();
     await expect(packages.getByRole("button", { name: `Show ${packageTiers[1].name}`, exact: true })).toHaveAttribute("aria-current", "true");
     await packages.getByRole("button", { name: "Previous package", exact: true }).click();
@@ -83,13 +82,10 @@ for (const width of [360, 390, 412, 540, 768, 1024, 1280, 1920]) {
       await menu.getByRole("button", { name: "Close", exact: true }).click();
       await expect(menu).not.toBeVisible();
     } else {
-      await expect(page.getByRole("navigation").getByRole("link", { name: "FAQ", exact: true })).toBeVisible();
+      await expect(page.locator("header").getByRole("navigation").getByRole("link", { name: "FAQ", exact: true })).toBeVisible();
     }
 
-    await page.getByRole("link", { name: "Just need the speakers?" }).click();
-    await expect(page).toHaveURL(/\/equipment$/);
-    await page.goBack();
-    await page.getByRole("link", { name: "Find my setup" }).click();
+    await page.getByRole("link", { name: "View packages" }).click();
     await expect(page).toHaveURL(/\/packages$/);
     await page.goBack();
     await page.getByRole("link", { name: "Let's chat", exact: true }).click();

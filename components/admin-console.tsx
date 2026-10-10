@@ -21,6 +21,7 @@ import { buildPickupReminderEmail } from "@/lib/pickup-reminders";
 import { calculateMedicareLevy, calculateResidentIncomeTax, type IncomeTaxYear } from "@/lib/income-tax";
 import type { BankTransferOption } from "@/lib/bank-transfer";
 import { AdminPaymentPanel } from "@/components/admin-payment-panel";
+import { AdminErrorDialog } from "@/components/admin-error-dialog";
 import type { BookingLineItem } from "@/lib/booking-line-items";
 
 type Booking = Record<string, unknown> & {
@@ -275,6 +276,7 @@ export function AdminConsole() {
 
   return (
     <div className="admin-console-shell min-h-screen bg-muted/30">
+      <AdminErrorDialog message={messageType === "error" ? message : ""} onClose={() => setMessage("")} />
       <aside className={`admin-console-sidebar fixed inset-y-0 left-0 z-30 w-64 border-r bg-card p-5 transition-transform md:translate-x-0 ${mobileNav ? "translate-x-0" : "-translate-x-full"}`}>
         <Link href="/" aria-label="Go to Peppermint Audio home" className="flex items-center gap-3 border-b pb-6"><div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground"><ShieldCheck className="size-5" /></div><div><p className="font-semibold">Peppermint Audio</p><p className="text-xs text-muted-foreground">Operations console</p></div></Link>
         <nav className="mt-6 space-y-1" aria-label="Admin sections"><a className={`admin-console-nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${section === "bookings" ? "bg-primary/10 text-primary shadow-[inset_3px_0_0_var(--primary)]" : "text-muted-foreground hover:bg-muted"}`} href="#bookings" aria-current={section === "bookings" ? "page" : undefined} onClick={(event) => navigateSection("bookings", event)}><LayoutDashboard className="size-4" />Bookings</a><a className={`admin-console-nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${section === "email-history" ? "bg-primary/10 text-primary shadow-[inset_3px_0_0_var(--primary)]" : "text-muted-foreground hover:bg-muted"}`} href="#email-history" aria-current={section === "email-history" ? "page" : undefined} onClick={(event) => navigateSection("email-history", event)}><Mail className="size-4" />Email history</a><a className={`admin-console-nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${section === "tax-report" ? "bg-primary/10 text-primary shadow-[inset_3px_0_0_var(--primary)]" : "text-muted-foreground hover:bg-muted"}`} href="#tax-report" aria-current={section === "tax-report" ? "page" : undefined} onClick={(event) => navigateSection("tax-report", event)}><FileSpreadsheet className="size-4" />Tax</a><a className={`admin-console-nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${section === "archive" ? "bg-primary/10 text-primary shadow-[inset_3px_0_0_var(--primary)]" : "text-muted-foreground hover:bg-muted"}`} href="#archive" aria-current={section === "archive" ? "page" : undefined} onClick={(event) => navigateSection("archive", event)}><Archive className="size-4" />Archive export</a></nav>
@@ -284,7 +286,7 @@ export function AdminConsole() {
       <div className="md:pl-64">
         <header className="admin-console-topbar sticky top-0 z-10 border-b bg-background/95 backdrop-blur"><div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-8"><Button variant="ghost" size="icon" className="shrink-0 md:hidden" onClick={() => setMobileNav(true)}><Menu /></Button><div className="hidden min-w-0 md:block"><p className="text-sm font-medium">{sectionHeading}</p><p className="text-xs text-muted-foreground">{sectionDescription}</p></div><div className="flex shrink-0 items-center gap-3"><span className="hidden text-xs text-muted-foreground sm:inline">{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" })}` : "Not updated yet"}</span><Button variant="outline" size="sm" className="gap-2" onClick={() => void load()} disabled={loading}><RefreshCw className={loading ? "size-3.5 animate-spin" : "size-3.5"} />Refresh</Button><Button variant="ghost" size="icon" className="md:hidden" onClick={() => void signOut()}><LogOut /></Button></div></div></header>
         <main className="admin-console-main mx-auto w-full max-w-6xl space-y-7 p-4 sm:p-8">
-          {message && <p role="status" className={`rounded-lg border px-4 py-2.5 text-sm ${messageType === "error" ? "border-destructive/20 bg-destructive/5 text-destructive" : "border-primary/20 bg-primary/5 text-primary"}`}>{message}</p>}
+          {message && messageType === "success" && <p role="status" className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm text-primary">{message}</p>}
           {section === "bookings" ? <><section className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-medium text-primary">Good to see you</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Bookings overview</h1><p className="mt-1 text-sm text-muted-foreground">Review enquiries, confirm details, and prepare every event.</p></div><div className="flex items-center gap-2 text-xs text-muted-foreground"><Clock3 className="size-3.5" />{lastUpdated ? `Last updated ${lastUpdated.toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short" })}` : "Loading latest data"}</div></section>
           <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">{([{ key: "upcoming", label: "Upcoming", icon: CalendarDays, color: "text-primary", count: upcomingCount }, { key: "submitted", label: "Submitted", icon: FileText, color: "text-amber-600", count: counts.submitted }, { key: "confirmed", label: "Confirmed", icon: CheckCircle2, color: "text-blue-600", count: counts.confirmed }, { key: "completed", label: "Completed", icon: CalendarDays, color: "text-emerald-600", count: counts.completed }, { key: "cancelled", label: "Cancelled", icon: XCircle, color: "text-red-600", count: counts.cancelled }] satisfies SummaryCard[]).map(({ key, label, icon: Icon, color, count }) => <Card key={key}><CardContent className="flex items-center justify-between p-4"><div><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-semibold">{count}</p></div><div className={`rounded-lg bg-muted p-2.5 ${color}`}><Icon className="size-5" /></div></CardContent></Card>)}</section>
           <section id="bookings" className="space-y-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">All bookings</h2><p className="text-sm text-muted-foreground">{visibleBookings.length} {visibleBookings.length === 1 ? "booking" : "bookings"} in view</p></div></div>
@@ -543,7 +545,7 @@ function EmailHistoryPage({ bookings, search, onSearch, onSelect }: { bookings: 
               const logs = booking.email_logs ?? [];
               const latest = logs.slice().sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime())[0];
               return (
-                <button key={booking.id} onClick={() => onSelect(booking)} className="flex w-full flex-wrap items-center gap-4 p-4 text-left transition-colors hover:bg-muted/50 sm:flex-nowrap">
+                <button key={booking.id} onClick={() => onSelect(booking)} className="grid w-full grid-cols-[1fr_auto] items-center gap-4 p-4 text-left transition-colors hover:bg-muted/50 lg:grid-cols-[minmax(0,1fr)_minmax(0,12rem)_5rem_11rem_1rem]">
                   <div className="flex min-w-0 flex-1 items-center gap-3">
                     <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">{booking.first_name[0]}{booking.last_name[0]}</div>
                     <div className="min-w-0">
@@ -551,8 +553,8 @@ function EmailHistoryPage({ bookings, search, onSearch, onSelect }: { bookings: 
                       <p className="truncate text-sm text-muted-foreground">{display(booking.email)}</p>
                     </div>
                   </div>
-                  <div className="min-w-32">
-                    <p className="text-sm font-medium">{display(booking.event_type)}</p>
+                  <div className="col-span-2 min-w-0 lg:col-span-1">
+                    <p className="break-words text-sm font-medium">{display(booking.event_type)}</p>
                     <p className="text-xs text-muted-foreground">{formatDate(booking.pickup_date)}</p>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">

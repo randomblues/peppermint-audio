@@ -28,14 +28,14 @@ export function MobileContactBar() {
 
   if (pathname.startsWith("/admin") || pathname.startsWith("/pay/") || pathname === "/booking") return null;
   return (
-    <div className="fixed inset-x-3 bottom-3 z-40 pb-[env(safe-area-inset-bottom)] md:inset-x-auto md:right-5 md:bottom-5 md:w-[min(calc(100%-2.5rem),22rem)]">
+    <div className="fixed inset-x-3 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-40 md:inset-x-auto md:right-5 md:bottom-5 md:w-[min(calc(100%-2.5rem),22rem)] md:pb-[env(safe-area-inset-bottom)]">
       <Sheet>
         <SheetTrigger
           render={
             <button
               type="button"
               aria-label="Check availability"
-              className="group flex min-h-14 w-full items-center gap-3 rounded-2xl border border-primary/65 bg-background/95 px-3 py-2 text-left text-foreground shadow-[0_8px_24px_rgb(0_0_0/0.2)] backdrop-blur-xl transition hover:border-primary/70 hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99] md:rounded-xl md:border-primary/45 md:px-4 md:py-0"
+              className="group flex min-h-16 w-full items-center gap-3 rounded-2xl border border-primary/65 bg-background/95 px-4 py-3 text-left text-foreground shadow-[0_8px_24px_rgb(0_0_0/0.2)] backdrop-blur-xl transition hover:border-primary/70 hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99] md:min-h-14 md:rounded-xl md:border-primary/45 md:px-4 md:py-0"
             />
           }
         >
@@ -51,8 +51,8 @@ export function MobileContactBar() {
             />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-sm leading-tight font-semibold">Check availability</span>
-            <span className="mt-0.5 block text-[0.68rem] leading-tight text-muted-foreground">
+            <span className="block text-base leading-tight font-semibold md:text-sm">Check availability</span>
+            <span className="mt-0.5 block text-xs leading-tight text-muted-foreground md:text-[0.68rem]">
               We&apos;ll help you find the right setup
             </span>
           </span>

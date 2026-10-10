@@ -59,7 +59,6 @@ export default function FaqPage() {
       />
       <section aria-labelledby="faq-heading" className="mx-auto w-full max-w-3xl px-5 pt-14 pb-20 sm:px-8 sm:pt-20 sm:pb-24">
         <header className="mb-8 sm:mb-12">
-          <p className="mb-4 text-sm font-medium text-primary">A few questions before the party</p>
           <h1 id="faq-heading" className="font-heading text-4xl leading-tight font-semibold tracking-tight sm:text-5xl">
             Good sound. Less stress.
           </h1>
@@ -67,7 +66,7 @@ export default function FaqPage() {
             You don&apos;t need to know all the sound stuff. Here&apos;s a little help figuring out what you need.
           </p>
         </header>
-        <Accordion defaultValue={faqs[0] ? [faqs[0].question] : []}>
+        <Accordion>
           {faqs.slice(0, 5).map(renderQuestion)}
         </Accordion>
         <details className="mt-8 border-y border-border/60 sm:mt-10">

@@ -23,7 +23,9 @@ Marketing website for a Melbourne PA equipment hire business, built with:
 - `/booking` (booking request form)
 - `/pay/[token]` (time-limited customer payment link)
 
-The homepage leads with "Good sound. Less stress.", a real stage photograph shown only at desktop widths (1024px and above), and direct paths to packages and individual gear. Mobile and portrait-tablet layouts keep the introduction focused on text and hire options without reserving space for the photo. Its introductory strip highlights hire options, Abbotsford pickup, and the included setup walkthrough. It keeps the existing package/cart interactions and customer reviews, with a three-step hire overview from `homeHireSteps` in `lib/site-content.ts`. Booking requests still require availability review before confirmation.
+The homepage leads with "Good sound. Less stress." and a real stage photograph shown only at desktop widths (1024px and above). Mobile and portrait-tablet layouts keep the introduction focused on text and hire options without reserving space for the photo. The hero flows directly into the packages section without an introductory information strip. It keeps the existing package/cart interactions and customer reviews, with a three-step hire overview from `homeHireSteps` in `lib/site-content.ts`. Booking requests still require availability review before confirmation.
+
+The hero uses a quiet, separated event-type list and a Melbourne hire description, followed by View packages and the tracked phone-call button. The hero phone button uses flat styling without changing the shared phone button's default appearance elsewhere. The former individual/custom-hire promotional panels and their replacement compact panel have been removed; the catalogue remains available through site navigation.
 
 The locally served homepage photo, `public/home-live-sound.jpg`, is [A Stage with Microphones and a Bar Stool by Caio](https://www.pexels.com/photo/a-stage-with-microphones-and-a-bar-stool-13061474/), used under the [Pexels License](https://www.pexels.com/license/). It is stock photography, not a photograph of Peppermint Audio's own inventory or an event serviced by the business.
 

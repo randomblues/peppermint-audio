@@ -1,21 +1,12 @@
-import Link from "next/link";
 import Image from "next/image";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { business } from "@/lib/site-content";
 
 export function Footer() {
   return (
-    <footer className="mt-10 border-t bg-muted/20 pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
+    <footer className="mt-10 border-t bg-muted/20 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
       <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">Pickup: {business.pickupSuburb} {business.pickupPostcode}</Badge>
-          <Badge variant="outline">Servicing {business.serviceArea}</Badge>
-        </div>
-        <Separator className="my-5" />
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between sm:gap-10">
           <div className="space-y-1 text-sm text-muted-foreground">
             <Image
               src="/logo-white.png"
@@ -27,9 +18,16 @@ export function Footer() {
             <p>Email: {business.email}</p>
             <p>Phone: {business.phone}</p>
           </div>
-          <Button variant="outline" nativeButton={false} render={<Link href="/contact" />}>
-            Send an enquiry
-          </Button>
+          <dl className="grid grid-cols-2 gap-6 border-t border-border/60 pt-5 text-sm sm:gap-8 sm:border-t-0 sm:border-l sm:pl-8 sm:pt-0">
+            <div>
+              <dt className="mb-1.5 text-xs text-muted-foreground">Pickup</dt>
+              <dd className="font-medium text-foreground">{business.pickupSuburb} {business.pickupPostcode}</dd>
+            </div>
+            <div>
+              <dt className="mb-1.5 text-xs text-muted-foreground">Servicing</dt>
+              <dd className="font-medium text-foreground">{business.serviceArea}</dd>
+            </div>
+          </dl>
         </div>
       </div>
     </footer>

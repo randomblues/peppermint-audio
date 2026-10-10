@@ -124,16 +124,19 @@ describe("Navbar", () => {
 });
 
 describe("Footer", () => {
-  it("shows pickup and contact details with an enquiry link", () => {
+  it("shows pickup and contact details without an enquiry button", () => {
     render(<Footer />);
 
     const footer = screen.getByRole("contentinfo");
-    expect(footer).toHaveClass("pb-[calc(3.5rem+env(safe-area-inset-bottom))]");
+    expect(footer).toHaveClass("pb-[calc(5rem+env(safe-area-inset-bottom))]", "md:pb-[calc(3.5rem+env(safe-area-inset-bottom))]");
     expect(footer).not.toHaveClass("md:pb-0");
-    expect(within(footer).getByText("Pickup: Abbotsford 3067")).toBeInTheDocument();
-    expect(within(footer).getByText("Servicing Melbourne")).toBeInTheDocument();
+    expect(within(footer).getByText("Pickup")).toBeInTheDocument();
+    expect(within(footer).getByText("Abbotsford 3067")).toBeInTheDocument();
+    expect(within(footer).getByText("Servicing")).toBeInTheDocument();
+    expect(within(footer).getByText("Melbourne")).toBeInTheDocument();
     expect(within(footer).getByText("Email: contactus@peppermintaudio.com.au")).toBeInTheDocument();
-    expect(within(footer).getByText("Send an enquiry").closest("a")).toHaveAttribute("href", "/contact");
+    expect(within(footer).queryByText("Send an enquiry")).not.toBeInTheDocument();
+    expect(within(footer).queryByRole("separator")).not.toBeInTheDocument();
   });
 });
 
@@ -167,6 +170,11 @@ describe("PackageCard", () => {
 
       expect(screen.getByRole("button", { name: "Previous package" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Next package" })).toBeInTheDocument();
+      const controls = screen.getByRole("group", { name: "Package navigation" });
+      expect(controls).toHaveClass("flex", "justify-center", "mb-6");
+      expect(screen.getByRole("button", { name: "Previous package" }).parentElement).toBe(controls);
+      expect(screen.getByRole("button", { name: "Next package" })).toHaveClass("rounded-full", "size-11");
+      expect(screen.getByRole("button", { name: "Next package" })).not.toHaveClass("absolute");
       expect(screen.getByLabelText("Choose a package")).toBeInTheDocument();
       for (const pkg of packageTiers) {
         expect(screen.getAllByText(pkg.name).length).toBeGreaterThanOrEqual(1);
@@ -404,13 +412,16 @@ describe("WhatsAppButton", () => {
 
       const availabilityButton = screen.getByRole("button", { name: "Check availability" });
       expect(availabilityButton).toHaveClass(
-        "min-h-14",
+        "min-h-16",
+        "md:min-h-14",
         "bg-background/95",
         "text-foreground",
         "border-primary/65",
         "md:border-primary/45",
       );
-      expect(within(availabilityButton).getByText("Check availability")).toHaveClass("text-sm");
+      expect(availabilityButton.closest(".fixed")).toHaveClass("bottom-[max(0.5rem,env(safe-area-inset-bottom))]");
+      expect(availabilityButton.closest(".fixed")).not.toHaveClass("pb-[env(safe-area-inset-bottom)]");
+      expect(within(availabilityButton).getByText("Check availability")).toHaveClass("text-base", "md:text-sm");
       expect(within(availabilityButton).getByText("We'll help you find the right setup")).toHaveClass(
         "block",
         "text-muted-foreground",
