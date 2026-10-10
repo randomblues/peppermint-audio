@@ -60,6 +60,13 @@ to the local webhook route, and supplies the listener's signing secret to the
 app without writing it to a file. The combined output is in
 `/tmp/dev-3000.log`; use `PORT` to select a different port. Leave Stripe
 forwarding disabled by using `scripts/dev-detached.sh` when it is not needed.
+
+With Stripe test-mode keys configured, enter `4242 4242 4242 4242`, a future
+expiry and any three-digit CVC in the customer payment UI. This US test card
+requires a five-digit ZIP such as `90210` when postal-code entry appears.
+Chrome's HTTP-localhost warning disables saved-card autofill, not manual
+test-card entry. Never use real card details for local testing.
+
 Both launchers, including `npm run dev:resend`, reuse any responding configured
 Docker engine. If no engine responds on macOS, they launch an already installed
 Docker Desktop from `/Applications` or `~/Applications`. Engine readiness is

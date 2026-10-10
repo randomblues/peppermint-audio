@@ -314,7 +314,17 @@ function PaymentForm({ data, token, onComplete }: { data: PaymentData; token: st
       <div className="rounded-xl border bg-muted/20 p-4">
         <p className="text-sm font-semibold">Card details</p>
         <div className="mt-3 rounded-lg border bg-background p-3">
-          <CardElement options={{ hidePostalCode: false }} />
+          <CardElement options={{
+            hidePostalCode: false,
+            style: {
+              base: {
+                color: "#f4f4f5",
+                fontSize: "16px",
+                "::placeholder": { color: "#a1a1aa" },
+              },
+              invalid: { color: "#f87171" },
+            },
+          }} />
         </div>
         {requiresDepositConsent && data.securityDepositCents > 0 && !hirePaid ? <label className="flex items-start gap-3 rounded-xl border p-4 text-sm leading-relaxed"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-1 shrink-0" /><span>{immediateDeposit
           ? `I authorise Peppermint Audio to charge the hire and place a temporary ${formatAudCents(data.securityDepositCents)} security deposit hold as part of this checkout. The hold is released after return unless charges apply under the hire terms.`

@@ -5,10 +5,13 @@ import { PaymentCheckout } from "./payment-checkout";
 import { depositHoldDate, melbourneDateKey } from "@/lib/payment-flow";
 
 const stripe = vi.hoisted(() => ({
-  createPaymentMethod: vi.fn(), confirmCardPayment: vi.fn(), clear: vi.fn(),
+  createPaymentMethod: vi.fn(), confirmCardPayment: vi.fn(), clear: vi.fn(), cardElementOptions: vi.fn(),
 }));
 vi.mock("@stripe/react-stripe-js", () => ({
-  CardElement: () => null,
+  CardElement: ({ options }: { options: unknown }) => {
+    stripe.cardElementOptions(options);
+    return null;
+  },
   Elements: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useElements: () => ({ getElement: () => ({ clear: stripe.clear }) }),
   useStripe: () => stripe,
@@ -42,6 +45,17 @@ describe("PaymentCheckout", () => {
     vi.stubGlobal("fetch", fetch);
     render(<PaymentCheckout token="advance-token" />);
     const pay = await screen.findByRole("button", { name: "Pay $110.00" });
+    expect(stripe.cardElementOptions).toHaveBeenCalledWith({
+      hidePostalCode: false,
+      style: {
+        base: {
+          color: "#f4f4f5",
+          fontSize: "16px",
+          "::placeholder": { color: "#a1a1aa" },
+        },
+        invalid: { color: "#f87171" },
+      },
+    });
     expect(pay).toBeDisabled();
     expect(screen.getByRole("heading", { level: 1, name: "Pay for your hire" })).toBeInTheDocument();
     const hireRow = screen.getByText("Hire subtotal").parentElement?.parentElement;
