@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdminJson } from "@/lib/admin-request";
 import { lineItemsForBooking, lineItemsTotalCents } from "@/lib/booking-line-items";
 import { isBankTransferOption, type BankTransferOption } from "@/lib/bank-transfer";
 import { sendInvoiceEmail } from "@/lib/invoice-service";
@@ -9,15 +9,9 @@ import { parseInvoiceRecipient } from "@/lib/invoice-recipient";
 import { parseAmountCents, rentalDays } from "@/lib/payment-flow";
 
 export async function POST(request: Request) {
-  const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  let body: { bookingId?: string; paymentMethod?: unknown; securityDepositAmount?: unknown; bankTransferOption?: unknown; gstInclusive?: unknown; billToName?: unknown; billToEmail?: unknown };
-  try {
-    body = await request.json() as typeof body;
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  }
+  const auth = await requireAdminJson<{ bookingId?: string; paymentMethod?: unknown; securityDepositAmount?: unknown; bankTransferOption?: unknown; gstInclusive?: unknown; billToName?: unknown; billToEmail?: unknown }>(request);
+  if ("response" in auth) return auth.response;
+  const { session, body } = auth;
   const bookingId = body.bookingId?.trim();
   const cashOnPickup = body.paymentMethod === "cash_on_pickup";
   if (body.paymentMethod !== undefined && body.paymentMethod !== "bank_transfer" && !cashOnPickup) {

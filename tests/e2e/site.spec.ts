@@ -46,6 +46,7 @@ test.describe("navigation", () => {
   test("mobile navigation opens and links to FAQ", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "mobile");
     await page.goto("/");
+    await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
 
     await page.getByRole("button", { name: "Open menu" }).click();
     const mobileMenu = page.getByRole("dialog", { name: "Peppermint Audio" });

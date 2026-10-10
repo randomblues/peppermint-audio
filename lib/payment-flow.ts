@@ -1,5 +1,5 @@
 export const MAX_STRIPE_HIRE_DAYS = 3;
-export const PAYMENT_LINK_VALIDITY_DAYS = 30;
+const PAYMENT_LINK_VALIDITY_DAYS = 30;
 
 export function depositHoldDate(pickupDate: string) {
   if (rentalDays(pickupDate, pickupDate) === null) throw new Error("Invalid pickup date.");

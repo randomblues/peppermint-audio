@@ -13,7 +13,7 @@ import { gstIncludedCents } from "@/lib/gst";
 import { createAdminClient } from "@/lib/supabase";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
-export type BillingDocumentType = "invoice" | "payment_receipt" | "deposit_authorisation" | "deposit_release" | "deposit_capture";
+type BillingDocumentType = "invoice" | "payment_receipt" | "deposit_authorisation" | "deposit_release" | "deposit_capture";
 
 type InvoiceBooking = {
   id: string;

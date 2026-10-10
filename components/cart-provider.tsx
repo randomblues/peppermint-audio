@@ -21,10 +21,10 @@ const hireDatesSchema = z.object({
   && (!pickupDate || !dropoffDate || dropoffDate >= pickupDate),
 );
 
-export type HireDates = z.infer<typeof hireDatesSchema>;
+type HireDates = z.infer<typeof hireDatesSchema>;
 const emptyHireDates: HireDates = { pickupDate: "", dropoffDate: "" };
 
-export type CartItem = {
+type CartItem = {
   id: string;
   name: string;
   kind: "package" | "equipment";

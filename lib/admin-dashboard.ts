@@ -1,7 +1,7 @@
 export const bookingStatuses = ["submitted", "confirmed", "completed", "cancelled"] as const;
-export type BookingStatus = (typeof bookingStatuses)[number];
+type BookingStatus = (typeof bookingStatuses)[number];
 
-export type DashboardBooking = {
+type DashboardBooking = {
   pickup_date?: string | null;
   status?: string | null;
 };

@@ -18,7 +18,7 @@ The production site is deployed to Vercel from the private GitHub repository `ra
 
 ## Technology stack
 
-- Next.js `16.2.6` App Router with React `19.2.4` and TypeScript.
+- Next.js `16.3.8` App Router with React `19.2.4` and TypeScript.
 - Tailwind CSS v4 with shadcn-style components built on `@base-ui/react`.
 - React Hook Form, `@hookform/resolvers`, and Zod for form handling and validation.
 - Supabase for booking persistence, authentication, and private photo-ID storage.
@@ -27,7 +27,8 @@ The production site is deployed to Vercel from the private GitHub repository `ra
 - JSZip for admin archive exports.
 - Vitest v3 with Testing Library, jsdom, and V8 coverage.
 - Playwright for end-to-end smoke tests in `tests/e2e`.
-- Vercel Cron for daily pickup reminders.
+- Vercel Cron for daily pickup reminders and deferred security-deposit holds.
+- Stripe for customer payment links, hire payments, and deposit authorisations; `pdf-lib` for invoice/receipt PDFs.
 
 ## Source-of-truth files
 
@@ -78,7 +79,17 @@ The public customer flow is catalogue → cart → booking request. The cart sen
 - `POST /api/admin/test-reminder`: authenticated reminder-template send action.
 - `POST /api/admin/send-confirmation`: authenticated confirmation-email resend for confirmed bookings.
 - `POST /api/admin/send-custom-email`: authenticated custom email to a booking contact.
+- `POST /api/admin/payments/create-checkout`: authenticated Stripe payment-link creation for eligible short hires.
+- `POST /api/admin/payments/bank-transfer`: authenticated bank-transfer or cash-on-pickup payment request with invoice.
+- `POST /api/admin/payments/update-booking`: authenticated hire-item, payment-method, and GST updates.
+- `POST /api/admin/payments/send-invoice`: authenticated invoice resend.
+- `POST /api/admin/payments/manage-deposit`: authenticated deposit release/capture and bank-transfer receipt/refund recording.
+- `GET /api/admin/tax-report`: authenticated JSON/CSV tax report by paid or issued date.
+- `GET/POST /api/payment/[token]`: public time-limited customer payment link backing `/pay/[token]`.
+- `POST /api/stripe/webhook`: Stripe-signed PaymentIntent status updates and billing-document emails.
 - `GET /api/cron/pickup-reminders`: CRON_SECRET-protected daily reminder job.
+- `GET /api/cron/deposit-holds`: CRON_SECRET-protected daily deferred deposit-hold job.
+- `POST /api/dev/admin-login`: development-only loopback local test-admin sign-in (see below).
 - `GET /api/google-calendar/connect`, `GET /api/google-calendar/callback`: OAuth connect/callback.
 
 Admin routes must remain server-only. Never expose `SUPABASE_SERVICE_ROLE_KEY`, private storage paths, or customer photo IDs to the browser.
@@ -100,30 +111,7 @@ Run the full migration in Supabase after schema changes, especially before using
 
 ## Environment variables
 
-Required email/configuration variables:
-
-- `RESEND_API_KEY`
-- `ENQUIRY_FROM_EMAIL`
-- `ENQUIRY_TO_EMAIL`
-- `NEXT_PUBLIC_SITE_URL` (optional; confirmation email logo falls back to the production domain)
-
-Supabase:
-
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY` (server-only)
-
-Google Calendar:
-
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
-- `GOOGLE_CALENDAR_REDIRECT_URI`
-- `GOOGLE_CALENDAR_REFRESH_TOKEN`
-- `GOOGLE_CALENDAR_ID` (optional; defaults to `primary`)
-
-Operations:
-
-- `CRON_SECRET`
+The complete list lives in the **Environment Variables** section of `README.md`; keep it as the single source rather than duplicating it here. `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `CRON_SECRET`, and Google OAuth secrets are server-only.
 
 Never put secret values in source files, test fixtures committed with real credentials, shell arguments, or documentation.
 
@@ -326,13 +314,6 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Additional observation:** Hidden or concurrently controlled tabs can return stale rendered frames even when `innerWidth` matches the requested width. Inspect an actual breakpoint-dependent layout and confirm the frame has updated before trusting the screenshot. If viewport, frame, or input evidence remains inconsistent after a bounded diagnostic attempt, stop retries and report responsive validation as incomplete rather than marking it passed.
 - **Next action:** Use a dedicated QA tab, capture evidence at every required width, and wait for cart hydration and the actual end of the page before checking footer clearance.
 
-### 2026-10-09 — Raw patch arguments rejected by tool hook
-
-- **Symptom:** The browser-lock hook blocked calendar edits and the patch to repair the hook itself.
-- **Root cause:** The hook attempted to JSON-parse every string-valued tool argument, including raw `apply_patch` text.
-- **Prevention:** Parse tool arguments according to the tool's input format. Decode JSON-encoded parallel arguments for lock inspection, but preserve raw patch text and keep browser/terminal ownership checks intact.
-- **Next action:** Add regression coverage for raw patch arguments alongside existing JSON-encoded parallel payload tests before extending tool hooks.
-
 ### 2026-10-09 — Local Supabase email login and signup flags
 
 - **Symptom:** The local test administrator could be created, but signing in failed with "Email logins are disabled".
@@ -353,6 +334,20 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Root cause:** Docker Desktop 4.43.2 answered `docker info` but its host backend hung every container start (even a trivial `docker run`). The launcher hid this behind a blocking `execFileSync`; on timeout it killed only the npm `.bin/supabase` wrapper, orphaning the native CLI, which kept output pipes open and Node alive. The interrupted start then left a `Created` database container that made later `supabase start` runs fail immediately.
 - **Prevention:** Prove the engine can start a trivial container before blaming Supabase. On macOS there is no `timeout`; signal-based limits (for example Perl `alarm`) can be swallowed because `docker run` forwards signals to the container, so use a fork-and-SIGKILL helper. Kill whole process groups when stopping child commands. Avoid reading Docker's Group Container settings file or running `python3` without a bound, because both can hang on macOS prompts or shims.
 - **Next action:** Keep `scripts/local-db.mjs` startup bounded (process-group kill, `Created`-state watchdog, redacted progress), and verify a fixed Docker engine with `docker run --rm hello-world` before rerunning `npm run dev`.
+
+### 2026-10-10 — Stale Next.js route types after route deletion
+
+- **Symptom:** Type-checking or the build failed on a generated route validator after its route had been deleted.
+- **Root cause:** `.next/dev/types` still contained generated type entries for the removed route.
+- **Prevention:** When deleting a route, check whether stale generated route types remain before diagnosing a source-code type error.
+- **Next action:** Remove the stale `.next/dev/types` output or rerun `next dev` to regenerate it, then rerun the build.
+
+### 2026-10-10 — Stale integrated-browser screenshot frames
+
+- **Symptom:** An integrated-browser screenshot did not reflect the requested viewport or the current rendered page.
+- **Root cause:** Screenshot helpers could reset emulated dimensions or capture a stale frame even when the viewport setter succeeded.
+- **Prevention:** Verify `innerWidth` and a breakpoint-dependent layout on the active tab before trusting a screenshot.
+- **Next action:** If the frame remains stale, apply `Emulation.setDeviceMetricsOverride` through CDP and capture directly with `Page.captureScreenshot`; stop and report incomplete validation if the frame still cannot be verified.
 
 # Agent working rules
 

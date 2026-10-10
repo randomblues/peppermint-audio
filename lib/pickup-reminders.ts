@@ -39,16 +39,6 @@ export function formatMelbourneDate(value: string): string {
   }).format(new Date(`${value}T12:00:00Z`));
 }
 
-export function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  })[character] ?? character);
-}
-
 export function getPickupInstructions(booking: PickupInstructionSource) {
   const hireItems = lineItemsForBooking({ hire_line_items: booking.hire_line_items });
   return {

@@ -1,19 +1,13 @@
 import { NextResponse } from "next/server";
 
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdminJson } from "@/lib/admin-request";
 import { sendBookingConfirmationEmail } from "@/lib/send-booking-confirmation";
 import { recordCustomerEmail } from "@/lib/email-log";
 
 export async function POST(request: Request) {
-  const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  let body: { bookingId?: string };
-  try {
-    body = await request.json() as { bookingId?: string };
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  }
+  const auth = await requireAdminJson<{ bookingId?: string }>(request);
+  if ("response" in auth) return auth.response;
+  const { session, body } = auth;
   if (!body.bookingId) return NextResponse.json({ error: "A booking ID is required." }, { status: 400 });
 
   const result = await session.admin.from("bookings")

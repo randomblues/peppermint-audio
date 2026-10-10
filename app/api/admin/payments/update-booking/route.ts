@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdminJson } from "@/lib/admin-request";
 import { isBankTransferOption, type BankTransferOption } from "@/lib/bank-transfer";
 import { lineItemsTotalCents, parseBookingLineItems, type BookingLineItem } from "@/lib/booking-line-items";
 import { sendInvoiceEmail } from "@/lib/invoice-service";
@@ -78,15 +78,9 @@ function paymentIsSettled(booking: Record<string, unknown>) {
 }
 
 export async function POST(request: Request) {
-  const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  let body: UpdateRequest;
-  try {
-    body = await request.json() as UpdateRequest;
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  }
+  const auth = await requireAdminJson<UpdateRequest>(request);
+  if ("response" in auth) return auth.response;
+  const { session, body } = auth;
 
   const bookingId = body.bookingId?.trim();
   const requestedMethod = body.paymentMethod;

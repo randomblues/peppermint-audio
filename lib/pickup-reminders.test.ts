@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildPickupReminderEmail, escapeHtml, formatMelbourneDate, getMelbourneTomorrow } from "@/lib/pickup-reminders";
+import { buildPickupReminderEmail, formatMelbourneDate, getMelbourneTomorrow } from "@/lib/pickup-reminders";
 
 describe("pickup reminders", () => {
-  it("formats dates consistently and escapes every HTML-sensitive character", () => {
+  it("formats dates consistently", () => {
     expect(formatMelbourneDate("2026-09-29")).toBe("29 September 2026");
-    expect(escapeHtml(`& < > " '`)).toBe("&amp; &lt; &gt; &quot; &#39;");
   });
 
   it("calculates tomorrow in Melbourne across a DST boundary", () => {

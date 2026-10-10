@@ -124,7 +124,7 @@ export function bookingHireTotalCents(items: BookingLineItem[], pickupDate: stri
   return lineItemsTotalCents(items, nights);
 }
 
-export function formatBookingLineItem(item: BookingLineItem) {
+function formatBookingLineItem(item: BookingLineItem) {
   return `${item.quantity > 1 ? `${item.quantity} × ` : ""}${item.name}${item.option ? ` (${item.option})` : ""}`;
 }
 

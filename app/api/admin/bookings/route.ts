@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdminJson } from "@/lib/admin-request";
 import { PHOTO_ID_BUCKET } from "@/lib/supabase";
 import { sendBookingConfirmationEmail } from "@/lib/send-booking-confirmation";
 import { recordCustomerEmail } from "@/lib/email-log";
@@ -46,14 +47,9 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  let body: { id?: string; status?: string; internal_notes?: string; hire_line_items?: unknown };
-  try {
-    body = await request.json() as { id?: string; status?: string; internal_notes?: string };
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  }
+  const auth = await requireAdminJson<{ id?: string; status?: string; internal_notes?: string; hire_line_items?: unknown }>(request);
+  if ("response" in auth) return auth.response;
+  const { session, body } = auth;
   if (!body.id || (body.status && !["submitted", "confirmed", "completed", "cancelled"].includes(body.status))) return NextResponse.json({ error: "Invalid update." }, { status: 400 });
   let lineItemUpdate: { hire_line_items: unknown; hire_amount_cents: number } | null = null;
   if (body.hire_line_items !== undefined) {
@@ -142,14 +138,9 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  let body: { id?: string; confirm?: boolean };
-  try {
-    body = await request.json() as { id?: string; confirm?: boolean };
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  }
+  const auth = await requireAdminJson<{ id?: string; confirm?: boolean }>(request);
+  if ("response" in auth) return auth.response;
+  const { session, body } = auth;
   if (!body.id || body.confirm !== true) return NextResponse.json({ error: "Explicit deletion confirmation is required." }, { status: 400 });
   const { data: booking, error: readError } = await session.admin.from("bookings").select("photo_id_paths").eq("id", body.id).single();
   if (readError) return NextResponse.json({ error: readError.message }, { status: 500 });

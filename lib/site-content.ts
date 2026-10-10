@@ -18,7 +18,7 @@ export type PackageTier = {
   image: string;
 };
 
-export type AddOn = {
+type AddOn = {
   name: string;
   price: number;
   category?: "DI boxes" | "Lighting" | "Microphones" | "Mixers" | "Accessories";

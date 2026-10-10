@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdminJson } from "@/lib/admin-request";
 import { lineItemsForBooking, lineItemsTotalCents } from "@/lib/booking-line-items";
 import { MAX_STRIPE_HIRE_DAYS, depositHoldDate, isImmediateDepositBooking, paymentLinkExpiry, parseAmountCents, rentalDays } from "@/lib/payment-flow";
 import { sendInvoiceEmail } from "@/lib/invoice-service";
@@ -74,15 +74,9 @@ function siteUrl(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  let body: PaymentRequest;
-  try {
-    body = await request.json() as PaymentRequest;
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  }
+  const auth = await requireAdminJson<PaymentRequest>(request);
+  if ("response" in auth) return auth.response;
+  const { session, body } = auth;
 
   const bookingId = body.bookingId?.trim();
   const recipientResult = parseInvoiceRecipient(body);

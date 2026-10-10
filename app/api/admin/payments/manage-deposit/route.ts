@@ -1,20 +1,14 @@
 import { NextResponse } from "next/server";
 
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdminJson } from "@/lib/admin-request";
 import { markInvoiceStatus, sendBillingDocument } from "@/lib/invoice-service";
 import { parseAmountCents } from "@/lib/payment-flow";
 import { getStripe } from "@/lib/stripe";
 
 export async function POST(request: Request) {
-  const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  let body: { bookingId?: string; action?: "release" | "capture" | "bank_transfer_received" | "bank_transfer_deposit_refunded"; amount?: unknown };
-  try {
-    body = await request.json() as typeof body;
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  }
+  const auth = await requireAdminJson<{ bookingId?: string; action?: "release" | "capture" | "bank_transfer_received" | "bank_transfer_deposit_refunded"; amount?: unknown }>(request);
+  if ("response" in auth) return auth.response;
+  const { session, body } = auth;
   const bookingId = body.bookingId?.trim();
   if (!bookingId || !["release", "capture", "bank_transfer_received", "bank_transfer_deposit_refunded"].includes(body.action ?? "")) {
     return NextResponse.json({ error: "Booking ID and a valid deposit action are required." }, { status: 400 });

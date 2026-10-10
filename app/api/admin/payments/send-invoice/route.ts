@@ -1,19 +1,14 @@
 import { NextResponse } from "next/server";
 
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdminJson } from "@/lib/admin-request";
 import { isBankTransferOption, type BankTransferOption } from "@/lib/bank-transfer";
 import { sendInvoiceEmail } from "@/lib/invoice-service";
 import { parseInvoiceRecipient } from "@/lib/invoice-recipient";
 
 export async function POST(request: Request) {
-  const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  let body: { bookingId?: string; bankTransferOption?: unknown; billToName?: unknown; billToEmail?: unknown };
-  try {
-    body = await request.json() as { bookingId?: string };
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  }
+  const auth = await requireAdminJson<{ bookingId?: string; bankTransferOption?: unknown; billToName?: unknown; billToEmail?: unknown }>(request);
+  if ("response" in auth) return auth.response;
+  const { session, body } = auth;
   const bookingId = body.bookingId?.trim();
   const recipientResult = parseInvoiceRecipient(body);
   if (recipientResult.error) return NextResponse.json({ error: recipientResult.error }, { status: 400 });

@@ -1,6 +1,6 @@
 import { emailFooterText } from "@/lib/email-footer";
 import { emailDetailsTable, emailLayout, emailPanel, escapeEmailHtml } from "@/lib/email-template";
-import { escapeHtml, type PickupInstructionSource, getPickupInstructions } from "@/lib/pickup-reminders";
+import { type PickupInstructionSource, getPickupInstructions } from "@/lib/pickup-reminders";
 import { summarizeBookingLineItems, type BookingLineItem } from "@/lib/booking-line-items";
 
 type BookingConfirmationDetails = {
@@ -41,8 +41,29 @@ export function buildBookingConfirmationEmail(details: BookingConfirmationDetail
       "Please bring suitable transport and valid photo ID for pickup.",
     ].join("\n")
     : "";
+  const sectionHeading = (title: string) => `<h2 style="font-size:16px;color:#20211f">${title}</h2>`;
+  const bulletList = (items: string[]) => `<ul>${items.map((item) => `<li>${escapeEmailHtml(item)}</li>`).join("")}</ul>`;
   const pickupInstructionsHtml = pickupInstructions
-    ? `<div style="margin-top:24px;border:1px solid #e4ddd5;border-radius:12px;background:#faf9f7;padding:20px"><p style="margin:0 0 16px;font-size:14px;font-weight:bold;color:#20211f">Same-day pickup details</p><p style="margin:7px 0;font-size:14px"><strong>Pickup address:</strong> 181 Nicholson St, Abbotsford VIC 3067</p><p style="margin:16px 0;padding:12px;background:#fff3d6;border:1px solid #e8c979"><strong>Please message or call Peppermint Audio on 0452 316 823 30 minutes before arriving.</strong></p><p style="margin:16px 0;padding:12px;background:#e8eee8"><strong>Please note:</strong> Peppermint Audio is a small business operating from a private residence. Please respect the property and call upon arrival.</p><h2 style="font-size:16px;color:#20211f">Hire items</h2><ul>${(pickupInstructions.hireItems.length ? pickupInstructions.hireItems : ["None specified"]).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul><h2 style="font-size:16px;color:#20211f">Transport and handling</h2><ul>${pickupInstructions.transportText.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>${pickupInstructions.additionalDetails ? `<h2 style="font-size:16px;color:#20211f">Additional requirements</h2><p style="white-space:pre-line">${escapeHtml(pickupInstructions.additionalDetails)}</p><p><strong>Please confirm these requirements with Peppermint Audio at pickup.</strong> Peppermint Audio is not responsible for anything extra required beyond what is provided in the package and discussed additional requirements.</p>` : ""}<p>Please bring suitable transport and valid photo ID for pickup.</p></div>`
+    ? [
+      `<div style="margin-top:24px;border:1px solid #e4ddd5;border-radius:12px;background:#faf9f7;padding:20px">`,
+      `<p style="margin:0 0 16px;font-size:14px;font-weight:bold;color:#20211f">Same-day pickup details</p>`,
+      `<p style="margin:7px 0;font-size:14px"><strong>Pickup address:</strong> 181 Nicholson St, Abbotsford VIC 3067</p>`,
+      `<p style="margin:16px 0;padding:12px;background:#fff3d6;border:1px solid #e8c979"><strong>Please message or call Peppermint Audio on 0452 316 823 30 minutes before arriving.</strong></p>`,
+      `<p style="margin:16px 0;padding:12px;background:#e8eee8"><strong>Please note:</strong> Peppermint Audio is a small business operating from a private residence. Please respect the property and call upon arrival.</p>`,
+      sectionHeading("Hire items"),
+      bulletList(pickupInstructions.hireItems.length ? pickupInstructions.hireItems : ["None specified"]),
+      sectionHeading("Transport and handling"),
+      bulletList(pickupInstructions.transportText),
+      ...(pickupInstructions.additionalDetails
+        ? [
+          sectionHeading("Additional requirements"),
+          `<p style="white-space:pre-line">${escapeEmailHtml(pickupInstructions.additionalDetails)}</p>`,
+          `<p><strong>Please confirm these requirements with Peppermint Audio at pickup.</strong> Peppermint Audio is not responsible for anything extra required beyond what is provided in the package and discussed additional requirements.</p>`,
+        ]
+        : []),
+      `<p>Please bring suitable transport and valid photo ID for pickup.</p>`,
+      `</div>`,
+    ].join("")
     : "";
   const subject = "Your booking with Peppermint Audio has been confirmed.";
   const text = [

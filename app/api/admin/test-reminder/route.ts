@@ -1,21 +1,15 @@
 import { NextResponse } from "next/server";
 import { EmailTransport as Resend, emailConfiguration } from "@/lib/email-transport";
 import { buildPickupReminderEmail, getMelbourneTomorrow } from "@/lib/pickup-reminders";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdminJson } from "@/lib/admin-request";
 import type { BookingLineItem } from "@/lib/booking-line-items";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  let body: { email?: string; bookingId?: string };
-  try {
-    body = await request.json() as { email?: string };
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  }
+  const auth = await requireAdminJson<{ email?: string; bookingId?: string }>(request);
+  if ("response" in auth) return auth.response;
+  const { session, body } = auth;
 
   let booking: {
     email: string;

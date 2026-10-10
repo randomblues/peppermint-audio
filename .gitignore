@@ -12,7 +12,8 @@
 
 # testing
 /coverage
-/.copilot-dev-session.json
+/test-results/
+/playwright-report/
 /.local-supabase/
 /supabase/.temp/
 

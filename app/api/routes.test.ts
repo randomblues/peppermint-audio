@@ -48,7 +48,6 @@ import { POST as logout } from "./admin/logout/route";
 import { GET as photoLink } from "./admin/photo-link/route";
 import { POST as sendConfirmation } from "./admin/send-confirmation/route";
 import { POST as sendCustomEmail } from "./admin/send-custom-email/route";
-import { POST as sendInvoiceEmail } from "./admin/send-invoice-email/route";
 import { GET as connectCalendar } from "./google-calendar/connect/route";
 import { GET as calendarCallback } from "./google-calendar/callback/route";
 
@@ -315,40 +314,6 @@ describe("admin booking routes", () => {
     expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({
       subject: "Your documents",
       attachments: [{ filename: "details.pdf", content: Buffer.from("document contents").toString("base64") }],
-    }));
-  });
-
-  it("sends an invoice email with the uploaded attachment", async () => {
-    const read = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: { email: "customer@example.com" }, error: null }),
-    };
-    mocks.requireAdmin.mockResolvedValue(adminSession({ from: vi.fn().mockReturnValue(read) }));
-    vi.stubEnv("RESEND_API_KEY", "key");
-    vi.stubEnv("ENQUIRY_FROM_EMAIL", "Peppermint Audio <from@example.com>");
-    const form = new Map<string, unknown>([
-      ["bookingId", "b1"],
-      ["subject", "Your invoice"],
-      ["message", "Please find your invoice attached."],
-      ["attachment", {
-        name: "invoice.pdf",
-        size: 16,
-        arrayBuffer: async () => new TextEncoder().encode("invoice contents").buffer,
-      }],
-    ]) as unknown as FormData;
-
-    const response = await sendInvoiceEmail({ formData: async () => form } as Request);
-
-    expect(response.status).toBe(200);
-    expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({
-      to: ["customer@example.com"],
-      subject: "Your invoice",
-      attachments: [{ filename: "invoice.pdf", content: Buffer.from("invoice contents").toString("base64") }],
-    }));
-    expect(mocks.recordCustomerEmail).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-      bookingId: "b1",
-      emailType: "invoice",
     }));
   });
 

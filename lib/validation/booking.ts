@@ -54,4 +54,3 @@ export const bookingSchema = z.object({
 });
 
 export type BookingInputValues = z.input<typeof bookingSchema>;
-export type BookingValues = z.output<typeof bookingSchema>;
