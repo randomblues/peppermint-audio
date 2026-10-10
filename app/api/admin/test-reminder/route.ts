@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Resend } from "resend";
+import { EmailTransport as Resend, emailConfiguration } from "@/lib/email-transport";
 import { buildPickupReminderEmail, getMelbourneTomorrow } from "@/lib/pickup-reminders";
 import { requireAdmin } from "@/lib/admin-auth";
 import type { BookingLineItem } from "@/lib/booking-line-items";
@@ -44,8 +44,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "A valid recipient email address is required." }, { status: 400 });
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.ENQUIRY_FROM_EMAIL;
+  const { apiKey, from } = emailConfiguration();
   if (!apiKey || !from) return NextResponse.json({ error: "Email service is not configured." }, { status: 500 });
 
   const reminder = buildPickupReminderEmail(booking ?? {

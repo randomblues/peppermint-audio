@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Resend } from "resend";
+import { EmailTransport as Resend, emailConfiguration } from "@/lib/email-transport";
 
 import { emailFooterText } from "@/lib/email-footer";
 import { recordCustomerEmail } from "@/lib/email-log";
@@ -7,11 +7,6 @@ import { emailDetailsTable, emailLayout, emailPanel } from "@/lib/email-template
 import { createAdminClient } from "@/lib/supabase";
 import { enquirySchema } from "@/lib/validation/enquiry";
 
-const resendApiKey = process.env.RESEND_API_KEY;
-const fromEmail = process.env.ENQUIRY_FROM_EMAIL;
-const toEmail = process.env.ENQUIRY_TO_EMAIL;
-
-const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
 function looksLikeSupplierSpam(message: string, eventType: string) {
   const text = `${message} ${eventType}`.toLowerCase();
@@ -28,6 +23,8 @@ function looksLikeSupplierSpam(message: string, eventType: string) {
 }
 
 export async function POST(request: Request) {
+  const { apiKey: resendApiKey, from: fromEmail, to: toEmail } = emailConfiguration();
+  const resend = resendApiKey ? new Resend(resendApiKey) : null;
   try {
     const payload = await request.json();
     const parsed = enquirySchema.safeParse(payload);

@@ -1,4 +1,4 @@
-import { Resend } from "resend";
+import { EmailTransport as Resend, emailConfiguration } from "@/lib/email-transport";
 
 import { buildBookingConfirmationEmail } from "@/lib/booking-confirmation-email";
 import { bookingReferenceForId } from "@/lib/booking-reference";
@@ -20,8 +20,7 @@ export type BookingConfirmationRecord = {
 };
 
 export async function sendBookingConfirmationEmail(booking: BookingConfirmationRecord) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.ENQUIRY_FROM_EMAIL;
+  const { apiKey, from } = emailConfiguration();
   if (!apiKey || !from) throw new Error("Email service is not configured.");
 
   const createdAt = booking.created_at ? new Date(booking.created_at) : null;

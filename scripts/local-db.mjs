@@ -2,6 +2,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { pathToFileURL } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 import pg from "pg";
@@ -59,20 +60,148 @@ enabled = false
 `;
 }
 
-function cli(root, settings, args, timeout = 30_000) {
+export function redact(text) {
+  return String(text)
+    .replace(/((?:key|secret|token|password)\b[^:=\n]{0,20}[:=]\s*)\S+/gi, "$1[redacted]")
+    .replace(/postgres(?:ql)?:\/\/\S+/g, "[database URL redacted]")
+    .replace(/\beyJ[\w.-]+/g, "[key redacted]")
+    .replace(/\bsb_(?:secret|publishable)_\S+/g, "[key redacted]");
+}
+
+// Async replacement for execFileSync: never blocks the event loop and always SIGKILLs the whole
+// process group on timeout/abort (npm .bin wrappers otherwise leave the native CLI orphaned).
+/**
+ * @param {string} command
+ * @param {string[]} args
+ * @param {{ timeout: number, env?: NodeJS.ProcessEnv, signal?: AbortSignal,
+ *   onStdout?: (chunk: string) => void, onStderr?: (chunk: string) => void,
+ *   spawnImpl?: typeof spawn, kill?: typeof process.kill }} options
+ * @returns {Promise<{ stdout: string, stderr: string }>}
+ */
+export function runBounded(command, args, {
+  timeout, env, signal, onStdout, onStderr, spawnImpl = spawn, kill = process.kill,
+}) {
+  return new Promise((resolve, reject) => {
+    let stdout = "", stderr = "", finished = false;
+    const child = spawnImpl(command, args, { env, detached: true, stdio: ["ignore", "pipe", "pipe"] });
+    const killTree = () => {
+      try {
+        kill(-child.pid, "SIGKILL");
+      } catch {
+        child.kill("SIGKILL");
+      }
+      child.stdout?.destroy();
+      child.stderr?.destroy();
+      child.unref?.();
+    };
+    const interrupt = received => {
+      killTree();
+      process.exit(received === "SIGINT" ? 130 : 143);
+    };
+    const finish = (error, result) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
+      process.off("SIGINT", interrupt);
+      process.off("SIGTERM", interrupt);
+      if (error) reject(Object.assign(error, { stdout, stderr }));
+      else resolve(result);
+    };
+    const stop = (code, message) => {
+      killTree();
+      finish(Object.assign(new Error(message), { code }));
+    };
+    const timer = setTimeout(() => stop("ETIMEDOUT", `${path.basename(command)} ${args[0]} timed out after ${Math.round(timeout / 1000)} seconds`), timeout);
+    const abort = () => stop("ABORT_ERR", `${path.basename(command)} ${args[0]} was stopped`);
+    // The detached child no longer receives terminal Ctrl-C, so forward it.
+    process.once("SIGINT", interrupt);
+    process.once("SIGTERM", interrupt);
+    if (signal?.aborted) return abort();
+    signal?.addEventListener("abort", abort, { once: true });
+    child.stdout?.on("data", chunk => { stdout += chunk; onStdout?.(String(chunk)); });
+    child.stderr?.on("data", chunk => { stderr += chunk; onStderr?.(String(chunk)); });
+    child.on("error", error => finish(error));
+    child.on("close", code => {
+      if (code === 0) finish(null, { stdout, stderr });
+      else finish(Object.assign(new Error(`${path.basename(command)} ${args[0]} exited with code ${code}`), { exitCode: code }));
+    });
+  });
+}
+
+export function progressPrinter(write = line => console.log(line), prefix = "  supabase: ") {
+  let buffer = "", last = "";
+  return chunk => {
+    buffer += chunk;
+    const lines = buffer.split(/\r\n|\r|\n/);
+    buffer = lines.pop() ?? "";
+    for (const raw of lines) {
+      const line = redact(raw.trim());
+      if (line && line !== last) write(`${prefix}${line}`);
+      if (line) last = line;
+    }
+  };
+}
+
+async function cli(root, settings, args, { timeout = 30_000, signal, onProgress } = {}) {
   try {
-    return execFileSync(path.join(root, "node_modules", ".bin", "supabase"),
-      [...args, "--workdir", settings.directory, "--yes"], {
-        encoding: "utf8", timeout, maxBuffer: 16 * 1024 * 1024,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+    const { stdout } = await runBounded(path.join(root, "node_modules", ".bin", "supabase"),
+      [...args, "--workdir", settings.directory, "--yes"], { timeout, signal, onStderr: onProgress });
+    return stdout;
   } catch (error) {
-    const detail = String(error.stderr ?? error.message)
-      .replace(/postgres(?:ql)?:\/\/\S+/g, "[database URL redacted]")
-      .replace(/\beyJ[\w.-]+/g, "[key redacted]")
-      .replace(/\bsb_(?:secret|publishable)_\S+/g, "[key redacted]");
+    if (error.code === "ABORT_ERR") throw error;
+    const detail = redact(error.stderr?.trim() || error.stdout?.trim() || error.message);
     throw new Error(`Local Supabase ${args[0]} failed: ${detail}`, { cause: undefined });
   }
+}
+
+export function stalledStartMessage(name, seconds) {
+  return `Docker created ${name} but did not start it within ${seconds} seconds. `
+    + "The Docker engine is answering but not starting containers (this affects every container, not only Supabase). "
+    + "Restart Docker Desktop and retry npm run dev. If it persists, update Docker Desktop or use its Troubleshoot menu, "
+    + "and confirm `docker run --rm hello-world` completes.";
+}
+
+// Runs start() while polling container states; aborts quickly if any container is stuck in "created".
+export async function superviseStart({
+  start, listStates, now = Date.now, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
+  stallMs = 45_000, pollMs = 3_000, onPoll = () => {},
+}) {
+  const controller = new AbortController();
+  const began = now();
+  let settled = false;
+  const started = Promise.resolve().then(() => start(controller.signal));
+  const done = started.then(() => { settled = true; }, () => { settled = true; });
+  const createdSince = new Map();
+  while (!settled) {
+    await Promise.race([sleep(pollMs), done]);
+    if (settled) break;
+    let states;
+    try {
+      states = await listStates();
+    } catch {
+      continue;
+    }
+    if (settled) break;
+    const time = now();
+    for (const name of [...createdSince.keys()]) if (states.get(name) !== "created") createdSince.delete(name);
+    for (const [name, state] of states) if (state === "created" && !createdSince.has(name)) createdSince.set(name, time);
+    const stalled = [...createdSince].find(([, since]) => time - since >= stallMs);
+    if (stalled) {
+      controller.abort();
+      await done;
+      throw new Error(stalledStartMessage(stalled[0], Math.round(stallMs / 1000)));
+    }
+    onPoll(time - began);
+  }
+  return started;
+}
+
+async function dockerStates(project, signal) {
+  const { stdout } = await runBounded("docker", [
+    "ps", "-a", "--filter", `name=${project}`, "--format", "{{.Names}}\t{{.State}}",
+  ], { timeout: 5_000, signal });
+  return new Map(stdout.split("\n").filter(Boolean).map(line => line.split("\t")));
 }
 
 export function validateStatus(status, settings) {
@@ -86,8 +215,146 @@ export function validateStatus(status, settings) {
   return status;
 }
 
-function statusFor(root, settings) {
-  return validateStatus(JSON.parse(cli(root, settings, ["status", "-o", "json"])), settings);
+async function statusFor(root, settings) {
+  return validateStatus(JSON.parse(await cli(root, settings, ["status", "-o", "json"])), settings);
+}
+
+export async function ensureDocker({
+  run = execFileSync, platform = process.platform, exists = existsSync,
+  home = os.homedir(), sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
+  now = Date.now,
+} = {}) {
+  const deadline = now() + 120_000;
+  const probe = () => {
+    try {
+      run("docker", ["info", "--format", "{{.ServerVersion}}"], {
+        timeout: Math.max(1, Math.min(5_000, deadline - now())), stdio: "ignore",
+      });
+      return true;
+    } catch (error) {
+      if (error.code === "ENOENT") {
+        throw new Error("Docker CLI is missing. Install Docker and make docker available on PATH, then retry npm run dev.");
+      }
+      return false;
+    }
+  };
+  if (probe()) return;
+  if (platform !== "darwin") {
+    throw new Error("Docker engine is unavailable. Start your configured Docker engine, then retry npm run dev.");
+  }
+  const desktop = ["/Applications/Docker.app", path.join(home, "Applications", "Docker.app")].find(exists);
+  if (!desktop) {
+    throw new Error("Docker engine is unavailable and Docker Desktop is not installed. Install Docker Desktop or start your configured engine, then retry npm run dev.");
+  }
+  try {
+    console.log("Docker engine is not running. Launching Docker Desktop (waiting up to 120 seconds)...");
+    run("open", ["-a", desktop], { timeout: 5_000, stdio: "ignore" });
+  } catch {
+    throw new Error("Could not launch Docker Desktop. Open it manually and wait for the engine, then retry npm run dev.");
+  }
+  // At most 24 retries, with each probe and the overall engine wait bounded.
+  for (let attempt = 0; attempt < 24 && now() < deadline; attempt++) {
+    await sleep(Math.min(5_000, deadline - now()));
+    if (now() < deadline && probe()) return;
+  }
+  throw new Error("Docker engine did not become ready within 120 seconds. Check Docker Desktop and your configured Docker engine, then retry npm run dev.");
+}
+
+export async function prepareLocalStack({
+  ensureEngine, stackState, startStack, readStatus, applyMigration, clearInterruptedStart = async () => {},
+  waitForHealthy = async () => {},
+}) {
+  await ensureEngine();
+  const state = await stackState();
+  // A "created" database is left behind by an interrupted start; Supabase refuses to start over it.
+  if (state === "created") await clearInterruptedStart();
+  if (["", "exited", "created", "dead"].includes(state)) await startStack();
+  else if (state !== "running") {
+    throw new Error(`Local Supabase database is ${state}. Check this checkout's containers before retrying.`);
+  }
+  // Docker restarts the stack automatically when the engine launches; status fails until the database is healthy.
+  await waitForHealthy();
+  // Status failures (including partial/unhealthy stacks) must not trigger a blind start.
+  const status = await readStatus();
+  await applyMigration(status);
+  return status;
+}
+
+export async function waitForDatabaseHealth({
+  health, now = Date.now, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
+  timeoutMs = 90_000, pollMs = 2_000, log = message => console.log(message),
+}) {
+  const deadline = now() + timeoutMs;
+  let announced = false;
+  for (;;) {
+    let state;
+    try {
+      state = (await health()).trim();
+    } catch {
+      state = "unknown";
+    }
+    // An empty status means the container has no health check, so Supabase status is the next gate.
+    if (state === "healthy" || state === "") return;
+    if (now() >= deadline) {
+      throw new Error(`Local Supabase database did not become healthy within ${Math.round(timeoutMs / 1000)} seconds (last state: ${state}). Check Docker Desktop, then retry npm run dev.`);
+    }
+    if (!announced) {
+      log(`Waiting for the local database to become healthy (${state})...`);
+      announced = true;
+    }
+    await sleep(Math.min(pollMs, Math.max(1, deadline - now())));
+  }
+}
+
+async function startStack(root, settings) {
+  mkdirSync(path.join(settings.directory, "supabase"), { recursive: true });
+  const config = path.join(settings.directory, "supabase", "config.toml");
+  if (!existsSync(config)) writeFileSync(config, localConfig(settings), { flag: "wx" });
+  console.log(`Starting local Supabase (${settings.project}). Missing Docker images are downloaded first; progress follows.`);
+  let lastOutput = Date.now();
+  const print = progressPrinter();
+  await superviseStart({
+    start: signal => cli(root, settings, ["start"], {
+      timeout: 600_000, signal, onProgress: chunk => { lastOutput = Date.now(); print(chunk); },
+    }),
+    listStates: () => dockerStates(settings.project),
+    onPoll: elapsed => {
+      if (Date.now() - lastOutput >= 15_000) {
+        lastOutput = Date.now();
+        console.log(`  supabase: still starting (${Math.round(elapsed / 1000)}s elapsed)...`);
+      }
+    },
+  });
+  console.log("Local Supabase started.");
+}
+
+export function startupLocalStack(root = process.cwd()) {
+  const settings = localSettings(root);
+  return prepareLocalStack({
+    ensureEngine: () => ensureDocker(),
+    stackState: async () => {
+      try {
+        const { stdout } = await runBounded("docker", [
+          "ps", "-a", "--filter", `name=^supabase_db_${settings.project}$`, "--format", "{{.State}}",
+        ], { timeout: 5_000 });
+        return stdout.trim();
+      } catch {
+        throw new Error("Could not inspect this checkout's local Supabase containers. Check your Docker engine and retry.");
+      }
+    },
+    startStack: () => startStack(root, settings),
+    waitForHealthy: () => waitForDatabaseHealth({
+      health: async () => (await runBounded("docker", [
+        "inspect", "--format", "{{if .State.Health}}{{.State.Health.Status}}{{end}}", `supabase_db_${settings.project}`,
+      ], { timeout: 5_000 })).stdout,
+    }),
+    clearInterruptedStart: async () => {
+      console.log("Clearing an interrupted local Supabase start (data volumes are kept)...");
+      await cli(root, settings, ["stop"], { timeout: 120_000, onProgress: progressPrinter() });
+    },
+    readStatus: () => statusFor(root, settings),
+    applyMigration: status => migrate(root, status),
+  });
 }
 
 async function migrate(root, status) {
@@ -149,6 +416,8 @@ async function seed(settings, status) {
 export function localEnvironment(status) {
   return {
     SUPABASE_TARGET: "local",
+    LOCAL_EMAIL_MODE: process.env.LOCAL_EMAIL_MODE || "capture",
+    LOCAL_EMAIL_INBOX_URL: status.INBUCKET_URL || `http://127.0.0.1:${Number(new URL(status.API_URL).port) + 3}`,
     LOCAL_SUPABASE_URL: status.API_URL,
     LOCAL_SUPABASE_ANON_KEY: status.ANON_KEY,
     LOCAL_SUPABASE_SERVICE_ROLE_KEY: status.SERVICE_ROLE_KEY,
@@ -196,6 +465,16 @@ async function verify(settings, status) {
   }
 }
 
+export function localEmailStartupMessage(environment) {
+  if (environment.LOCAL_EMAIL_MODE === "capture") {
+    return `Email mode: Local capture — no Resend quota used\nEmail inbox: ${environment.LOCAL_EMAIL_INBOX_URL}`;
+  }
+  if (environment.LOCAL_EMAIL_MODE === "resend") {
+    return "Email mode: Resend — real delivery uses Resend quota; a valid designated test recipient is required";
+  }
+  return "Email mode: Invalid configuration — email delivery will be rejected";
+}
+
 async function main() {
   const root = process.cwd();
   const settings = localSettings(root);
@@ -206,24 +485,23 @@ async function main() {
   }
   if (process.env.VERCEL || process.env.CI) throw new Error("Local database commands cannot run in deployment or CI.");
   if (action === "start") {
-    mkdirSync(path.join(settings.directory, "supabase"), { recursive: true });
-    const config = path.join(settings.directory, "supabase", "config.toml");
-    if (!existsSync(config)) writeFileSync(config, localConfig(settings), { flag: "wx" });
-    console.log(`Starting ${settings.project}. First startup downloads Docker images (up to 10 minutes).`);
-    cli(root, settings, ["start"], 600_000);
-    await migrate(root, statusFor(root, settings));
+    await startStack(root, settings);
+    await migrate(root, await statusFor(root, settings));
   }
   if (action === "stop") {
-    cli(root, settings, ["stop"], 120_000);
+    await cli(root, settings, ["stop"], { timeout: 120_000, onProgress: progressPrinter() });
     console.log("Stopped this worktree's local stack. Database and storage volumes are retained.");
     return;
   }
-  const status = statusFor(root, settings);
+  const status = ["dev", "serve"].includes(action)
+    ? await startupLocalStack(root) : await statusFor(root, settings);
   if (action === "seed") await seed(settings, status);
   if (action === "verify") await verify(settings, status);
   if (action === "dev" || action === "serve") {
+    const environment = localEnvironment(status);
+    console.log(localEmailStartupMessage(environment));
     const child = spawn(process.execPath, [path.join(root, "node_modules", "next", "dist", "bin", "next"), action === "dev" ? "dev" : "start", ...args], {
-      stdio: "inherit", env: { ...process.env, ...localEnvironment(status) },
+      stdio: "inherit", env: { ...process.env, ...environment },
     });
     for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => child.kill(signal));
     child.on("error", error => { console.error(error.message); process.exitCode = 1; });

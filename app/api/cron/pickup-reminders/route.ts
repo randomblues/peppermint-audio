@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Resend } from "resend";
+import { EmailTransport as Resend, emailConfiguration } from "@/lib/email-transport";
 import { buildPickupReminderEmail, getMelbourneTomorrow, type PickupReminderBooking } from "@/lib/pickup-reminders";
 import { createAdminClient } from "@/lib/supabase";
 import { recordCustomerEmail } from "@/lib/email-log";
@@ -15,8 +15,7 @@ export async function GET(request: Request) {
   if (!isCronAuthorized(request, secret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.ENQUIRY_FROM_EMAIL;
+  const { apiKey, from } = emailConfiguration();
   if (!apiKey || !from) return NextResponse.json({ error: "Email service is not configured." }, { status: 500 });
 
   const pickupDate = getMelbourneTomorrow();

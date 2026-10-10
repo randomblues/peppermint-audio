@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { afterCallback, calendar, createAdminClient, send, Resend } = vi.hoisted(() => {
   process.env.RESEND_API_KEY = "re_test";
@@ -98,12 +98,34 @@ function configureAdmin({ insertError = null, uploadError = null, updateError = 
 describe("POST /api/booking", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-01T00:00:00Z"));
     vi.stubEnv("RESEND_API_KEY", "re_test");
     vi.stubEnv("ENQUIRY_FROM_EMAIL", "Peppermint Audio <from@example.com>");
     vi.stubEnv("ENQUIRY_TO_EMAIL", "to@example.com");
     calendar.mockResolvedValue("https://calendar.google.com/event");
     send.mockResolvedValue({ data: { id: "email-id" }, error: null });
     configureAdmin();
+  });
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+
+  it("captures both booking emails locally without provider credentials", async () => {
+    vi.stubEnv("SUPABASE_TARGET", "local");
+    vi.stubEnv("LOCAL_EMAIL_MODE", "capture");
+    vi.stubEnv("RESEND_API_KEY", "");
+    vi.stubEnv("ENQUIRY_FROM_EMAIL", "");
+    vi.stubEnv("ENQUIRY_TO_EMAIL", "");
+    const capture = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ ID: "local-id" })));
+    vi.stubGlobal("fetch", capture);
+    const response = await POST(bookingRequest());
+    expect(response.status).toBe(200);
+    await afterCallback.mock.calls[0][0]();
+    expect(send).not.toHaveBeenCalled();
+    expect(capture).toHaveBeenCalledTimes(2);
+    const messages = capture.mock.calls.map(([, request]) => JSON.parse(request.body));
+    expect(messages[0].To).toEqual([{ Email: "team@peppermint.local" }]);
+    expect(messages[0].Attachments).toHaveLength(2);
+    expect(messages[1].To).toEqual([{ Email: validFields.email }]);
   });
 
   it("rejects missing or invalid booking details and ID files", async () => {

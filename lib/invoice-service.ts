@@ -1,4 +1,4 @@
-import { Resend } from "resend";
+import { EmailTransport as Resend, emailConfiguration } from "@/lib/email-transport";
 
 import { emailFooterText } from "@/lib/email-footer";
 import { bookingHireTotalCents, lineItemHireTotalCents, lineItemsForBooking, type BookingLineItem } from "@/lib/booking-line-items";
@@ -290,8 +290,7 @@ export async function sendBillingDocument(admin: AdminClient, bookingId: string,
   const claim = await claimDocument(admin, invoice, bookingId, documentType, force);
   if (!claim.claimed) return claim.record.provider_message_id as string | null;
 
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.ENQUIRY_FROM_EMAIL;
+  const { apiKey, from } = emailConfiguration();
   if (!apiKey || !from) throw new Error("Email service is not configured.");
   const details = pdfDetails(documentType, booking, invoice, recipient);
   const emailRecipients = invoiceEmailRecipients(booking.email, recipient?.billToEmail);

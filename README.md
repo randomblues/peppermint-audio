@@ -38,7 +38,7 @@ Public browsing pages include a fixed **Check availability** contact prompt. On 
 ### Local-only database, authentication and storage
 
 Local development uses Supabase **on your own machine**, not the hosted project.
-Start Docker Desktop, then run:
+Install Docker (with its CLI available on PATH), then run:
 
 ```bash
 npm install
@@ -46,6 +46,29 @@ npm run db:local:start
 npm run db:local:seed
 npm run dev
 ```
+
+For normal startup, just run `npm run dev` (or `npm start` for an existing build).
+Both launchers, including `npm run dev:resend`, reuse any responding configured
+Docker engine. If no engine responds on macOS, they launch an already installed
+Docker Desktop from `/Applications` or `~/Applications`. Engine readiness is
+bounded to 120 seconds: one initial probe and at most 24 retries, with up to five
+seconds between attempts and a five-second timeout per probe. On other platforms,
+or without Docker Desktop, start your configured engine manually and retry.
+The launchers never install software, switch Docker contexts, stop running
+containers, or reset/delete local data. They start this checkout's absent/stopped
+Supabase stack once (bounded to ten minutes), streaming Supabase progress with
+credentials redacted and printing a heartbeat when it is quiet. If a container
+stays in Docker's `Created` state for 45 seconds, startup stops early with a
+Docker diagnosis: the engine is answering but not starting containers, so
+restart Docker Desktop (or update it if the fault persists) and check that
+`docker run --rm hello-world` completes. If an earlier start was interrupted
+and left this checkout's database container in `Created`, the launcher first
+clears only this checkout's never-started containers (`supabase stop`; data
+volumes are kept). It then waits up to 90 seconds for the database health check
+(Docker restarts an existing stack on its own when the engine launches), validates
+the local status and applies the canonical
+migration transaction before starting Next.js. Unexpected status errors are
+reported rather than triggering a blind restart.
 
 `db:local:start` starts PostgreSQL, Auth, private Storage, Studio and a local Auth
 email inbox. It applies the canonical `supabase/001_booking_management.sql` inside
@@ -97,22 +120,67 @@ their mocked hosted configuration). A non-Vercel production deployment must
 explicitly set `SUPABASE_TARGET=hosted` and use its normal Next.js hosting entry
 point rather than the local npm launcher. Local mode is rejected on Vercel.
 
-**External services are separate:** local Supabase does not sandbox Resend,
+### Safe local email
+
+Both `npm run dev` and `npm start` default application emails to **capture**
+when `SUPABASE_TARGET=local`, regardless of `NODE_ENV`. Enquiries, booking
+acknowledgements, confirmations, reminders, custom emails, billing PDFs and
+deposit notifications go to this worktree's Supabase Mailpit inbox, alongside
+Auth emails. No Resend credentials are needed. Missing sender/internal recipient
+settings default to `hello@peppermint.local` / `team@peppermint.local`.
+
+Run `npm run db:local:status` and open the printed **Local Auth mail** URL
+(this checkout: `http://127.0.0.1:30074`). Inspect recipients, message bodies and
+PDF attachments there. Capture uses the loopback-only Mailpit HTTP API; inbox
+errors fail delivery, never fall back to an external provider.
+Both `npm run dev` and `npm run start` print the email mode at startup. Capture
+mode also prints this worktree's inbox URL; Resend mode warns about quota usage.
+
+For deliberately controlled Resend testing, set `LOCAL_EMAIL_MODE=resend`,
+`LOCAL_EMAIL_TEST_RECIPIENT` to one plain email address, and configure
+`RESEND_API_KEY` and a verified `ENQUIRY_FROM_EMAIL` through your secure local
+environment. Restart the local app after changing configuration.
+Alternatively, stop the running app and use the hands-free shortcut below:
+
+```bash
+npm run dev:resend
+```
+
+The shortcut defaults all recipients to `shanedsouza6823@gmail.com`. An optional
+override is `npm run dev:resend -- you@example.com`; empty, invalid or multiple
+addresses are rejected. It enables Resend only for that run and uses your
+Resend quota. Stop it and run `npm run dev` to return to
+capture (unless you separately configured Resend mode in your environment).
+
+**Every application email is redirected to that one inbox**: original `to`
+recipients are replaced; `cc`, `bcc`, `replyTo` and custom headers are removed.
+PDF attachments are preserved. Missing/invalid recipients, missing provider
+credentials or unknown modes reject delivery without an external send.
+Never enter credentials in command arguments or commit them.
+
+Return to `LOCAL_EMAIL_MODE=capture` (or unset it) and restart to restore the
+pretend inbox. The launcher injects `LOCAL_EMAIL_INBOX_URL` for its own stack.
+For direct local launches it defaults to `http://127.0.0.1:30074`; overrides must
+be loopback HTTP URLs. Hosted production keeps its existing Resend behavior;
+local email settings do not redirect hosted deployments.
+
+**Other external services remain separate:** local Supabase does not sandbox
 Stripe or Google Calendar. Do not use real customer information or live payment
-keys in local tests. Use Stripe test-mode keys, keep calendar disabled, and
-configure a safe email recipient/provider before triggering email workflows.
-The local Auth inbox captures Auth emails only, not application Resend emails.
+keys in local tests. Use Stripe test-mode keys and keep calendar disabled.
 
 1. Install dependencies.
 2. Copy `.env.example` to `.env.local`.
-3. Fill in a real Resend API key and destination email. Placeholder values do not send mail.
-4. For local confirmation-email testing, use a verified sender domain in `ENQUIRY_FROM_EMAIL`. Resend's `onboarding@resend.dev` sender is restricted to the Resend account email until a domain is verified.
+3. Local email capture needs no Resend key; follow **Safe local email** above.
+4. For production or controlled Resend mode, configure a verified sender. Resend's `onboarding@resend.dev` sender is restricted to the Resend account email until a domain is verified.
 
 ## Environment Variables
 
 - `RESEND_API_KEY`: API key from Resend
 - `ENQUIRY_FROM_EMAIL`: verified sender (or Resend onboarding address during setup)
 - `ENQUIRY_TO_EMAIL`: inbox for customer enquiries
+- `LOCAL_EMAIL_MODE`: local-only `capture` (default) or explicit `resend`
+- `LOCAL_EMAIL_TEST_RECIPIENT`: single designated recipient required for local Resend mode
+- `LOCAL_EMAIL_INBOX_URL`: loopback HTTP Mailpit URL (injected by the local launcher)
 - `SUPABASE_URL`: Supabase project URL
 - `SUPABASE_ANON_KEY`: Supabase publishable/anon key
 - `SUPABASE_SERVICE_ROLE_KEY`: server-only Supabase service role key

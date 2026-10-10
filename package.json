@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "node scripts/local-db.mjs dev",
+    "dev:resend": "node scripts/dev-resend.mjs",
     "db:local:start": "node scripts/local-db.mjs start",
     "db:local:stop": "node scripts/local-db.mjs stop",
     "db:local:status": "node scripts/local-db.mjs status",

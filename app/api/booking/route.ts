@@ -1,5 +1,5 @@
 import { after, NextResponse } from "next/server";
-import { Resend } from "resend";
+import { EmailTransport as Resend, emailConfiguration } from "@/lib/email-transport";
 import { emailFooterText } from "@/lib/email-footer";
 import { emailDetailsTable, emailLayout, emailPanel } from "@/lib/email-template";
 import { recordCustomerEmail } from "@/lib/email-log";
@@ -11,9 +11,6 @@ import { createAdminClient, PHOTO_ID_BUCKET } from "@/lib/supabase";
 import { bookingSchema } from "@/lib/validation/booking";
 
 const maxFileSize = 1.5 * 1024 * 1024;
-const resendApiKey = process.env.RESEND_API_KEY;
-const fromEmail = process.env.ENQUIRY_FROM_EMAIL;
-const toEmail = process.env.ENQUIRY_TO_EMAIL;
 function formatEmailDate(value: string) {
   return new Intl.DateTimeFormat("en-AU", {
     day: "numeric",
@@ -24,6 +21,7 @@ function formatEmailDate(value: string) {
 }
 
 export async function POST(request: Request) {
+  const { apiKey: resendApiKey, from: fromEmail, to: toEmail } = emailConfiguration();
   try {
     const formData = await request.formData();
     const payload = Object.fromEntries(Array.from(formData.entries()).filter(([, value]) => typeof value === "string"));

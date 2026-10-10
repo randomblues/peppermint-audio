@@ -347,6 +347,13 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Prevention:** Select visible semantic controls rather than the first duplicated text label. For data-access smoke checks, sign in through the same Playwright context's request API, navigate to `/admin`, and wait for the actual booking control. Test the login form separately when its behavior is in scope.
 - **Next action:** Use a booking button's accessible name and wait for loaded controls at every viewport; preserve the separate integrated-browser validation requirement.
 
+### 2026-10-10 — Hung Docker container starts and unbounded local startup
+
+- **Symptom:** `npm run dev` stalled for many minutes after Docker Desktop launched; Supabase containers stayed `Created`, and the launcher never exited.
+- **Root cause:** Docker Desktop 4.43.2 answered `docker info` but its host backend hung every container start (even a trivial `docker run`). The launcher hid this behind a blocking `execFileSync`; on timeout it killed only the npm `.bin/supabase` wrapper, orphaning the native CLI, which kept output pipes open and Node alive. The interrupted start then left a `Created` database container that made later `supabase start` runs fail immediately.
+- **Prevention:** Prove the engine can start a trivial container before blaming Supabase. On macOS there is no `timeout`; signal-based limits (for example Perl `alarm`) can be swallowed because `docker run` forwards signals to the container, so use a fork-and-SIGKILL helper. Kill whole process groups when stopping child commands. Avoid reading Docker's Group Container settings file or running `python3` without a bound, because both can hang on macOS prompts or shims.
+- **Next action:** Keep `scripts/local-db.mjs` startup bounded (process-group kill, `Created`-state watchdog, redacted progress), and verify a fixed Docker engine with `docker run --rm hello-world` before rerunning `npm run dev`.
+
 # Agent working rules
 
 These rules are mandatory. Safety, preservation of existing work, bounded execution, and truthful verification take priority over speed.

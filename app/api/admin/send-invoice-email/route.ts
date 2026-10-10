@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Resend } from "resend";
+import { EmailTransport as Resend, emailConfiguration } from "@/lib/email-transport";
 
 import { emailFooterText } from "@/lib/email-footer";
 import { recordCustomerEmail } from "@/lib/email-log";
@@ -41,8 +41,7 @@ export async function POST(request: Request) {
   if (booking.error) return NextResponse.json({ error: booking.error.message }, { status: 500 });
   if (!booking.data) return NextResponse.json({ error: "Booking could not be found." }, { status: 404 });
 
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.ENQUIRY_FROM_EMAIL;
+  const { apiKey, from } = emailConfiguration();
   if (!apiKey || !from) return NextResponse.json({ error: "Email service is not configured." }, { status: 500 });
 
   const attachmentContent = Buffer.from(

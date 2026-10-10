@@ -1,5 +1,5 @@
 import type Stripe from "stripe";
-import { Resend } from "resend";
+import { EmailTransport as Resend, emailConfiguration } from "@/lib/email-transport";
 
 import { createAdminClient } from "@/lib/supabase";
 import { getStripe } from "@/lib/stripe";
@@ -174,9 +174,7 @@ export async function notifyDepositAttention(admin: Admin, booking: DeferredDepo
   if (!["submitted", "confirmed"].includes(booking.status)) return;
   if (!["failed", "action_required", "hold_too_short", "expired"].includes(booking.deposit_payment_status)
     || booking.deposit_attention_sent_at) return;
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.ENQUIRY_FROM_EMAIL;
-  const to = process.env.ENQUIRY_TO_EMAIL;
+  const { apiKey, from, to } = emailConfiguration();
   if (!apiKey || !from || !to) throw new Error("Deposit notification email service is not configured.");
   const origin = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://peppermint-audio.vercel.app").replace(/\/$/, "");
   const actionable = ["failed", "action_required"].includes(booking.deposit_payment_status) && booking.payment_token;
