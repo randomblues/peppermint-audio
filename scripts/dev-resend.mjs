@@ -15,7 +15,7 @@ function main() {
   const environment = resendDevelopmentEnvironment(process.argv.slice(2));
   console.log("Starting local Resend mode. All application emails go to your designated test inbox and use Resend quota.");
   const child = spawn(process.execPath, [
-    fileURLToPath(new URL("./local-db.mjs", import.meta.url)), "dev",
+    fileURLToPath(new URL("./local-dev.mjs", import.meta.url)), "dev",
   ], { stdio: "inherit", env: { ...process.env, ...environment } });
   for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => child.kill(signal));
   child.on("error", error => { console.error(error.message); process.exitCode = 1; });

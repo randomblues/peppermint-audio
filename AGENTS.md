@@ -89,7 +89,6 @@ The public customer flow is catalogue → cart → booking request. The cart sen
 - `POST /api/stripe/webhook`: Stripe-signed PaymentIntent status updates and billing-document emails.
 - `GET /api/cron/pickup-reminders`: CRON_SECRET-protected daily reminder job.
 - `GET /api/cron/deposit-holds`: CRON_SECRET-protected daily deferred deposit-hold job.
-- `POST /api/dev/admin-login`: development-only loopback local test-admin sign-in (see below).
 - `GET /api/google-calendar/connect`, `GET /api/google-calendar/callback`: OAuth connect/callback.
 
 Admin routes must remain server-only. Never expose `SUPABASE_SERVICE_ROLE_KEY`, private storage paths, or customer photo IDs to the browser.
@@ -225,49 +224,20 @@ The focused test command is preferred while iterating; the full suite and build 
 - Preserve unrelated working-tree changes. In particular, inspect `git status --short` before edits and never reset or checkout files as a recovery shortcut.
 - Use `git diff --check` before commits. Do not commit or push unless the user explicitly asks.
 
-## Local development database and test administrator
+## Local development environment
 
 Every new agent session must use the local-only Supabase stack when working
 locally. Never use the hosted database, production admin credentials or real
 customer data for local validation.
 
-- Run `npm run db:local:status` in the current checkout to check its stack and
-  discover its local API, Studio and Auth inbox URLs without printing keys.
-- If it is not running, ensure Docker Desktop is running, then use
-  `npm run db:local:start`. This applies the canonical booking schema without
-  resetting local data. Do not run a database reset or delete volumes without
-  explicit approval.
-- Run `npm run db:local:seed` when the test account or fixtures are needed.
-  It creates the local administrator `admin@peppermint.local` with the admin role
-  and three disposable bookings. Repeated seeding preserves existing fixtures.
-- The generated test-admin password is in the ignored, owner-readable
-  `.local-supabase/admin-login.json` inside that checkout. Never print, commit,
-  paste into chat or place these credentials in command arguments.
-- Start the app with `npm run dev` (or `npm start` for a built local app), not
-  a bare Next.js command. These launchers inject only this worktree's local
-  credentials. Keep one task server on the agreed port and do not interrupt
-  another agent's server without approval.
-- The admin console is at `/admin`; the normal login form is at `/admin/login`.
-  **The agent must sign in itself; do not ask the user to fill in credentials.**
-  For the integrated browser, reuse the localhost tab and run:
-  `await page.evaluate(async () => { const result = await fetch("/api/dev/admin-login", { method: "POST" }); if (!result.ok) throw new Error(await result.text()); });`
-  Then navigate that same tab to `/admin`. This endpoint reads the local login
-  file on the server and authenticates through local Supabase; it returns normal
-  HTTP-only session cookies, never credentials. It is available only in
-  development on a loopback, same-origin request, and never on Vercel or in a
-  production build. The normal login form remains unchanged.
-  For terminal-run Playwright checks, call
-  `context.request.post(localUrl + "/api/dev/admin-login", { headers: { origin: localUrl } })`
-  then open `/admin` using `context.newPage()` in that same context.
-  If the helper reports missing fixtures, run the start/seed commands above and
-  retry once. Report browser-tool connection failures instead of asking the user
-  to log in or repeatedly retrying a broken browser connection.
-  Do not print login data, cookie values or storage-state contents.
-- Each worktree has its own stack, ports, data and test-admin credentials.
-  Do not borrow another checkout's login file or connect to its database.
-- `npm run db:local:verify` checks actual local Auth, the admin role, booking
-  persistence, anonymous access denial and private storage with disposable
-  fixtures; it cleans up its own verification records and files.
+- Start the app with `npm run dev` (or `npm start` for an existing build), not
+  a bare Next.js command. These launchers start or reuse this worktree's local
+  stack and inject its credentials into Next.js. Keep one task server on the
+  agreed port and do not interrupt another agent's server without approval.
+- The local stack is isolated per worktree and is not seeded with bookings or an
+  admin account. Use only a separately provisioned disposable local admin for
+  admin testing; never ask for or use production credentials.
+- Do not run a database reset or delete volumes without explicit approval.
 - Local database isolation does not sandbox Stripe, Resend or Google Calendar.
   Use Stripe test keys, safe email settings and disabled calendar integration.
   Never assume a local booking cannot trigger an external side effect.
@@ -316,24 +286,24 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 
 ### 2026-10-09 — Local Supabase email login and signup flags
 
-- **Symptom:** The local test administrator could be created, but signing in failed with "Email logins are disabled".
+- **Symptom:** A local email user could be created, but signing in failed with "Email logins are disabled".
 - **Root cause:** Setting `[auth.email].enable_signup = false` disabled the email login provider, not just public account creation.
 - **Prevention:** Keep `[auth].enable_signup = false` to block public signup while setting `[auth.email].enable_signup = true` to allow administrator email login.
-- **Next action:** After changing Auth configuration, stop/start only the affected local stack and run `npm run db:local:verify` against real local Auth.
+- **Next action:** After changing Auth configuration, restart only the affected local stack and validate local sign-in against local Auth.
 
 ### 2026-10-09 — Responsive admin selectors and post-login state
 
 - **Symptom:** Browser checks timed out waiting for a booking name even though local authentication and booking retrieval worked.
 - **Root cause:** Text selectors matched a hidden responsive copy; client-side navigation also exposed the initial loading state before booking controls were ready.
 - **Prevention:** Select visible semantic controls rather than the first duplicated text label. For data-access smoke checks, sign in through the same Playwright context's request API, navigate to `/admin`, and wait for the actual booking control. Test the login form separately when its behavior is in scope.
-- **Next action:** Use a booking button's accessible name and wait for loaded controls at every viewport; preserve the separate integrated-browser validation requirement.
+- **Next action:** Use a booking button's accessible name and wait for loaded controls when a disposable local admin account is available; preserve the separate integrated-browser validation requirement.
 
 ### 2026-10-10 — Hung Docker container starts and unbounded local startup
 
 - **Symptom:** `npm run dev` stalled for many minutes after Docker Desktop launched; Supabase containers stayed `Created`, and the launcher never exited.
 - **Root cause:** Docker Desktop 4.43.2 answered `docker info` but its host backend hung every container start (even a trivial `docker run`). The launcher hid this behind a blocking `execFileSync`; on timeout it killed only the npm `.bin/supabase` wrapper, orphaning the native CLI, which kept output pipes open and Node alive. The interrupted start then left a `Created` database container that made later `supabase start` runs fail immediately.
 - **Prevention:** Prove the engine can start a trivial container before blaming Supabase. On macOS there is no `timeout`; signal-based limits (for example Perl `alarm`) can be swallowed because `docker run` forwards signals to the container, so use a fork-and-SIGKILL helper. Kill whole process groups when stopping child commands. Avoid reading Docker's Group Container settings file or running `python3` without a bound, because both can hang on macOS prompts or shims.
-- **Next action:** Keep `scripts/local-db.mjs` startup bounded (process-group kill, `Created`-state watchdog, redacted progress), and verify a fixed Docker engine with `docker run --rm hello-world` before rerunning `npm run dev`.
+- **Next action:** Keep `scripts/local-dev.mjs` startup bounded (process-group kill, `Created`-state watchdog, redacted progress), and verify a fixed Docker engine with `docker run --rm hello-world` before rerunning `npm run dev`.
 
 ### 2026-10-10 — Stale Next.js route types after route deletion
 
@@ -341,6 +311,13 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Root cause:** `.next/dev/types` still contained generated type entries for the removed route.
 - **Prevention:** When deleting a route, check whether stale generated route types remain before diagnosing a source-code type error.
 - **Next action:** Remove the stale `.next/dev/types` output or rerun `next dev` to regenerate it, then rerun the build.
+
+### 2026-10-10 — Single local development entry point
+
+- **Symptom:** Local setup exposed several commands for starting, stopping, checking, seeding, and verifying services even though `npm run dev` already starts or reuses the local stack and app.
+- **Root cause:** Local database administration commands were presented as part of the normal development workflow.
+- **Prevention:** Keep `npm run dev` as the default local entry point; expose additional commands only when a recurring workflow requires them.
+- **Next action:** Keep local startup, health checks, and optional Stripe forwarding together in `scripts/local-dev.mjs`.
 
 ### 2026-10-10 — Stale integrated-browser screenshot frames
 

@@ -217,6 +217,13 @@ Where they are used:
 - `STRIPE_WEBHOOK_SECRET`: verifies incoming webhook signatures.
 - `NEXT_PUBLIC_SITE_URL`: builds customer payment links and branded URLs. The request origin is used as a fallback.
 
+For local development, install Stripe CLI and authenticate once with `stripe login`.
+Set `LOCAL_STRIPE_WEBHOOKS=true` in `.env.local`, then run `npm run dev`.
+The launcher starts a Stripe test-mode listener, forwards supported payment
+events to the local webhook route, and injects that listener's signing secret
+into the local app process. The secret is not written to `.env.local`. Leave the
+flag unset to run without Stripe CLI forwarding.
+
 Never expose `STRIPE_SECRET_KEY` or `STRIPE_WEBHOOK_SECRET` to client components, browser responses, logs, screenshots, tests with real values, or documentation.
 
 ## Database fields

@@ -1,10 +1,9 @@
 import { execFileSync, spawn } from "node:child_process";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { pathToFileURL } from "node:url";
-import { createClient } from "@supabase/supabase-js";
 import pg from "pg";
 
 export function localSettings(root) {
@@ -64,8 +63,106 @@ export function redact(text) {
   return String(text)
     .replace(/((?:key|secret|token|password)\b[^:=\n]{0,20}[:=]\s*)\S+/gi, "$1[redacted]")
     .replace(/postgres(?:ql)?:\/\/\S+/g, "[database URL redacted]")
+    .replace(/\bwhsec_[A-Za-z0-9_+/=-]+/g, "[webhook secret redacted]")
     .replace(/\beyJ[\w.-]+/g, "[key redacted]")
     .replace(/\bsb_(?:secret|publishable)_\S+/g, "[key redacted]");
+}
+
+export function localStripeWebhooksEnabled(environmentValue, envFileContents = "") {
+  let value = environmentValue;
+  if (value === undefined) {
+    const match = envFileContents.match(/^[ \t]*(?:export[ \t]+)?LOCAL_STRIPE_WEBHOOKS[ \t]*=[ \t]*(.*?)[ \t]*$/m);
+    if (!match) return false;
+    value = match[1].replace(/[ \t]+#.*$/, "").trim().replace(/^(['"])(.*)\1$/, "$2");
+  }
+  return value.trim().toLowerCase() === "true";
+}
+
+export function extractStripeWebhookSecret(text) {
+  return String(text).match(/\bwhsec_[A-Za-z0-9_+/=-]+/)?.[0] ?? null;
+}
+
+export function localDevPort(args = [], defaultPort = process.env.PORT || "3000") {
+  let value = defaultPort;
+  for (let index = 0; index < args.length; index++) {
+    if (args[index] === "--port" || args[index] === "-p") value = args[index + 1];
+    else if (args[index].startsWith("--port=")) value = args[index].slice("--port=".length);
+  }
+  const port = Number(value);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error("Local Stripe webhook forwarding requires a valid development port.");
+  }
+  return port;
+}
+
+function stripeCliEnvironment() {
+  const keys = [
+    "PATH", "HOME", "USERPROFILE", "USER", "LOGNAME", "TMPDIR", "TMP", "TEMP",
+    "LANG", "LC_ALL", "TERM", "COLORTERM", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
+    "NO_PROXY", "SSL_CERT_FILE", "SSL_CERT_DIR", "SYSTEMROOT",
+  ];
+  return Object.fromEntries(keys.filter(key => process.env[key]).map(key => [key, process.env[key]]));
+}
+
+export function stripeWebhookForwarderArgs(port) {
+  const events = [
+    "checkout.session.completed",
+    "checkout.session.async_payment_succeeded",
+    "payment_intent.amount_capturable_updated",
+    "payment_intent.succeeded",
+    "payment_intent.canceled",
+    "payment_intent.payment_failed",
+  ].join(",");
+  return [
+    "listen", "--skip-update", "--events", events,
+    "--forward-to", `http://127.0.0.1:${port}/api/stripe/webhook`,
+  ];
+}
+
+export function startStripeWebhookForwarder(port, {
+  spawnImpl = spawn, timeoutMs = 30_000, output = text => process.stdout.write(text),
+} = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawnImpl("stripe", stripeWebhookForwarderArgs(port), {
+      stdio: ["ignore", "pipe", "pipe"], env: stripeCliEnvironment(),
+    });
+    let outputBuffer = "";
+    let settled = false;
+    const timeout = setTimeout(() => {
+      fail(new Error(`Stripe CLI did not provide a webhook secret within ${Math.ceil(timeoutMs / 1000)} seconds. Run stripe login and retry.`));
+    }, timeoutMs);
+    timeout.unref?.();
+
+    function fail(error) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      child.kill("SIGTERM");
+      reject(error);
+    }
+
+    function read(chunk) {
+      const text = String(chunk);
+      output(redact(text));
+      if (settled) return;
+      outputBuffer = `${outputBuffer}${text}`.slice(-512);
+      const secret = extractStripeWebhookSecret(outputBuffer);
+      if (secret) {
+        settled = true;
+        clearTimeout(timeout);
+        resolve({ child, secret });
+      }
+    }
+
+    child.stdout.on("data", read);
+    child.stderr.on("data", read);
+    child.once("error", error => {
+      fail(new Error(`Could not start Stripe CLI (${error.message}). Install Stripe CLI, run stripe login, and retry.`));
+    });
+    child.once("exit", code => {
+      fail(new Error(`Stripe CLI exited before webhook forwarding was ready (code ${code ?? "unknown"}). Run stripe login and retry.`));
+    });
+  });
 }
 
 // Async replacement for execFileSync: never blocks the event loop and always SIGKILLs the whole
@@ -372,47 +469,6 @@ async function migrate(root, status) {
   }
 }
 
-async function seed(settings, status) {
-  const accessFile = path.join(settings.directory, "admin-login.json");
-  const login = existsSync(accessFile)
-    ? JSON.parse(readFileSync(accessFile, "utf8"))
-    : { email: "admin@peppermint.local", password: randomBytes(24).toString("base64url") };
-  const admin = createClient(status.API_URL, status.SERVICE_ROLE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-  let user;
-  for (let page = 1; !user; page++) {
-    const result = await admin.auth.admin.listUsers({ page, perPage: 100 });
-    if (result.error) throw result.error;
-    user = result.data.users.find(entry => entry.email === login.email);
-    if (result.data.users.length < 100) break;
-  }
-  const attributes = { password: login.password, email_confirm: true, app_metadata: { role: "admin" } };
-  const result = user
-    ? await admin.auth.admin.updateUserById(user.id, attributes)
-    : await admin.auth.admin.createUser({ email: login.email, ...attributes });
-  if (result.error) throw result.error;
-  if (!existsSync(accessFile)) writeFileSync(accessFile, `${JSON.stringify(login, null, 2)}\n`, { flag: "wx", mode: 0o600 });
-
-  const date = offset => {
-    const value = new Date();
-    value.setUTCDate(value.getUTCDate() + offset);
-    return value.toISOString().slice(0, 10);
-  };
-  const bookings = [1, 7, 30].map((offset, index) => ({
-    id: `00000000-0000-4000-8000-00000000000${index + 1}`,
-    email: `test-hire-${index + 1}@example.invalid`,
-    first_name: "Local", last_name: `Test ${index + 1}`, mobile: "0400000000",
-    event_type: "Private party", event_address: "Disposable local test address",
-    pickup_date: date(offset), dropoff_date: date(offset + index + 1),
-    terms_accepted: true, status: "submitted",
-    internal_notes: "Disposable local fixture. Not a real booking.",
-  }));
-  const inserted = await admin.from("bookings").upsert(bookings, { onConflict: "id", ignoreDuplicates: true });
-  if (inserted.error) throw inserted.error;
-  console.log(`Local admin credentials: ${accessFile}\nSeeded three disposable bookings (existing records preserved).`);
-}
-
 export function localEnvironment(status) {
   return {
     SUPABASE_TARGET: "local",
@@ -422,47 +478,6 @@ export function localEnvironment(status) {
     LOCAL_SUPABASE_ANON_KEY: status.ANON_KEY,
     LOCAL_SUPABASE_SERVICE_ROLE_KEY: status.SERVICE_ROLE_KEY,
   };
-}
-
-async function verify(settings, status) {
-  const options = { auth: { autoRefreshToken: false, persistSession: false } };
-  const admin = createClient(status.API_URL, status.SERVICE_ROLE_KEY, options);
-  const auth = createClient(status.API_URL, status.ANON_KEY, options);
-  const login = JSON.parse(readFileSync(path.join(settings.directory, "admin-login.json"), "utf8"));
-  const signedIn = await auth.auth.signInWithPassword(login);
-  if (signedIn.error) throw signedIn.error;
-  if (signedIn.data.user.app_metadata.role !== "admin") throw new Error("Seeded local user is not an administrator.");
-  const anonymous = createClient(status.API_URL, status.ANON_KEY, options);
-  const blocked = await anonymous.from("bookings").select("id").limit(1);
-  if (!blocked.error) throw new Error("Anonymous clients unexpectedly have booking access.");
-  const id = randomUUID();
-  const object = `local-verification/${id}.txt`;
-  const contents = "Disposable local storage verification";
-  try {
-    const insert = await admin.from("bookings").insert({
-      id, email: "integration@example.invalid", first_name: "Disposable", last_name: "Verification",
-      mobile: "0400000000", event_type: "Test", event_address: "Local only",
-      pickup_date: "2099-01-01", dropoff_date: "2099-01-02",
-    }).select("id").single();
-    if (insert.error) throw insert.error;
-    if (insert.data.id !== id) throw new Error("Local booking persistence did not return the inserted ID.");
-    const upload = await admin.storage.from("booking-photo-ids").upload(object, Buffer.from(contents), { contentType: "text/plain" });
-    if (upload.error) throw upload.error;
-    const link = await admin.storage.from("booking-photo-ids").createSignedUrl(object, 60);
-    if (link.error) throw link.error;
-    const file = await fetch(link.data.signedUrl, { signal: AbortSignal.timeout(10_000) });
-    if (!file.ok || await file.text() !== contents) throw new Error("Local signed storage download failed.");
-    const publicFile = await fetch(`${status.API_URL}/storage/v1/object/public/booking-photo-ids/${object}`, { signal: AbortSignal.timeout(10_000) });
-    if (publicFile.ok) throw new Error("Local private file is publicly accessible.");
-    console.log("PASS: local Auth, admin role, booking persistence, anonymous access denial, private upload and signed download.");
-  } finally {
-    const removed = await admin.storage.from("booking-photo-ids").remove([object]);
-    if (removed.error) throw removed.error;
-    const deleted = await admin.from("bookings").delete().eq("id", id);
-    if (deleted.error) throw deleted.error;
-    const logout = await auth.auth.signOut();
-    if (logout.error) throw logout.error;
-  }
 }
 
 export function localEmailStartupMessage(environment) {
@@ -477,43 +492,67 @@ export function localEmailStartupMessage(environment) {
 
 async function main() {
   const root = process.cwd();
-  const settings = localSettings(root);
   const [action, ...args] = process.argv.slice(2);
-  if (!["start", "stop", "status", "seed", "verify", "dev", "serve"].includes(action)
-    || (!["dev", "serve"].includes(action) && args.length)) {
-    throw new Error("Usage: node scripts/local-db.mjs start|stop|status|seed|verify|dev|serve [Next.js server options]");
+  if (!["dev", "serve"].includes(action)) {
+    throw new Error("Usage: node scripts/local-dev.mjs dev|serve [Next.js server options]");
   }
-  if (process.env.VERCEL || process.env.CI) throw new Error("Local database commands cannot run in deployment or CI.");
-  if (action === "start") {
-    await startStack(root, settings);
-    await migrate(root, await statusFor(root, settings));
-  }
-  if (action === "stop") {
-    await cli(root, settings, ["stop"], { timeout: 120_000, onProgress: progressPrinter() });
-    console.log("Stopped this worktree's local stack. Database and storage volumes are retained.");
-    return;
-  }
-  const status = ["dev", "serve"].includes(action)
-    ? await startupLocalStack(root) : await statusFor(root, settings);
-  if (action === "seed") await seed(settings, status);
-  if (action === "verify") await verify(settings, status);
+  if (process.env.VERCEL || process.env.CI) throw new Error("Local development commands cannot run in deployment or CI.");
+  const status = await startupLocalStack(root);
   if (action === "dev" || action === "serve") {
     const environment = localEnvironment(status);
     console.log(localEmailStartupMessage(environment));
-    const child = spawn(process.execPath, [path.join(root, "node_modules", "next", "dist", "bin", "next"), action === "dev" ? "dev" : "start", ...args], {
+    const envFile = path.join(root, ".env.local");
+    const envFileContents = existsSync(envFile) ? readFileSync(envFile, "utf8") : "";
+    const stripeEnabled = action === "dev"
+      && localStripeWebhooksEnabled(process.env.LOCAL_STRIPE_WEBHOOKS, envFileContents);
+    const port = stripeEnabled ? localDevPort(args) : null;
+    let stripeChild;
+    if (stripeEnabled) {
+      const forwarder = await startStripeWebhookForwarder(port);
+      stripeChild = forwarder.child;
+      environment.STRIPE_WEBHOOK_SECRET = forwarder.secret;
+      console.log(`Stripe CLI: forwarding test payment events to http://127.0.0.1:${port}/api/stripe/webhook`);
+    } else if (action === "dev") {
+      console.log("Stripe CLI forwarding is off. Set LOCAL_STRIPE_WEBHOOKS=true in .env.local to enable it.");
+    }
+    const nextArgs = [path.join(root, "node_modules", "next", "dist", "bin", "next"), action === "dev" ? "dev" : "start", ...args];
+    if (stripeEnabled && !args.some(argument => argument === "--port" || argument === "-p" || argument.startsWith("--port="))) {
+      nextArgs.push("--port", String(port));
+    }
+    const child = spawn(process.execPath, nextArgs, {
       stdio: "inherit", env: { ...process.env, ...environment },
     });
-    for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => child.kill(signal));
-    child.on("error", error => { console.error(error.message); process.exitCode = 1; });
-    child.on("exit", code => { process.exitCode = code ?? 1; });
+    let stopping = false;
+    const stopChildren = signal => {
+      stopping = true;
+      child.kill(signal);
+      stripeChild?.kill(signal);
+    };
+    for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => stopChildren(signal));
+    child.on("error", error => {
+      stopping = true;
+      stripeChild?.kill("SIGTERM");
+      console.error(error.message);
+      process.exitCode = 1;
+    });
+    child.on("exit", code => {
+      stopping = true;
+      stripeChild?.kill("SIGTERM");
+      process.exitCode = code ?? 1;
+    });
+    stripeChild?.once("exit", code => {
+      if (stopping) return;
+      console.error(`Stripe CLI webhook forwarding stopped unexpectedly (code ${code ?? "unknown"}); stopping the local app.`);
+      stopping = true;
+      child.kill("SIGTERM");
+    });
     return;
   }
-  console.log(`Local API: ${status.API_URL}\nLocal Studio: http://127.0.0.1:${settings.studioPort}\nLocal Auth mail: http://127.0.0.1:${settings.mailPort}`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   main().catch(error => {
-    console.error(`Local database setup failed: ${error.message}`);
+    console.error(`Local development setup failed: ${error.message}`);
     process.exitCode = 1;
   });
 }

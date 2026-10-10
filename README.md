@@ -35,19 +35,26 @@ Public browsing pages include a fixed **Check availability** contact prompt. On 
 
 ## Setup
 
-### Local-only database, authentication and storage
+### Local development environment
 
 Local development uses Supabase **on your own machine**, not the hosted project.
 Install Docker (with its CLI available on PATH), then run:
 
 ```bash
 npm install
-npm run db:local:start
-npm run db:local:seed
 npm run dev
 ```
 
-For normal startup, just run `npm run dev` (or `npm start` for an existing build).
+`npm run dev` automatically starts or reuses the local services, applies the
+canonical database migration, and starts Next.js. For an existing build, use
+`npm start`.
+
+For local Stripe webhook testing, install and authenticate the Stripe CLI once
+with `stripe login`, then set `LOCAL_STRIPE_WEBHOOKS=true` in `.env.local`.
+`npm run dev` (and `npm run dev:resend`) then starts Stripe's test-mode listener
+alongside the app and supplies its signing secret to the local server process.
+The generated secret is not written to a file. Leave it unset to run without
+Stripe CLI forwarding.
 Both launchers, including `npm run dev:resend`, reuse any responding configured
 Docker engine. If no engine responds on macOS, they launch an already installed
 Docker Desktop from `/Applications` or `~/Applications`. Engine readiness is
@@ -70,28 +77,9 @@ the local status and applies the canonical
 migration transaction before starting Next.js. Unexpected status errors are
 reported rather than triggering a blind restart.
 
-`db:local:start` starts PostgreSQL, Auth, private Storage, Studio and a local Auth
-email inbox. It applies the canonical `supabase/001_booking_management.sql` inside
-a transaction. Run it again after schema changes; it does not reset existing
-local data. First startup downloads Docker images and can take several minutes.
-
-`db:local:seed` creates three disposable bookings and a local administrator with
-the admin role. Its generated login is stored in the ignored, owner-readable
-`.local-supabase/admin-login.json`; use that account at `/admin/login`. Repeated
-seeding preserves existing fixture bookings and never copies production data.
-
-Future agent sessions are instructed in `AGENTS.md` to sign in themselves using
-the local test admin, not ask you to fill the form or use the real account.
-`POST /api/dev/admin-login` reads the ignored credentials on the server and signs
-in through local Supabase, setting the normal HTTP-only session cookies. Agents
-call it from the same-origin localhost browser tab, then navigate to `/admin`.
-Terminal-run Playwright checks use the same browser context's request API with
-an `Origin` header matching the localhost app URL.
-
-This helper is disabled outside development, on Vercel, and for non-loopback or
-cross-origin requests; production-built local servers use normal login or
-direct test-account authentication instead. Credentials and session cookies must
-never be printed or committed. The normal login form remains unchanged.
+The local stack starts without sample bookings or an administrator account.
+Admin-console testing requires a separately provisioned disposable local admin;
+never use production credentials or customer data for local testing.
 
 `npm run dev` and `npm start` inject this worktree's local credentials into Next.js without
 editing `.env.local`. Both server database clients and admin session refresh use
@@ -102,17 +90,9 @@ against the same local stack. A direct `next dev` invocation also requires
 `LOCAL_SUPABASE_SERVICE_ROLE_KEY`; prefer `npm run dev`.
 
 Each checkout/worktree has a distinct Docker project, persistent data volumes and
-deterministic port range. Run these commands separately inside each agent's
-worktree. Port conflicts fail explicitly rather than selecting another database.
-Moving a checkout changes its project identity; stop its stack before moving it.
-
-```bash
-npm run db:local:status   # Prints local URLs, not keys
-npm run db:local:verify   # Real local Auth/database/private-storage integration check
-npm run db:local:stop     # Stops only this worktree's stack; retains data
-```
-
-Studio can create/edit/delete disposable records and manage local files.
+deterministic port range. Port conflicts fail explicitly rather than selecting
+another database. The app launcher prints the local Auth mail inbox URL at startup.
+Studio can manage local database records and files.
 No reset/delete command is provided automatically. Production still uses the
 existing `SUPABASE_*` deployment variables on Vercel. Outside Vercel, database
 clients default to local even in production-mode server runs (unit tests retain
@@ -129,8 +109,7 @@ deposit notifications go to this worktree's Supabase Mailpit inbox, alongside
 Auth emails. No Resend credentials are needed. Missing sender/internal recipient
 settings default to `hello@peppermint.local` / `team@peppermint.local`.
 
-Run `npm run db:local:status` and open the printed **Local Auth mail** URL
-(this checkout: `http://127.0.0.1:30074`). Inspect recipients, message bodies and
+Open the printed **Local Auth mail** URL from the `npm run dev` output. Inspect recipients, message bodies and
 PDF attachments there. Capture uses the loopback-only Mailpit HTTP API; inbox
 errors fail delivery, never fall back to an external provider.
 Both `npm run dev` and `npm run start` print the email mode at startup. Capture
@@ -181,6 +160,7 @@ keys in local tests. Use Stripe test-mode keys and keep calendar disabled.
 - `LOCAL_EMAIL_MODE`: local-only `capture` (default) or explicit `resend`
 - `LOCAL_EMAIL_TEST_RECIPIENT`: single designated recipient required for local Resend mode
 - `LOCAL_EMAIL_INBOX_URL`: loopback HTTP Mailpit URL (injected by the local launcher)
+- `LOCAL_STRIPE_WEBHOOKS`: set to `true` to start Stripe CLI test-mode webhook forwarding during local development
 - `SUPABASE_URL`: Supabase project URL
 - `SUPABASE_ANON_KEY`: Supabase publishable/anon key
 - `SUPABASE_SERVICE_ROLE_KEY`: server-only Supabase service role key

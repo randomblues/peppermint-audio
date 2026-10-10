@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { existsSync } from "node:fs";
 import {
-  ensureDocker, prepareLocalStack, localConfig, localEmailStartupMessage, localEnvironment, localSettings, progressPrinter,
-  redact, runBounded, stalledStartMessage, superviseStart, validateStatus, waitForDatabaseHealth,
-} from "../scripts/local-db.mjs";
+  ensureDocker, prepareLocalStack, localConfig, localDevPort, localEmailStartupMessage, localEnvironment,
+  localSettings, localStripeWebhooksEnabled, progressPrinter, extractStripeWebhookSecret,
+  redact, runBounded, stalledStartMessage, stripeWebhookForwarderArgs, superviseStart, validateStatus, waitForDatabaseHealth,
+} from "../scripts/local-dev.mjs";
 
 describe("automatic local startup", () => {
   function engine() {
@@ -314,8 +315,29 @@ describe("bounded, observable stack startup", () => {
   });
 });
 
-describe("local database tooling", () => {
+describe("local development tooling", () => {
   afterEach(() => vi.unstubAllEnvs());
+
+  it("enables local Stripe webhook forwarding only when explicitly configured", () => {
+    expect(localStripeWebhooksEnabled(undefined)).toBe(false);
+    expect(localStripeWebhooksEnabled("false", "LOCAL_STRIPE_WEBHOOKS=true")).toBe(false);
+    expect(localStripeWebhooksEnabled(undefined, "LOCAL_STRIPE_WEBHOOKS=true")).toBe(true);
+    expect(localStripeWebhooksEnabled(undefined, "export LOCAL_STRIPE_WEBHOOKS='true' # local test only")).toBe(true);
+    expect(localStripeWebhooksEnabled(undefined, "LOCAL_STRIPE_WEBHOOKS=1")).toBe(false);
+  });
+
+  it("uses the configured local port and extracts/redacts webhook signing secrets", () => {
+    expect(localDevPort([], "3000")).toBe(3000);
+    expect(localDevPort(["--port", "3010"], "3000")).toBe(3010);
+    expect(localDevPort(["--port=3011"], "3000")).toBe(3011);
+    expect(localDevPort([], "3012")).toBe(3012);
+    expect(extractStripeWebhookSecret("Ready! Your webhook signing secret is whsec_test_123-abc")).toBe("whsec_test_123-abc");
+    expect(redact("webhook secret whsec_test_123-abc")).not.toContain("whsec_test_123-abc");
+    const args = stripeWebhookForwarderArgs(3010);
+    expect(args).toContain("http://127.0.0.1:3010/api/stripe/webhook");
+    expect(args.find(argument => argument.startsWith("checkout.session.completed"))).toContain("payment_intent.succeeded");
+    expect(args).not.toContain("--live");
+  });
 
   it("prints the actual capture inbox and quota status", () => {
     expect(localEmailStartupMessage({

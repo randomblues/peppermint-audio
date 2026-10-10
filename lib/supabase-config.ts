@@ -22,7 +22,7 @@ export function supabaseConnection(role: "admin" | "auth") {
     : local ? process.env.LOCAL_SUPABASE_ANON_KEY : process.env.SUPABASE_ANON_KEY;
   if (!url || !key) {
     throw new Error(local
-      ? "Local Supabase is not configured. Run npm run db:local:start, then npm run dev."
+      ? "Local Supabase is not configured. Run npm run dev."
       : role === "admin"
         ? "Supabase is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
         : "Supabase auth is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY.");
