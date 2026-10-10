@@ -232,6 +232,10 @@ Every new agent session must use the local-only Supabase stack when working
 locally. Never use the hosted database, production admin credentials or real
 customer data for local validation.
 
+- Before running local setup commands, read the current `package.json` scripts
+  and this section from disk. These define the current workflow; do not reuse
+  removed setup commands from older session guidance. Startup, migration and
+  health checks are handled by the app launcher, not separate database commands.
 - Start the app with `npm run dev`; for agent-run long-lived servers, use
   `scripts/dev-detached.sh`, which runs the same launcher in the background. It starts or reuses this worktree's
   local stack and injects its credentials into Next.js. Read `/tmp/dev-<port>.log` to check startup and use
@@ -352,12 +356,12 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Prevention:** Do not inspect restricted environment files; when the user requests the documented local launcher, run it directly and assess its explicit startup result.
 - **Next action:** Use `npm run dev` for local UI validation without independently opening `.env.local`.
 
-### 2026-10-10 — Stale session workflow references
+### 2026-10-10 — Current checkout workflow verification
 
-- **Symptom:** A nonexistent `npm run db:local:status` command was recommended for this checkout.
+- **Symptom:** A removed standalone database command was recommended for this checkout.
 - **Root cause:** Session-provided workflow guidance lagged behind the active repository scripts.
 - **Prevention:** Check the active checkout's package scripts before relying on environment-provided setup commands.
-- **Next action:** Use `npm run dev` as the standard local launcher; keep obsolete `db:local` commands out of maintained project guidance.
+- **Next action:** Use `npm run dev` as the standard local launcher; keep removed setup commands out of maintained project guidance.
 
 # Agent working rules
 
