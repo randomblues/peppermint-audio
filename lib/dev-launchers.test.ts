@@ -25,7 +25,7 @@ function fakeTools() {
   return { directory, bin };
 }
 
-function runScript(script: string, bin: string, env: NodeJS.ProcessEnv) {
+function runScript(script: string, bin: string, env: Partial<NodeJS.ProcessEnv>) {
   return spawnSync("/bin/bash", [script], {
     cwd: root,
     encoding: "utf8",
@@ -51,7 +51,7 @@ async function waitForFile(file: string) {
 
 describe("detached development launchers", () => {
   it("refuses to start when the requested port already has a listener", () => {
-    const tools = fakeTools("12345");
+    const tools = fakeTools();
     const capture = path.join(tools.directory, "capture");
     try {
       const result = runScript(detachedScript, tools.bin, {
