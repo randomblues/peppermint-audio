@@ -13,6 +13,7 @@ import { MobileContactBar } from "./mobile-contact-bar";
 import { Section } from "./section";
 import { WhatsAppButton } from "./whatsapp-button";
 import * as googleAds from "@/lib/google-ads";
+import { lineItemsFromCart } from "@/lib/booking-line-items";
 import { business, packageTiers } from "@/lib/site-content";
 
 const { usePathname } = vi.hoisted(() => ({
@@ -274,7 +275,8 @@ describe("PackageCard", () => {
   });
 
   it("adds recommended add-ons from the upsell modal as individual equipment cart items", () => {
-    const pkg = packageTiers[0];
+    const pkg = packageTiers.find((packageTier) => packageTier.slug === "standard-party-events");
+    if (!pkg) throw new Error("Standard Party & Events package is missing");
 
     render(
       <CartProvider>
@@ -283,28 +285,29 @@ describe("PackageCard", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Add to cart" }));
-    fireEvent.click(screen.getByRole("button", { name: "Add this to my cart" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Add this to my cart" })[0]);
 
     expect(screen.getByRole("button", { name: "Added to cart" })).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem("peppermint-audio-cart") ?? "[]")).toEqual(
       expect.arrayContaining([
         {
-          id: "package:speech-presentation-wireless",
-          name: "Speech & Presentation Package",
+          id: "package:standard-party-events",
+          name: "Standard Party & Events Package",
           kind: "package",
-          price: 65,
+          price: 160,
           quantity: 1,
         },
         {
-          id: "equipment:hire-party-light-par-can:Single item",
-          name: "Party Light PAR Can",
+          id: "addon:wireless-microphones",
+          name: "Wireless Microphone",
           kind: "equipment",
           option: "Single item",
-          price: 10,
+          price: 20,
           quantity: 1,
         },
       ]),
     );
+    expect(lineItemsFromCart(localStorage.getItem("peppermint-audio-cart") ?? "[]")).toHaveLength(2);
   });
 
   it("links each recommended add-on to its item details page", () => {

@@ -108,7 +108,7 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
     if (!addOn) return;
 
     addItem({
-      id: `equipment:hire-${addOnSlug}:Single item`,
+      id: `addon:${addOnSlug}`,
       name: addOn.name.replace(" Upgrade", ""),
       kind: "equipment",
       option: "Single item",

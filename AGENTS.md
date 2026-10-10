@@ -327,6 +327,13 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Prevention:** Verify `innerWidth` and a breakpoint-dependent layout on the active tab before trusting a screenshot.
 - **Next action:** If the frame remains stale, apply `Emulation.setDeviceMetricsOverride` through CDP and capture directly with `Page.captureScreenshot`; stop and report incomplete validation if the frame still cannot be verified.
 
+### 2026-10-10 — Restricted environment file access blocked a local test launch
+
+- **Symptom:** Local end-to-end testing was delayed after access to `.env.local` was denied.
+- **Root cause:** Restricted access to the environment file was incorrectly treated as a blocker to invoking the repository's normal local launcher.
+- **Prevention:** Do not inspect restricted environment files; when the user requests the documented local launcher, run it directly and assess its explicit startup result.
+- **Next action:** Use `npm run dev` for local UI validation without independently opening `.env.local`.
+
 # Agent working rules
 
 These rules are mandatory. Safety, preservation of existing work, bounded execution, and truthful verification take priority over speed.
