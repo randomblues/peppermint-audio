@@ -1,7 +1,9 @@
+// @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { inflateSync } from "node:zlib";
+import { PDFArray, PDFDocument, PDFRawStream, decodePDFRawStream } from "pdf-lib";
 
-import { buildInvoicePdf } from "./invoice-pdf";
+import { buildInvoicePdf, type InvoicePdfDetails } from "./invoice-pdf";
 
 function extractCompressedPdfText(pdf: Buffer) {
   const streams: string[] = [];
@@ -33,6 +35,80 @@ function extractCompressedPdfText(pdf: Buffer) {
 }
 
 describe("invoice PDF generation", () => {
+  it.each([20, 100])("keeps %s wrapped line items, totals and payment panels inside actual PDF page bounds", async count => {
+    const details: InvoicePdfDetails = {
+      title: "Invoice", documentNumber: "PA-BOUNDS", issuedAt: "10 October 2026",
+      customerName: "Disposable Test", customerEmail: "test@example.com", eventType: "Party",
+      pickupDate: "11 October 2026", dropoffDate: "12 October 2026",
+      paymentMethod: "Cash due on pickup",
+      lineItems: Array.from({ length: count }, (_, index) => ({
+        description: `Item ${index + 1}: ${"Long wrapped equipment description ".repeat(8)}`,
+        amountCents: 1000, status: "Due",
+      })),
+      totalCents: count * 1000, gstIncludedCents: 909,
+      notes: ["Pay securely online: https://example.com/pay/" + "token".repeat(220),
+        "Important instructions ".repeat(600)],
+      bankTransfer: { amountCents: 10000, reference: "PA-BOUNDS", accountName: "Test", bsb: "000000", accountNumber: "123456", payId: "test@example.com" },
+    };
+    for (const bankTransfer of [details.bankTransfer, undefined]) {
+      const pdf = await buildInvoicePdf({ ...details, bankTransfer });
+      const document = await PDFDocument.load(pdf);
+      expect(document.getPageCount()).toBeGreaterThan(1);
+      for (const page of document.getPages()) {
+        expect(page.getSize()).toEqual({ width: 595, height: 842 });
+        const contents = page.node.Contents() as PDFArray;
+        const operators = Array.from({ length: contents.size() }, (_, index) => {
+          const stream = document.context.lookup(contents.get(index));
+          if (!(stream instanceof PDFRawStream)) throw new Error("Expected a raw PDF content stream.");
+          return Buffer.from(decodePDFRawStream(stream).decode()).toString("latin1");
+        }).join("\n");
+        const textPositions = [...operators.matchAll(/1 0 0 1 ([\d.-]+) ([\d.-]+) Tm/g)];
+        expect(textPositions.length).toBeGreaterThan(0);
+        for (const [, x, y] of textPositions) {
+          expect(Number(x)).toBeGreaterThanOrEqual(0);
+          expect(Number(x)).toBeLessThan(595);
+          // Only the branded footer may occupy the bottom 88 points.
+          expect(Number(y) <= 88 || Number(y) >= 104).toBe(true);
+          expect(Number(y)).toBeGreaterThanOrEqual(0);
+          expect(Number(y)).toBeLessThanOrEqual(842);
+        }
+        for (const [, , y, , height] of operators.matchAll(/([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+) re/g)) {
+          expect(Number(y)).toBeGreaterThanOrEqual(0);
+          expect(Number(y) + Number(height)).toBeLessThanOrEqual(842);
+          expect(Number(y) === 0 || Number(y) >= 104).toBe(true);
+        }
+      }
+      const text = extractCompressedPdfText(pdf);
+      expect(text).toContain(bankTransfer ? "BANK TRANSFER DETAILS" : "PAYMENT");
+      for (let index = 1; index <= count; index++) expect(text).toContain(`Item ${index}:`);
+      expect(text).toContain("TOTAL (INC. GST)");
+      expect(text).toContain("ONLINE PAYMENT");
+      expect(text).toContain("NOTES");
+    }
+  });
+
+  it("splits a single description spanning several pages without losing its ending", async () => {
+    const pdf = await buildInvoicePdf({
+      title: "Invoice", documentNumber: "PA-LONG", issuedAt: "10 October 2026",
+      customerName: "Test", customerEmail: "test@example.com", eventType: "Party",
+      pickupDate: "11 October 2026", dropoffDate: "12 October 2026", paymentMethod: "Cash",
+      lineItems: [{ description: "Equipment ".repeat(3000) + "END OF DESCRIPTION", amountCents: 1000 }],
+      totalCents: 1000, notes: [],
+    });
+    expect((await PDFDocument.load(pdf)).getPageCount()).toBeGreaterThan(2);
+    const text = extractCompressedPdfText(pdf);
+    expect(text.match(/Equipment/g)).toHaveLength(3000);
+    expect(text).toContain("END");
+    expect(text).toContain("DESCRIPTION");
+    expect(await buildInvoicePdf({
+      title: "Invoice", documentNumber: "PA-LONG", issuedAt: "10 October 2026",
+      customerName: "Test", customerEmail: "test@example.com", eventType: "Party",
+      pickupDate: "11 October 2026", dropoffDate: "12 October 2026", paymentMethod: "Cash",
+      lineItems: [{ description: "Equipment ".repeat(3000) + "END OF DESCRIPTION", amountCents: 1000 }],
+      totalCents: 1000, notes: [],
+    })).toEqual(pdf);
+  });
+
   it("generates a readable PDF document with invoice details", async () => {
     const pdf = await buildInvoicePdf({
       title: "Tax Invoice",

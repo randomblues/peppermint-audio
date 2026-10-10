@@ -33,11 +33,15 @@ export async function POST(request: Request) {
   }
 
   const result = await session.admin.from("bookings")
-    .select("id,status,pickup_date,dropoff_date,hire_line_items,payment_method,hire_amount_cents,security_deposit_cents,gst_inclusive")
+    .select("id,status,pickup_date,dropoff_date,hire_line_items,payment_method,hire_amount_cents,security_deposit_cents,gst_inclusive,hire_payment_status,deposit_payment_status")
     .eq("id", bookingId)
     .single();
   if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 });
   if (!result.data) return NextResponse.json({ error: "Booking could not be found." }, { status: 404 });
+  if (["paid", "succeeded", "captured", "bank_transfer_received"].includes(result.data.hire_payment_status ?? "")
+    || ["authorized", "captured", "bank_transfer_received", "bank_transfer_refunded"].includes(result.data.deposit_payment_status ?? "")) {
+    return NextResponse.json({ error: "This booking has already been paid or its deposit has been processed. Resend its existing invoice instead." }, { status: 409 });
+  }
   const hireLineItems = lineItemsForBooking(result.data);
   const nights = rentalDays(result.data.pickup_date, result.data.dropoff_date);
   if (nights === null) return NextResponse.json({ error: "The booking dates are invalid." }, { status: 400 });

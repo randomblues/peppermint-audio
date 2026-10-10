@@ -162,7 +162,7 @@ describe("admin booking routes", () => {
       }),
     };
     const update = { update: vi.fn().mockReturnThis(), eq: vi.fn().mockResolvedValue({ error: null }) };
-    mocks.requireAdmin.mockResolvedValue(adminSession({ from: vi.fn().mockReturnValueOnce(read).mockReturnValueOnce(update) }));
+    mocks.requireAdmin.mockResolvedValue(adminSession({ from: vi.fn().mockReturnValueOnce(read).mockReturnValue(update) }));
     vi.stubEnv("RESEND_API_KEY", "key");
     vi.stubEnv("ENQUIRY_FROM_EMAIL", "Peppermint Audio <from@example.com>");
 
@@ -175,8 +175,36 @@ describe("admin booking routes", () => {
     }));
     expect(update.update).toHaveBeenCalledWith(expect.objectContaining({
       status: "confirmed",
-      confirmation_email_sent: true,
     }));
+    expect(update.update).toHaveBeenCalledWith(expect.objectContaining({ confirmation_email_sent: true }));
+    expect(update.update.mock.invocationCallOrder[0]).toBeLessThan(mocks.sendBookingConfirmationEmail.mock.invocationCallOrder[0]);
+  });
+
+  it.each(["write", "delivery", "tracking"])("preserves usable confirmation state after a %s failure", async (failure) => {
+    const read = {
+      select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({
+        data: { email: "customer@example.com", first_name: "Alex", confirmation_email_sent: false, hire_payment_status: "paid" },
+        error: null,
+      }),
+    };
+    const update = {
+      update: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockResolvedValueOnce({ error: failure === "write" ? { message: "write failed" } : null })
+        .mockResolvedValue({ error: failure === "tracking" ? { message: "tracking failed" } : null }),
+    };
+    mocks.requireAdmin.mockResolvedValue(adminSession({ from: vi.fn().mockReturnValueOnce(read).mockReturnValue(update) }));
+    if (failure === "delivery") mocks.sendBookingConfirmationEmail.mockRejectedValueOnce(new Error("provider down"));
+    const response = await patchBooking(jsonRequest("/api/admin/bookings", { id: "b1", status: "confirmed" }));
+    expect(response.status).toBe(failure === "delivery" ? 502 : 500);
+    if (failure === "write") {
+      expect(mocks.sendBookingConfirmationEmail).not.toHaveBeenCalled();
+    } else {
+      expect(update.update).toHaveBeenNthCalledWith(1, expect.objectContaining({ status: "confirmed" }));
+      const result = await response.json();
+      expect(result.error).toContain(failure === "delivery" ? "Use Send confirmation email to retry" : "avoid sending a duplicate");
+      if (failure === "delivery") expect(update.update).toHaveBeenCalledTimes(1);
+    }
   });
 
   it("blocks confirmation until the hire payment is paid", async () => {
@@ -222,7 +250,7 @@ describe("admin booking routes", () => {
       }),
     };
     const update = { update: vi.fn().mockReturnThis(), eq: vi.fn().mockResolvedValue({ error: null }) };
-    mocks.requireAdmin.mockResolvedValue(adminSession({ from: vi.fn().mockReturnValueOnce(read).mockReturnValueOnce(update) }));
+    mocks.requireAdmin.mockResolvedValue(adminSession({ from: vi.fn().mockReturnValueOnce(read).mockReturnValue(update) }));
     vi.stubEnv("RESEND_API_KEY", "key");
     vi.stubEnv("ENQUIRY_FROM_EMAIL", "Peppermint Audio <from@example.com>");
 

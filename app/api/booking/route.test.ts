@@ -82,17 +82,18 @@ function testFile(contents: string, name: string) {
 
 function configureAdmin({ insertError = null, uploadError = null, updateError = null } = {}) {
   const update = vi.fn().mockResolvedValue({ error: updateError });
+  const updateValues = vi.fn(() => ({ eq: update }));
   const insert = vi.fn().mockResolvedValue({ error: insertError });
   const upload = vi.fn().mockResolvedValue({ error: uploadError });
   const remove = vi.fn().mockResolvedValue({ error: null });
   createAdminClient.mockReturnValue({
     storage: { from: vi.fn(() => ({ upload, remove })) },
     from: vi.fn((table: string) => table === "bookings"
-      ? { insert, update: vi.fn(() => ({ eq: update })) }
+      ? { insert, update: updateValues }
       : {}),
   });
   insertMock = insert;
-  return { insert, upload, remove, update };
+  return { insert, upload, remove, update, updateValues };
 }
 
 describe("POST /api/booking", () => {
@@ -263,6 +264,19 @@ describe("POST /api/booking", () => {
     expect(response.status).toBe(500);
     expect((await response.json()).error).toContain("Photo ID upload failed: storage down");
     expect(remove).toHaveBeenCalledOnce();
+  });
+
+  it("still sends both emails when the calendar outcome write fails", async () => {
+    const { update, updateValues } = configureAdmin();
+    update.mockResolvedValueOnce({ error: { message: "calendar write failed" } });
+    const response = await POST(bookingRequest());
+    expect(response.status).toBe(200);
+    await afterCallback.mock.calls[0][0]();
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(updateValues).toHaveBeenLastCalledWith(expect.objectContaining({
+      internal_email_sent: true, customer_email_sent: true,
+      calendar_event_link: "https://calendar.google.com/event",
+    }));
   });
 
   it("records calendar failures and still sends email", async () => {

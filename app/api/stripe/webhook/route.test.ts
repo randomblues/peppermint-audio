@@ -46,6 +46,9 @@ describe("Stripe webhook", () => {
     });
     mocks.markInvoiceStatus.mockResolvedValue(undefined);
     mocks.sendBillingDocument.mockResolvedValue("document-1");
+    mocks.readDepositBooking.mockResolvedValue({
+      id: "booking-1", stripe_hire_payment_intent_id: "pi_hire", hire_payment_status: "pending",
+    });
   });
 
   it.each([
@@ -87,7 +90,7 @@ describe("Stripe webhook", () => {
     expect(mocks.syncDeferredDeposit).not.toHaveBeenCalled();
   });
 
-  it.each(["deferred", "immediate"])("ignores a delayed %s hire failure after its payment has succeeded", async (depositSchedule) => {
+  it.each(["deferred", "immediate", "none", undefined])("ignores a delayed %s hire failure after its payment has succeeded", async (depositSchedule) => {
     mocks.readDepositBooking.mockResolvedValue({ id: "booking-1", stripe_hire_payment_intent_id: "pi_hire", hire_payment_status: "paid" });
     const admin = adminClient();
     mocks.createAdminClient.mockReturnValue(admin);
@@ -97,6 +100,21 @@ describe("Stripe webhook", () => {
     }) } });
     expect((await POST(request())).status).toBe(200);
     expect(admin.update).not.toHaveBeenCalled();
+  });
+
+  it.each(["deferred", "immediate", "none", undefined])("ignores replaced %s hire intents", async (depositSchedule) => {
+    mocks.readDepositBooking.mockResolvedValue({
+      id: "booking-1", stripe_hire_payment_intent_id: "pi_current", hire_payment_status: "pending",
+    });
+    const admin = adminClient();
+    mocks.createAdminClient.mockReturnValue(admin);
+    mocks.getStripe.mockReturnValue({ webhooks: { constructEvent: vi.fn().mockReturnValue({
+      type: "payment_intent.succeeded",
+      data: { object: { id: "pi_old", metadata: { bookingId: "booking-1", paymentType: "hire", depositSchedule } } },
+    }) } });
+    expect((await POST(request())).status).toBe(200);
+    expect(admin.update).not.toHaveBeenCalled();
+    expect(mocks.sendBillingDocument).not.toHaveBeenCalled();
   });
 
   it("retrieves current deferred-deposit state for out-of-order events", async () => {

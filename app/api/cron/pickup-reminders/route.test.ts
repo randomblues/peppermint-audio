@@ -116,6 +116,7 @@ describe("GET /api/cron/pickup-reminders", () => {
     expect(query.select).toHaveBeenCalledWith("id,email,first_name,last_name,event_type,pickup_date,pickup_time,hire_line_items,additional_details");
     expect(query.eq).toHaveBeenCalledWith("pickup_date", "2026-09-29");
     expect(query.neq).toHaveBeenCalledWith("status", "cancelled");
+    expect(query.neq).toHaveBeenCalledWith("status", "completed");
     expect(query.is).toHaveBeenCalledWith("reminder_sent_at", null);
   });
 

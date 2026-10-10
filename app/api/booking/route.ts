@@ -93,7 +93,11 @@ export async function POST(request: Request) {
         calendarError = error instanceof Error ? error.message : "Unknown Google Calendar error";
         console.error("Google Calendar event creation failed:", error);
       }
-      await updateBooking({ calendar_event_link: calendarEventLink, calendar_error: calendarError });
+      try {
+        await updateBooking({ calendar_event_link: calendarEventLink, calendar_error: calendarError });
+      } catch (error) {
+        console.error("Calendar outcome persistence failed; continuing booking emails:", error);
+      }
       const text = [
       "New audio equipment booking", `Booking Reference: ${bookingReference}`, `Name: ${data.firstName} ${data.lastName}`, `Email: ${data.email}`, `Mobile: ${data.mobile}`,
       `Event type: ${data.eventType}`, `Event address: ${data.eventAddress}`,

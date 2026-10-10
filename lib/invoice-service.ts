@@ -289,14 +289,26 @@ export async function sendBillingDocument(admin: AdminClient, bookingId: string,
   const invoice = await ensureInvoice(admin, booking, paymentUrl, bankTransferOption, force, allowPaymentMethodChange, allowInvoiceAmountChange);
   const claim = await claimDocument(admin, invoice, bookingId, documentType, force);
   if (!claim.claimed) return claim.record.provider_message_id as string | null;
+  // Retain the previous receipt until this attempt is durably sent. A retry,
+  // including a forced resend whose status write failed, uses the same key.
+  const idempotencyKey = `billing-${claim.record.id}-${claim.record.provider_message_id ?? "initial"}`;
+  if (claim.record.status === "sent") {
+    const pending = await admin.from("billing_documents").update({
+      status: "pending", updated_at: new Date().toISOString(),
+    }).eq("id", claim.record.id);
+    if (pending.error) throw new Error(`Billing document pending status update failed: ${pending.error.message}`);
+  }
 
   const { apiKey, from } = emailConfiguration();
   if (!apiKey || !from) throw new Error("Email service is not configured.");
   const details = pdfDetails(documentType, booking, invoice, recipient);
+  if (claim.record.created_at) {
+    details.issuedAt = new Intl.DateTimeFormat("en-AU", { dateStyle: "long", timeZone: "Australia/Melbourne" }).format(new Date(claim.record.created_at));
+  }
   const emailRecipients = invoiceEmailRecipients(booking.email, recipient?.billToEmail);
   const customerName = recipient?.billToName || `${booking.first_name} ${booking.last_name}`;
   const gstInclusive = booking.gst_inclusive !== false;
-  const emailIntro = billingDocumentIntro(documentType, customerName, gstInclusive, force && claim.record.status === "sent");
+  const emailIntro = billingDocumentIntro(documentType, customerName, gstInclusive, Boolean(claim.record.provider_message_id));
   const pdf = await buildInvoicePdf(details);
   const customerPaymentUrl = documentType === "invoice" ? invoice.payment_url : null;
   const bodyText = [
@@ -349,17 +361,19 @@ export async function sendBillingDocument(admin: AdminClient, bookingId: string,
     text: bodyText,
     html: emailHtml,
     attachments: [{ filename: `${documentType}-${invoice.invoice_number}.pdf`, content: pdf.toString("base64") }],
-  });
+  }, { idempotencyKey });
   if (response.error) {
-    await admin.from("billing_documents").update({ status: "failed", updated_at: new Date().toISOString() }).eq("id", claim.record.id);
+    const failed = await admin.from("billing_documents").update({ status: "failed", updated_at: new Date().toISOString() }).eq("id", claim.record.id);
+    if (failed.error) throw new Error(`Billing document email could not be sent; failed status update failed: ${failed.error.message}`);
     throw new Error("Billing document email could not be sent.");
   }
-  await admin.from("billing_documents").update({
+  const sent = await admin.from("billing_documents").update({
     status: "sent",
     provider_message_id: response.data?.id ?? null,
     sent_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }).eq("id", claim.record.id);
+  if (sent.error) throw new Error(`Billing document email was sent but sent status update failed: ${sent.error.message}`);
   try {
     await recordCustomerEmail(admin, {
       bookingId,

@@ -33,6 +33,15 @@ type CartItem = {
   quantity: number;
 };
 
+const cartItemsSchema = z.array(z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  kind: z.enum(["package", "equipment"]),
+  option: z.string().optional(),
+  price: z.number().finite().nonnegative(),
+  quantity: z.number().int().min(1).max(100),
+})).max(100);
+
 type CartContextValue = {
   items: CartItem[];
   addItem: (item: Omit<CartItem, "quantity">) => void;
@@ -93,11 +102,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem(storageKey);
+      const restored = stored ? cartItemsSchema.parse(JSON.parse(stored)) : [];
       startTransition(() => {
-        setItems(stored ? (JSON.parse(stored) as CartItem[]) : []);
+        setItems(restored);
         setHydrated(true);
       });
-    } catch {
+    } catch (error) {
+      console.warn("Could not restore your cart. Please select your hire items again.", error);
       window.localStorage.removeItem(storageKey);
       startTransition(() => setHydrated(true));
     }
@@ -114,7 +125,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const existing = current.find((entry) => entry.id === item.id);
       if (existing) {
         return current.map((entry) =>
-          entry.id === item.id ? { ...entry, quantity: entry.quantity + 1 } : entry,
+          entry.id === item.id ? { ...entry, quantity: Math.min(100, entry.quantity + 1) } : entry,
         );
       }
       return [...current, { ...item, quantity: 1 }];
@@ -123,7 +134,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     updateQuantity: (id, quantity) =>
       setItems((current) =>
         quantity > 0
-          ? current.map((item) => (item.id === id ? { ...item, quantity } : item))
+          ? current.map((item) => (item.id === id ? { ...item, quantity: Math.min(100, quantity) } : item))
           : current.filter((item) => item.id !== id),
       ),
     clearCart: () => {

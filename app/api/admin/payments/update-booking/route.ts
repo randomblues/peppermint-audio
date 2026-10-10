@@ -109,7 +109,7 @@ export async function POST(request: Request) {
   if ("error" in parsedLineItems) return NextResponse.json({ error: parsedLineItems.error }, { status: 400 });
   const hireLineItems: BookingLineItem[] = parsedLineItems.items;
   const securityDepositCents = body.securityDepositAmount === undefined ? null : parseAmountCents(body.securityDepositAmount);
-  if (!lineItemsTotalCents(hireLineItems) || (securityDepositCents !== null && securityDepositCents < 0)) {
+  if (!lineItemsTotalCents(hireLineItems) || (body.securityDepositAmount !== undefined && securityDepositCents === null)) {
     return NextResponse.json({ error: "Add at least one priced hire item and enter a valid security deposit amount." }, { status: 400 });
   }
 
@@ -136,6 +136,13 @@ export async function POST(request: Request) {
 
   try {
     if (body.saveOnly === true) {
+      if (existing.data.payment_method === "stripe_card_hold"
+        && (existing.data.payment_token || existing.data.stripe_hire_payment_intent_id)
+        && JSON.stringify(hireLineItems) !== JSON.stringify(existing.data.hire_line_items)) {
+        return NextResponse.json({
+          error: "This booking has an active card payment request. Use Send invoice to update the hire items and replace the payment link together.",
+        }, { status: 409 });
+      }
       const write = await session.admin.from("bookings").update(update).eq("id", bookingId);
       if (write.error) return NextResponse.json({ error: write.error.message }, { status: 500 });
       return NextResponse.json({ ok: true, bookingId, hireAmountCents });

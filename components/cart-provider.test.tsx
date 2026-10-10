@@ -31,6 +31,27 @@ afterEach(() => {
 });
 
 describe("CartProvider hire dates", () => {
+  it("keeps quantity controls within the persisted and booking validation limit", () => {
+    localStorage.setItem("peppermint-audio-cart", JSON.stringify([{ ...cartItems[0], quantity: 100 }]));
+    render(<CartProvider><CartView /></CartProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "Increase quantity for Standard Party & Events Package" }));
+    expect(screen.getByLabelText("Quantity for Standard Party & Events Package")).toHaveTextContent("100");
+    expect(JSON.parse(localStorage.getItem("peppermint-audio-cart")!)[0].quantity).toBe(100);
+  });
+
+  it.each([
+    "null", "{}", "42", "not-json", '[null]',
+    JSON.stringify([{ ...cartItems[0], quantity: -1 }]),
+    JSON.stringify([{ ...cartItems[0], price: "160" }]),
+  ])("recovers from malformed saved cart data without crashing: %s", async (stored) => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    localStorage.setItem("peppermint-audio-cart", stored);
+    render(<StrictMode><CartProvider><CartView /></CartProvider></StrictMode>);
+    expect(screen.getByText("Your cart is empty")).toBeInTheDocument();
+    expect(warning).toHaveBeenCalled();
+    await waitFor(() => expect(JSON.parse(localStorage.getItem("peppermint-audio-cart")!)).toEqual([]));
+  });
+
   it("restores and persists a single hire range under Strict Mode", async () => {
     const dates = { pickupDate: "2026-10-20", dropoffDate: "2026-10-23" };
     localStorage.setItem(datesKey, JSON.stringify(dates));

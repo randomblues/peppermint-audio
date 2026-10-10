@@ -53,6 +53,18 @@ function wrappedLines(text: string, width: number, size: number, font: Awaited<R
   const lines: string[] = [];
   let line = "";
   for (const word of words) {
+    if (font.widthOfTextAtSize(word, size) > width) {
+      if (line) lines.push(line);
+      line = "";
+      for (const character of word) {
+        if (font.widthOfTextAtSize(line + character, size) > width) {
+          lines.push(line);
+          line = "";
+        }
+        line += character;
+      }
+      continue;
+    }
     const next = line ? `${line} ${word}` : word;
     if (font.widthOfTextAtSize(next, size) > width && line) {
       lines.push(line);
@@ -65,14 +77,10 @@ function wrappedLines(text: string, width: number, size: number, font: Awaited<R
   return lines;
 }
 
-function drawWrapped(page: ReturnType<PDFDocument["addPage"]>, text: string, x: number, y: number, width: number, size: number, font: Awaited<ReturnType<PDFDocument["embedFont"]>>, color = rgb(0.18, 0.2, 0.19)) {
-  const lines = wrappedLines(text, width, size, font);
-  lines.forEach((current, index) => page.drawText(current, { x, y: y - index * (size + 4), size, font, color }));
-  return y - lines.length * (size + 4);
-}
-
 export async function buildInvoicePdf(details: InvoicePdfDetails) {
   const document = await PDFDocument.create();
+  document.setCreationDate(new Date(0));
+  document.setModificationDate(new Date(0));
   let page = document.addPage([pageWidth, pageHeight]);
   const regular = await document.embedFont(StandardFonts.Helvetica);
   const bold = await document.embedFont(StandardFonts.HelveticaBold);
@@ -108,6 +116,18 @@ export async function buildInvoicePdf(details: InvoicePdfDetails) {
     drawFooterRight(`Pickup and return: ${business.pickupSuburb} ${business.pickupPostcode}`, 34, 8, regular, rgb(0.73, 0.83, 0.77));
     drawFooterRight(`Servicing ${business.serviceArea}`, 21, 8, regular, rgb(0.73, 0.83, 0.77));
   };
+  const ensureSpace = (height: number) => {
+    if (y - height >= 104) return;
+    drawFooter(page);
+    page = document.addPage([pageWidth, pageHeight]);
+    y = pageHeight - margin;
+  };
+  const drawItemHeader = () => {
+    page.drawRectangle({ x: margin, y: y - 28, width: pageWidth - margin * 2, height: 28, color: paleGreen });
+    page.drawText("DESCRIPTION", { x: margin + 12, y: y - 16, size: 8, font: bold, color: dark });
+    page.drawText("AMOUNT", { x: pageWidth - margin - 80, y: y - 16, size: 8, font: bold, color: dark });
+    y -= 58;
+  };
 
   page.drawRectangle({ x: 0, y: pageHeight - 112, width: pageWidth, height: 112, color: dark });
   page.drawImage(logo, { x: margin - 9, y: pageHeight - 65, width: logoWidth, height: logoHeight });
@@ -142,21 +162,39 @@ export async function buildInvoicePdf(details: InvoicePdfDetails) {
   page.drawText(pdfText(`Return: ${details.dropoffDate}`), { x: 390, y: y - 51, size: 8, font: regular, color: muted });
   y -= 91;
 
-  page.drawRectangle({ x: margin, y: y - 28, width: pageWidth - margin * 2, height: 28, color: paleGreen });
-  page.drawText("DESCRIPTION", { x: margin + 12, y: y - 16, size: 8, font: bold, color: dark });
-  page.drawText("AMOUNT", { x: pageWidth - margin - 80, y: y - 16, size: 8, font: bold, color: dark });
-  y -= 58;
+  drawItemHeader();
   for (const item of details.lineItems) {
-    page.drawRectangle({ x: margin, y: y - 28, width: pageWidth - margin * 2, height: 42, color: rgb(0.98, 0.99, 0.98) });
-    y = drawWrapped(page, item.description, margin + 12, y, 330, 10, regular, dark);
+    const descriptionLines = wrappedLines(item.description, 330, 10, regular);
+    const trailingHeight = (item.status ? 27 : 14) + 20;
+    if (y - (descriptionLines.length * 14 + trailingHeight) < 104) {
+      ensureSpace(690);
+      drawItemHeader();
+    }
+    let firstSegment = true;
+    while (descriptionLines.length) {
+      const count = Math.max(1, Math.floor((y - 104 - trailingHeight) / 14));
+      const segment = descriptionLines.splice(0, count);
+      const segmentHeight = segment.length * 14;
+      page.drawRectangle({ x: margin, y: y - segmentHeight - 14, width: pageWidth - margin * 2, height: segmentHeight + 28, color: rgb(0.98, 0.99, 0.98) });
+      if (firstSegment) page.drawText(aud(item.amountCents), { x: pageWidth - margin - 80, y, size: 10, font: regular, color: dark });
+      segment.forEach(current => {
+        page.drawText(current, { x: margin + 12, y, size: 10, font: regular, color: dark });
+        y -= 14;
+      });
+      firstSegment = false;
+      if (descriptionLines.length) {
+        ensureSpace(690);
+        drawItemHeader();
+      }
+    }
     if (item.status) page.drawText(pdfText(item.status), { x: margin + 12, y: y + 3, size: 8, font: regular, color: muted });
-    page.drawText(aud(item.amountCents), { x: pageWidth - margin - 80, y: y + 3, size: 10, font: regular, color: dark });
     y -= item.status ? 27 : 14;
     page.drawLine({ start: { x: margin, y }, end: { x: pageWidth - margin, y }, thickness: 0.5, color: line });
     y -= 20;
   }
 
   const summaryAmountX = pageWidth - margin - 80;
+  ensureSpace(68);
   const totalLabel = details.gstIncludedCents && details.gstIncludedCents > 0 ? "TOTAL (INC. GST)" : "TOTAL";
   const totalLabelWidth = bold.widthOfTextAtSize(totalLabel, 10);
   page.drawRectangle({ x: pageWidth - margin - 220, y: y - 38, width: 220, height: 58, color: paleGreen });
@@ -171,6 +209,7 @@ export async function buildInvoicePdf(details: InvoicePdfDetails) {
   y -= details.gstIncludedCents && details.gstIncludedCents > 0 ? 58 : 42;
   if (details.bankTransfer) {
     const paymentHeight = 178;
+    ensureSpace(paymentHeight);
     const paymentTop = y;
     page.drawRectangle({ x: margin, y: paymentTop - paymentHeight, width: pageWidth - margin * 2, height: paymentHeight, color: rgb(0.97, 0.99, 0.98) });
     page.drawRectangle({ x: margin, y: paymentTop - 32, width: pageWidth - margin * 2, height: 32, color: dark });
@@ -194,45 +233,38 @@ export async function buildInvoicePdf(details: InvoicePdfDetails) {
     });
     y = paymentTop - paymentHeight - 18;
   } else {
+    ensureSpace(43 + wrappedLines(details.paymentMethod, pageWidth - margin * 2 - 24, 9, regular).length * 13);
     page.drawRectangle({ x: margin, y: y - 30, width: pageWidth - margin * 2, height: 30, color: paleGreen });
     page.drawText("PAYMENT", { x: margin + 12, y: y - 19, size: 8, font: bold, color: green });
-    y = drawWrapped(page, details.paymentMethod, margin + 12, y - 43, pageWidth - margin * 2 - 24, 9, regular, muted);
+    y -= 43;
+    for (const current of wrappedLines(details.paymentMethod, pageWidth - margin * 2 - 24, 9, regular)) {
+      ensureSpace(13);
+      page.drawText(current, { x: margin + 12, y, size: 9, font: regular, color: muted });
+      y -= 13;
+    }
     y -= 16;
   }
   const paymentNote = details.notes.find((note) => note.startsWith("Pay securely online:"));
   const otherNotes = details.notes.filter((note) => note !== paymentNote);
   const paymentLines = paymentNote ? wrappedLines(paymentNote.replace("Pay securely online: ", ""), pageWidth - margin * 2 - 32, 8, regular) : [];
-  const paymentHeight = paymentNote ? 58 + Math.max(0, paymentLines.length - 1) * 12 : 0;
   const noteWidth = pageWidth - margin * 2 - 28;
-  const noteLineCount = otherNotes.reduce((count, note) => count + wrappedLines(note, noteWidth - 12, 8, regular).length, 0);
-  const notesHeight = otherNotes.length ? 34 + noteLineCount * 12 + Math.max(0, otherNotes.length - 1) * 5 : 0;
-  if (paymentNote || otherNotes.length) {
-    const notesBlockHeight = (paymentNote ? paymentHeight + 12 : 0) + notesHeight;
-    if (y - notesBlockHeight < 104) {
-      drawFooter(page);
-      page = document.addPage([pageWidth, pageHeight]);
-      y = pageHeight - margin;
+  const drawPanel = (heading: string, lines: string[], online = false) => {
+    const topPadding = online ? 48 : 32;
+    while (lines.length) {
+      ensureSpace(Math.min(690, topPadding + lines.length * 12 + 10));
+      const count = Math.max(1, Math.floor((y - 104 - topPadding - 10) / 12));
+      const segment = lines.splice(0, count);
+      const height = topPadding + segment.length * 12 + 10;
+      const top = y;
+      page.drawRectangle({ x: margin, y: top - height, width: pageWidth - margin * 2, height, color: online ? paleGreen : rgb(0.98, 0.99, 0.98) });
+      page.drawText(heading, { x: margin + 14, y: top - 17, size: 8, font: bold, color: green });
+      if (online) page.drawText("Pay securely online", { x: margin + 14, y: top - 34, size: 9, font: bold, color: dark });
+      segment.forEach((current, index) => page.drawText(current, { x: margin + 14, y: top - topPadding - index * 12, size: 8, font: regular, color: muted }));
+      y = top - height - 12;
     }
-  }
-  if (paymentNote) {
-    const paymentUrl = paymentNote.replace("Pay securely online: ", "");
-    const paymentTop = y;
-    page.drawRectangle({ x: margin, y: paymentTop - paymentHeight, width: pageWidth - margin * 2, height: paymentHeight, color: paleGreen });
-    page.drawText("ONLINE PAYMENT", { x: margin + 14, y: paymentTop - 17, size: 8, font: bold, color: green });
-    page.drawText("Pay securely online", { x: margin + 14, y: paymentTop - 34, size: 9, font: bold, color: dark });
-    drawWrapped(page, paymentUrl, margin + 14, paymentTop - 48, pageWidth - margin * 2 - 28, 8, regular, muted);
-    y = paymentTop - paymentHeight - 12;
-  }
-  if (otherNotes.length) {
-    const notesTop = y;
-    page.drawRectangle({ x: margin, y: notesTop - notesHeight, width: pageWidth - margin * 2, height: notesHeight, color: rgb(0.98, 0.99, 0.98) });
-    page.drawText("NOTES", { x: margin + 14, y: notesTop - 17, size: 8, font: bold, color: green });
-    let noteY = notesTop - 32;
-    for (const note of otherNotes) {
-      page.drawText("-", { x: margin + 14, y: noteY, size: 8, font: regular, color: green });
-      noteY = drawWrapped(page, note, margin + 26, noteY, noteWidth - 12, 8, regular, muted) - 5;
-    }
-  }
+  };
+  if (paymentNote) drawPanel("ONLINE PAYMENT", paymentLines, true);
+  if (otherNotes.length) drawPanel("NOTES", otherNotes.flatMap(note => wrappedLines(`- ${note}`, noteWidth, 8, regular)));
 
   drawFooter(page);
   return Buffer.from(await document.save());

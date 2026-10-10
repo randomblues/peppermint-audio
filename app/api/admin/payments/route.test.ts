@@ -506,6 +506,64 @@ describe("admin payment routes", () => {
     expect(mocks.sendInvoiceEmail).not.toHaveBeenCalled();
   });
 
+  it("rejects draft-only changes while a card payment link is active", async () => {
+    const { session, update } = adminSession(revisableBooking({
+      payment_method: "stripe_card_hold", hire_payment_status: "pending",
+      deposit_payment_status: "scheduled", payment_token: "active-token",
+      stripe_hire_payment_intent_id: "pi_hire",
+    }));
+    mocks.requireAdmin.mockResolvedValue(session);
+    const response = await updateBooking(request("/api/admin/payments/update-booking", {
+      bookingId: "booking-original", hireLineItems: [{ ...hireLineItems[0], quantity: 2 }], saveOnly: true,
+    }));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toContain("Use Send invoice");
+    expect(update.update).not.toHaveBeenCalled();
+    expect(mocks.paymentIntentCancel).not.toHaveBeenCalled();
+    expect(mocks.sendInvoiceEmail).not.toHaveBeenCalled();
+  });
+
+  it("allows unchanged items to be saved for an active card request", async () => {
+    const { session, update } = adminSession(revisableBooking({
+      payment_method: "stripe_card_hold", hire_payment_status: "pending",
+      deposit_payment_status: "scheduled", payment_token: "active-token",
+      stripe_hire_payment_intent_id: "pi_hire",
+    }));
+    mocks.requireAdmin.mockResolvedValue(session);
+    const response = await updateBooking(request("/api/admin/payments/update-booking", {
+      bookingId: "booking-original", hireLineItems, saveOnly: true,
+    }));
+    expect(response.status).toBe(200);
+    expect(update.update).toHaveBeenCalled();
+    expect(mocks.paymentIntentCancel).not.toHaveBeenCalled();
+  });
+
+  it.each(["invalid", "-1", "1.001", null])("rejects invalid revised deposit amounts: %s", async (securityDepositAmount) => {
+    const { session, update } = adminSession(revisableBooking());
+    mocks.requireAdmin.mockResolvedValue(session);
+    const response = await updateBooking(request("/api/admin/payments/update-booking", {
+      bookingId: "booking-original", hireLineItems, securityDepositAmount,
+    }));
+    expect(response.status).toBe(400);
+    expect(update.update).not.toHaveBeenCalled();
+    expect(mocks.sendInvoiceEmail).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { hire_payment_status: "bank_transfer_received", deposit_payment_status: "not_required" },
+    { hire_payment_status: "bank_transfer_received", deposit_payment_status: "bank_transfer_refunded" },
+    { hire_payment_status: "bank_transfer_pending", deposit_payment_status: "bank_transfer_received" },
+  ])("does not reset settled bank-transfer payments: %j", async (statuses) => {
+    const { session, update } = adminSession(revisableBooking(statuses));
+    mocks.requireAdmin.mockResolvedValue(session);
+    const response = await createBankTransfer(request("/api/admin/payments/bank-transfer", {
+      bookingId: "booking-original", securityDepositAmount: "100",
+    }));
+    expect(response.status).toBe(409);
+    expect(update.update).not.toHaveBeenCalled();
+    expect(mocks.sendInvoiceEmail).not.toHaveBeenCalled();
+  });
+
   it("ignores missing Stripe intents when revising an existing Stripe booking", async () => {
     const read = {
       select: vi.fn().mockReturnThis(),

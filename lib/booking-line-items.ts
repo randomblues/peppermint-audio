@@ -175,7 +175,8 @@ export function lineItemsFromCart(cartJson: string): BookingLineItem[] {
 }
 
 export function lineItemsForBooking(booking: StoredBooking): BookingLineItem[] {
-  const stored = parseBookingLineItems(booking.hire_line_items);
-  if ("items" in stored && stored.items) return stored.items;
-  return [];
+  if (booking.hire_line_items === null || booking.hire_line_items === undefined) return [];
+  const stored = z.array(bookingLineItemSchema).max(100).safeParse(booking.hire_line_items);
+  if (!stored.success) throw new Error("Stored hire items are invalid.");
+  return stored.data;
 }

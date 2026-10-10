@@ -53,7 +53,7 @@ export function getPickupInstructions(booking: PickupInstructionSource) {
   };
 }
 
-export function buildPickupReminderEmail(booking: PickupReminderBooking) {
+export function buildPickupReminderEmail(booking: PickupReminderBooking, options: { tomorrow?: boolean } = {}) {
   const { hireItems, additionalDetails, transportText } = getPickupInstructions(booking);
   const pickupDate = formatMelbourneDate(booking.pickup_date);
   const pickupTime = booking.pickup_time ? ` at ${booking.pickup_time}` : "";
@@ -65,7 +65,7 @@ export function buildPickupReminderEmail(booking: PickupReminderBooking) {
     ]
     : "";
   const text = [
-    `Hi ${booking.first_name}. Your pickup is tomorrow, ${pickupDate}${pickupTime}.`,
+    `Hi ${booking.first_name}. Your pickup is ${options.tomorrow === false ? "on" : "tomorrow,"} ${pickupDate}${pickupTime}.`,
     "",
     "Here are your pickup details:",
     "Hire items:",
@@ -91,7 +91,7 @@ export function buildPickupReminderEmail(booking: PickupReminderBooking) {
     : "";
   const html = emailLayout({
     eyebrow: "Pickup reminder",
-    title: "Your pickup is tomorrow",
+    title: options.tomorrow === false ? "Your pickup details" : "Your pickup is tomorrow",
     intro: `Hi ${escapeEmailHtml(booking.first_name.trim()) || "there"}, please review the details below for ${escapeEmailHtml(pickupDate)}${escapeEmailHtml(pickupTime)}.`,
     content: `
       ${emailPanel(emailDetailsTable([

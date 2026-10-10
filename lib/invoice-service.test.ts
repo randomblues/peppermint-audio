@@ -11,6 +11,87 @@ import { depositHoldDate, melbourneDateKey } from "./payment-flow";
 
 afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks(); });
 
+describe("billing delivery tracking and retry safety", () => {
+  function setup(status = "pending", providerMessageId: string | null = null) {
+    vi.stubEnv("RESEND_API_KEY", "re_test_placeholder");
+    vi.stubEnv("ENQUIRY_FROM_EMAIL", "test@example.com");
+    mocks.pdf.mockResolvedValue(Buffer.from("test-pdf"));
+    mocks.send.mockResolvedValue({ data: { id: "next-email" }, error: null });
+    const booking = {
+      id: "booking-1", email: "test@example.com", first_name: "Test", last_name: "Customer", event_type: "Party",
+      pickup_date: "2026-10-09", dropoff_date: "2026-10-10",
+      hire_line_items: [catalogLineItemFromKey("package:standard-party-events")],
+      hire_amount_cents: 16000, security_deposit_cents: 10000, payment_method: "cash_on_pickup",
+    };
+    const invoice = {
+      id: "invoice-1", booking_id: booking.id, invoice_number: "PA-TEST", payment_method: "cash_on_pickup",
+      hire_amount_cents: 16000, security_deposit_cents: 10000, total_amount_cents: 26000,
+      gst_inclusive: true, bank_transfer_option: "both", status: "issued",
+    };
+    const document = { id: "doc-1", status, provider_message_id: providerMessageId, created_at: "2026-10-09T00:00:00Z" };
+    let failedStatus: string | undefined;
+    const update = vi.fn((values: typeof document) => ({
+      eq: vi.fn(async () => {
+        if (values.status === failedStatus) return { error: { message: "tracking unavailable" } };
+        Object.assign(document, values);
+        return { error: null };
+      }),
+    }));
+    const query = (data: unknown) => ({
+      select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(),
+      single: vi.fn(async () => ({ data: { ...data as object }, error: null })),
+      maybeSingle: vi.fn(async () => ({ data: { ...data as object }, error: null })), update,
+    });
+    const admin = { from: vi.fn((table: string) => query(table === "bookings" ? booking : table === "invoices" ? invoice : document)) };
+    return { admin, document, failStatus: (value?: string) => { failedStatus = value; } };
+  }
+
+  it("surfaces a failed sent write and reuses the provider key on retry", async () => {
+    const { admin, failStatus } = setup();
+    failStatus("sent");
+    await expect(sendBillingDocument(admin as never, "booking-1", "invoice")).rejects.toThrow("sent status update failed");
+    failStatus();
+    await expect(sendBillingDocument(admin as never, "booking-1", "invoice")).resolves.toBe("next-email");
+    expect(mocks.send.mock.calls.map(call => call[1])).toEqual([
+      { idempotencyKey: "billing-doc-1-initial" }, { idempotencyKey: "billing-doc-1-initial" },
+    ]);
+    expect(mocks.send.mock.calls[0][0]).toEqual(mocks.send.mock.calls[1][0]);
+    await sendBillingDocument(admin as never, "booking-1", "invoice");
+    expect(mocks.send).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives an intentional resend a new key while retaining it across failed persistence", async () => {
+    const { admin, failStatus } = setup("sent", "original-email");
+    failStatus("sent");
+    await expect(sendBillingDocument(admin as never, "booking-1", "invoice", undefined, true)).rejects.toThrow("sent status update failed");
+    failStatus();
+    await sendBillingDocument(admin as never, "booking-1", "invoice", undefined, true);
+    expect(mocks.send.mock.calls.map(call => call[1])).toEqual([
+      { idempotencyKey: "billing-doc-1-original-email" }, { idempotencyKey: "billing-doc-1-original-email" },
+    ]);
+    expect(mocks.send.mock.calls[0][0]).toEqual(mocks.send.mock.calls[1][0]);
+    await sendBillingDocument(admin as never, "booking-1", "invoice", undefined, true);
+    expect(mocks.send.mock.lastCall?.[1]).toEqual({ idempotencyKey: "billing-doc-1-next-email" });
+  });
+
+  it("does not deliver a forced resend when its pending write fails", async () => {
+    const { admin, failStatus } = setup("sent", "original-email");
+    failStatus("pending");
+    await expect(sendBillingDocument(admin as never, "booking-1", "invoice", undefined, true)).rejects.toThrow("pending status update failed");
+    expect(mocks.send).not.toHaveBeenCalled();
+  });
+
+  it("surfaces both delivery and failed-status persistence errors", async () => {
+    const { admin, failStatus } = setup();
+    mocks.send.mockResolvedValue({ data: null, error: { message: "provider rejected" } });
+    failStatus("failed");
+    await expect(sendBillingDocument(admin as never, "booking-1", "invoice")).rejects.toThrow("could not be sent; failed status update failed");
+    failStatus();
+    await expect(sendBillingDocument(admin as never, "booking-1", "invoice")).rejects.toThrow("could not be sent.");
+    expect(mocks.send.mock.lastCall?.[1]).toEqual({ idempotencyKey: "billing-doc-1-initial" });
+  });
+});
+
 describe("billing document email copy", () => {
   it.each([true, false])("a scheduled card deposit is not represented as money received (GST %s)", async gstInclusive => {
     vi.stubEnv("RESEND_API_KEY", "re_test_placeholder");

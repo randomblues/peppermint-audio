@@ -95,6 +95,16 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Mark the hire payment as paid before confirming this booking." }, { status: 409 });
     }
     confirmation = result.data;
+  }
+  const update = {
+    ...(body.status ? { status: body.status } : {}),
+    ...(body.internal_notes !== undefined ? { internal_notes: body.internal_notes } : {}),
+    ...(lineItemUpdate ?? {}),
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await session.admin.from("bookings").update(update).eq("id", body.id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (confirmation) {
     if (!confirmation.confirmation_email_sent) {
       try {
         const providerMessageId = await sendBookingConfirmationEmail(confirmation);
@@ -111,21 +121,13 @@ export async function PATCH(request: Request) {
       } catch (error) {
         console.error("Booking confirmation email failed:", error);
         const message = error instanceof Error ? error.message : "Booking confirmation email could not be sent.";
-        return NextResponse.json({ error: message }, { status: message === "Email service is not configured." ? 500 : 502 });
+        return NextResponse.json({ error: `Booking confirmed, but the confirmation email failed. Use Send confirmation email to retry. ${message}` }, { status: 502 });
       }
+      const tracking = await session.admin.from("bookings")
+        .update({ confirmation_email_sent: true, updated_at: new Date().toISOString() }).eq("id", body.id);
+      if (tracking.error) return NextResponse.json({ error: "Booking confirmed and email sent, but email tracking could not be saved. Refresh before retrying to avoid sending a duplicate." }, { status: 500 });
     }
   }
-  const update = {
-    ...(body.status ? { status: body.status } : {}),
-    ...(body.internal_notes !== undefined ? { internal_notes: body.internal_notes } : {}),
-    ...(lineItemUpdate ?? {}),
-    updated_at: new Date().toISOString(),
-  };
-  if (body.status === "confirmed" && confirmation && !confirmation.confirmation_email_sent) {
-    Object.assign(update, { confirmation_email_sent: true });
-  }
-  const { error } = await session.admin.from("bookings").update(update).eq("id", body.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (body.status === "cancelled") {
     try {
       await releaseCancelledDeferredDeposit(session.admin, body.id);

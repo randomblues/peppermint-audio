@@ -93,6 +93,13 @@ The local stack starts without sample bookings or an administrator account.
 Admin-console testing requires a separately provisioned disposable local admin;
 never use production credentials or customer data for local testing.
 
+For automated browser checks, `POST /api/dev/admin-login` signs in the disposable
+`admin@peppermint.local` account from the owner-only ignored
+`.local-supabase/admin-login.json` file. It requires development mode, local
+Supabase, and a same-origin loopback request; it is unavailable on Vercel and in
+production. It issues the normal HTTP-only auth cookies without returning login
+credentials. The regular admin login form is unchanged.
+
 `npm run dev` and `npm start` inject this worktree's local credentials into Next.js without
 editing `.env.local`. Both server database clients and admin session refresh use
 the same target. Development rejects hosted connections and never falls back to
@@ -188,6 +195,23 @@ Run `supabase/001_booking_management.sql` in the Supabase SQL editor, then creat
 
 The admin bookings view includes a **Send Email** menu with booking confirmation, pickup reminder, custom email, and invoice options. New Stripe payment links remain valid for at least 30 days and through return plus three days. Bank-transfer and cash-on-pickup invoices do not expose customer payment secrets.
 
+When a card payment request is active, use **Send invoice** to change hire items
+and replace the payment link together. Saving changed items alone is rejected so
+the displayed total cannot diverge from the charge. Received payments and processed
+deposits cannot be reset through bank-transfer setup; resend the existing invoice.
+Invalid deposit amounts are rejected rather than retaining an earlier amount.
+
+Booking confirmation saves the confirmed status before sending the customer
+email. If delivery fails, the booking remains confirmed and the admin can retry
+using **Send confirmation email**. Automated pickup reminders exclude cancelled
+and completed bookings. Manual reminders use the actual pickup date without
+assuming tomorrow. Calendar-outcome recording failures are logged independently
+and do not prevent booking-request email attempts.
+
+Invoice PDFs paginate long item lists and payment details above the branded
+footers. Billing delivery tracking errors are surfaced; provider idempotency
+protects retries while allowing deliberate resends.
+
 ## Hire pricing
 
 Catalogue prices are first-night rates. Packages and individual equipment cost the full rate for the first night and 50% of that rate for each additional night (not a compounding discount). Nights are the calendar-date difference between pickup and return, with a one-night minimum for same-day hires; agreed pickup/return times do not change that count.
@@ -197,6 +221,11 @@ For multi-night hires, the cart and booking form highlight the amount saved agai
 The cart collects the event start/end dates and shows the complete hire total as dates or quantities change. In the start-date calendar, customers select the start date and then the end date in the same calendar; completing the range automatically fills the end-date field. Selecting an earlier second date restarts the range, and selecting the start date again completes a same-day hire. The end-date calendar remains available for separate adjustments. These dates are stored with the hire selection and used as the pickup/drop-off dates in the booking request; the booking form only asks for the times, not the dates again. Customers can return to the cart to change their dates. Both dates are required before continuing, and same-day hire uses the one-night rate. The same calculation is used by booking persistence, admin item editing, Stripe, bank-transfer/cash requests, and invoice/receipt line items. Security deposits and admin-added custom line items remain separate flat charges. Per-unit hire totals are rounded to the nearest cent before multiplying by quantity.
 
 The rule and public explanation live in `lib/site-content.ts`; shared calculations live in `lib/booking-line-items.ts`. No database schema change or legacy pricing mode is required.
+
+Persisted booking items retain their agreed names and prices, including retired
+catalogue items. New selections are validated against current catalogue prices.
+Malformed saved carts are reported and cleared so browsing remains usable; item
+quantities are capped at the booking limit of 100.
 
 ## Deferred security-deposit holds
 

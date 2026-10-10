@@ -6,6 +6,18 @@ describe("pickup reminders", () => {
     expect(formatMelbourneDate("2026-09-29")).toBe("29 September 2026");
   });
 
+  it("uses the actual date without tomorrow claims for manual reminders", () => {
+    const email = buildPickupReminderEmail({
+      email: "customer@example.com", first_name: "Alex", last_name: "Lee",
+      event_type: "Meeting", pickup_date: "2026-09-29", pickup_time: "10:00",
+      hire_line_items: [], additional_details: null,
+    }, { tomorrow: false });
+    expect(email.text).toContain("Your pickup is on 29 September 2026 at 10:00");
+    expect(email.text).not.toContain("tomorrow");
+    expect(email.html).not.toContain("tomorrow");
+    expect(email.html).toContain("Your pickup details");
+  });
+
   it("calculates tomorrow in Melbourne across a DST boundary", () => {
     expect(getMelbourneTomorrow(new Date("2026-10-03T16:00:00Z"))).toBe("2026-10-05");
   });

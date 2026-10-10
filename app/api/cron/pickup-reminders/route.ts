@@ -24,6 +24,7 @@ export async function GET(request: Request) {
     .select("id,email,first_name,last_name,event_type,pickup_date,pickup_time,hire_line_items,additional_details")
     .eq("pickup_date", pickupDate)
     .neq("status", "cancelled")
+    .neq("status", "completed")
     .is("reminder_sent_at", null);
   if (result.error) {
     console.error("Pickup reminder booking query failed:", result.error);

@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     pickup_date: getMelbourneTomorrow(),
     hire_line_items: [],
     additional_details: "This is a test email. No booking has been created.",
-  });
+  }, { tomorrow: !booking || booking.pickup_date === getMelbourneTomorrow() });
   const response = await new Resend(apiKey).emails.send({
     from,
     to: [email],

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { bookingHireTotalCents, catalogLineItemFromKey, customBookingLineItem, lineItemHireTotalCents, lineItemsTotalCents } from "./booking-line-items";
+import { bookingHireTotalCents, catalogLineItemFromKey, customBookingLineItem, lineItemHireTotalCents, lineItemsForBooking, lineItemsTotalCents, parseBookingLineItems } from "./booking-line-items";
 
 describe("nightly hire pricing", () => {
   const item = { ...catalogLineItemFromKey("package:speech-presentation-wireless")!, unitPriceCents: 10000 };
@@ -38,5 +38,24 @@ describe("nightly hire pricing", () => {
     for (const nights of [0, -1, 1.5, Number.NaN]) {
       expect(() => lineItemHireTotalCents(item, nights)).toThrow("whole night");
     }
+  });
+
+  it("preserves agreed prices and names when reading stored bookings", () => {
+    const agreed = { ...item, name: "Agreed package", unitPriceCents: 12345, quantity: 2 };
+    expect(lineItemsForBooking({ hire_line_items: [agreed] })).toEqual([agreed]);
+    const intake = parseBookingLineItems([agreed]);
+    expect(intake.items?.[0].unitPriceCents).toBe(catalogLineItemFromKey(agreed.catalogKey!)!.unitPriceCents);
+  });
+
+  it("retains historical items that are no longer in the catalogue", () => {
+    const retired = { ...item, id: "package:retired", catalogKey: "package:retired" };
+    expect(lineItemsForBooking({ hire_line_items: [retired] })).toEqual([retired]);
+    expect(parseBookingLineItems([retired])).toHaveProperty("error");
+  });
+
+  it("allows empty drafts but rejects malformed persisted hire items", () => {
+    expect(lineItemsForBooking({})).toEqual([]);
+    expect(lineItemsForBooking({ hire_line_items: [] })).toEqual([]);
+    expect(() => lineItemsForBooking({ hire_line_items: [{ ...item, quantity: -1 }] })).toThrow("Stored hire items are invalid");
   });
 });

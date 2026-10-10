@@ -82,8 +82,15 @@ describe("POST /api/admin/test-reminder", () => {
     expect(await response.json()).toEqual({ ok: true, id: "email-id" });
     expect(query.select).toHaveBeenCalledWith("email,first_name,last_name,event_type,pickup_date,pickup_time,hire_line_items,additional_details");
     expect(query.eq).toHaveBeenCalledWith("id", "booking-1");
-    expect(buildPickupReminderEmail).toHaveBeenCalledWith(booking);
+    expect(buildPickupReminderEmail).toHaveBeenCalledWith(booking, { tomorrow: true });
     expect(send).toHaveBeenCalledWith(expect.objectContaining({ to: ["booked@example.com"] }));
+  });
+
+  it("uses date-neutral wording for manual reminders not due tomorrow", async () => {
+    const laterBooking = { ...booking, pickup_date: "2026-10-05" };
+    configureLookup({ data: laterBooking, error: null });
+    expect((await POST(request({ bookingId: "booking-1" }))).status).toBe(200);
+    expect(buildPickupReminderEmail).toHaveBeenCalledWith(laterBooking, { tomorrow: false });
   });
 
   it("returns not found when a booking lookup succeeds without data", async () => {
