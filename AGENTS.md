@@ -218,6 +218,7 @@ The focused test command is preferred while iterating; the full suite and build 
 - Vercel Cron invocation may be difficult to verify from the dashboard; use the authorized route and inspect logs carefully.
 - `after()` moves calendar/email work after the booking response; do not assume those side effects have completed when the HTTP response returns.
 - Use one localhost server per task. Before browser validation, check which process owns the target port, stop stale task-owned servers by PID, start one current server, and use one browser tab/URL consistently. Do not alternate between stale `localhost:3000`, `localhost:3001`, `localhost:3002`, or `localhost:3003` tabs.
+- Start development servers and listeners in a managed background session and capture their output in a log so the startup command returns.
 - **Reuse an existing browser tab when the required site or tool is already open. Do not open duplicate tabs or keep piling up browser tabs.**
 - If a browser tab does not reflect an edit, reload it and verify its URL, port, process, and rendered source before changing code again. Do not assume a stale tab proves the implementation is broken.
 - After a required browser check passes, do not repeat the same validation loop unless code or viewport behavior has changed. Report the result and move on.
