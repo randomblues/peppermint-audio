@@ -363,6 +363,13 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Prevention:** Check the active checkout's package scripts before relying on environment-provided setup commands.
 - **Next action:** Use `npm run dev` as the standard local launcher; keep removed setup commands out of maintained project guidance.
 
+### 2026-10-12 — Payment checkout browser test lacked a real link
+
+- **Symptom:** The first browser check showed a missing payment link instead of the consent copy.
+- **Root cause:** The test used a dummy token against the real local API, which correctly returned 404.
+- **Prevention:** Intercept the local payment API with a disposable test response when validating checkout UI, so the actual page renders without creating a real payment link or triggering a charge.
+- **Next action:** Verify the consent text, checkbox interaction, and responsive layout in the integrated browser at the required viewport widths.
+
 # Agent working rules
 
 These rules are mandatory. Safety, preservation of existing work, bounded execution, and truthful verification take priority over speed.
