@@ -370,6 +370,13 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Prevention:** Intercept the local payment API with a disposable test response when validating checkout UI, so the actual page renders without creating a real payment link or triggering a charge.
 - **Next action:** Verify the consent text, checkbox interaction, and responsive layout in the integrated browser at the required viewport widths.
 
+### 2026-10-12 — Google Ads keyword pagination returned stale rows
+
+- **Symptom:** A broad-match audit initially read previous-page keyword rows after the pagination counter had advanced.
+- **Root cause:** The table data refreshed more slowly than the page counter, so rapid page navigation produced stale row results.
+- **Prevention:** Wait for the keyword table itself to finish refreshing before auditing each page; confirm its displayed rows match the current page.
+- **Next action:** Use settled row data for each page when checking keyword status across a paginated Google Ads list.
+
 # Agent working rules
 
 These rules are mandatory. Safety, preservation of existing work, bounded execution, and truthful verification take priority over speed.

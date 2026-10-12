@@ -4,6 +4,8 @@ import { StrictMode } from "react";
 
 import { BookingForm } from "./booking-form";
 
+const mockTrackBookingSubmission = vi.hoisted(() => vi.fn());
+
 const mockCart = vi.hoisted(() => ({
     items: [{ id: "equipment:bose-s1-pro:Single speaker", name: "Bose S1 Pro", kind: "equipment", price: 55, quantity: 1 }],
     hireDates: { pickupDate: "2026-10-20", dropoffDate: "2026-10-23" },
@@ -12,11 +14,15 @@ const mockCart = vi.hoisted(() => ({
 
 vi.mock("@/components/cart-provider", () => ({ useCart: () => mockCart }));
 vi.mock("@/lib/date-utils", () => ({ getMelbourneToday: () => "2026-10-09" }));
+vi.mock("@/lib/google-ads", () => ({
+  trackGoogleAdsBookingSubmission: mockTrackBookingSubmission,
+}));
 
 describe("BookingForm", () => {
   beforeEach(() => {
     mockCart.hireDates = { pickupDate: "2026-10-20", dropoffDate: "2026-10-23" };
     mockCart.clearCart.mockClear();
+    mockTrackBookingSubmission.mockClear();
   });
 
   it("restores contact details under Strict Mode and uses only cart dates", () => {
@@ -114,6 +120,7 @@ describe("BookingForm", () => {
     expect(screen.getByRole("link", { name: "Contact us" })).toHaveAttribute("href", "/contact");
     expect(screen.getByRole("link", { name: "Back to home" })).toHaveAttribute("href", "/");
     expect(mockCart.clearCart).toHaveBeenCalledOnce();
+    expect(mockTrackBookingSubmission).toHaveBeenCalledOnce();
     expect(window.localStorage.getItem("peppermint-audio-booking-draft")).toBeNull();
     expect(fetchMock).toHaveBeenCalledOnce();
   });

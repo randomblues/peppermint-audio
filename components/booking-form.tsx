@@ -20,6 +20,7 @@ import { hireTerms } from "@/lib/site-content";
 import { formatAudCents, rentalDays } from "@/lib/payment-flow";
 import { bookingSchema, type BookingInputValues } from "@/lib/validation/booking";
 import { preparePhotoId } from "@/lib/prepare-photo-id";
+import { trackGoogleAdsBookingSubmission } from "@/lib/google-ads";
 
 const draftKey = "peppermint-audio-booking-draft";
 
@@ -228,6 +229,7 @@ export function BookingForm() {
       const reference = payload?.bookingReference ?? (payload?.bookingId ? bookingReferenceForId(payload.bookingId) : null);
       if (!reference) throw new Error("Your request was submitted, but no booking reference was returned.");
       setSubmitted(reference);
+      trackGoogleAdsBookingSubmission();
       clearCart();
       window.localStorage.removeItem(draftKey);
     } catch (error) {
