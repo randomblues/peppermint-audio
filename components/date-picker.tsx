@@ -188,9 +188,9 @@ export function DatePicker({
             </button>
           </div>
 
-          {onRangeChange ? (
+          {onRangeChange && pendingRangeStart ? (
             <p role="status" className="mt-2 text-center text-xs text-muted-foreground">
-              {pendingRangeStart ? "Select your end date" : "Select your start date, then your end date"}
+              Select your end date
             </p>
           ) : null}
 

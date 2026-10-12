@@ -48,7 +48,7 @@ const bookingSteps = [
   },
   {
     title: "Review your hire",
-    description: "Check your selected items and add any extra setup notes.",
+    description: "Review your selected items and add any additional details or special requests.",
   },
   {
     title: "Photo ID and terms",
@@ -363,8 +363,8 @@ export function BookingForm() {
 
                 <div className="space-y-3">
                   <h3 className="text-base font-semibold">Anything else?</h3>
-                  <Label htmlFor="additionalDetails">Additional details or access requirements <span className="font-normal text-muted-foreground">(optional)</span></Label>
-                  <Textarea id="additionalDetails" value={values.additionalDetails} onChange={(event) => update("additionalDetails", event.target.value)} placeholder="Venue access, setup notes, or special requirements..." className="min-h-28" />
+                  <Label htmlFor="additionalDetails">Additional details or special requests <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                  <Textarea id="additionalDetails" value={values.additionalDetails} onChange={(event) => update("additionalDetails", event.target.value)} placeholder="Share any additional details or special requests for your booking..." className="min-h-28" />
                   {errors.additionalDetails ? <p className="text-xs text-destructive">{errors.additionalDetails}</p> : null}
                 </div>
               </div>

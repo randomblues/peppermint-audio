@@ -326,9 +326,7 @@ function PaymentForm({ data, token, onComplete }: { data: PaymentData; token: st
             },
           }} />
         </div>
-        {requiresDepositConsent && data.securityDepositCents > 0 && !hirePaid ? <label className="flex items-start gap-3 rounded-xl border p-4 text-sm leading-relaxed"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-1 shrink-0" /><span>{immediateDeposit
-          ? `I authorise Peppermint Audio to charge the hire and place a temporary ${formatAudCents(data.securityDepositCents)} security deposit hold as part of this checkout. The hold is released after return unless charges apply under the hire terms.`
-          : `I authorise Peppermint Audio to save my card, charge the hire, and place a temporary ${formatAudCents(data.securityDepositCents)} security deposit hold on ${formatMelbourneDate(data.depositHoldDate!)} (one day before pickup). The hold is released after return unless charges apply under the hire terms.`}</span></label> : null}
+        {requiresDepositConsent && data.securityDepositCents > 0 && !hirePaid ? <label className="flex items-start gap-3 rounded-xl border p-4 text-sm leading-relaxed"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-1 shrink-0" /><span>{`I authorise Peppermint Audio to charge my equipment hire fee of ${formatAudCents(data.hireAmountCents)} and place a separate temporary security deposit hold of ${formatAudCents(data.securityDepositCents)} before the scheduled pickup date.`}</span></label> : null}
       </div>
       {error ? <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">{error}</p> : null}
       <Button type="submit" className="w-full" disabled={processing || !stripe || !elements || (requiresDepositConsent && !hirePaid && !consent && data.securityDepositCents > 0) || (!data.hireClientSecret && !data.depositClientSecret)}>

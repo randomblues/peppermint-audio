@@ -39,7 +39,7 @@ describe("CartView", () => {
     expect(screen.getByText("You save $55.00")).toBeInTheDocument();
     expect(screen.getByText(/Every extra night is 50% off/)).toBeInTheDocument();
     expect(screen.getByText("Your hire dates").closest('[data-slot="card"]')).toHaveClass("overflow-visible");
-    expect(screen.getByRole("button", { name: "Submit a Booking Request" })).toHaveAttribute("href", "/booking");
+    expect(screen.getByRole("button", { name: "Proceed with booking request" })).toHaveAttribute("href", "/booking");
   });
 
   it("offers package and equipment browsing when the cart is empty", () => {
@@ -57,10 +57,10 @@ describe("CartView", () => {
     expect(screen.getByText("$55.00")).toBeInTheDocument();
     expect(screen.getByText("1-night rate")).toBeInTheDocument();
     expect(screen.queryByText(/You save/)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Submit a Booking Request" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Proceed with booking request" })).toBeDisabled();
     mockCart.hireDates = { pickupDate: "2026-10-01", dropoffDate: "2026-10-03" };
     rerender(<CartView />);
-    expect(screen.getByRole("button", { name: "Submit a Booking Request" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Proceed with booking request" })).toBeDisabled();
   });
 
   it("updates period totals with dates and quantities, including same-day hire", () => {
@@ -102,7 +102,7 @@ describe("CartView", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     mockCart.hireDates = { pickupDate: "2026-10-21", dropoffDate: "" };
     rerender(<CartView />);
-    expect(screen.getByRole("button", { name: "Submit a Booking Request" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Proceed with booking request" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "25/10/2026" }));
     expect(mockCart.setHireDates).toHaveBeenLastCalledWith({ pickupDate: "2026-10-21", dropoffDate: "2026-10-25" });
     mockCart.hireDates = { pickupDate: "2026-10-21", dropoffDate: "2026-10-25" };
@@ -111,7 +111,7 @@ describe("CartView", () => {
     expect(screen.getByLabelText("End date")).toHaveTextContent("25 October 2026");
     expect(screen.getByText("4 nights")).toBeInTheDocument();
     expect(screen.getByText("$137.50")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Submit a Booking Request" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Proceed with booking request" })).toBeEnabled();
   });
 
   it("surfaces unavailable items rather than continuing with a partial total", () => {
@@ -119,7 +119,7 @@ describe("CartView", () => {
     render(<CartView />);
     expect(screen.getByRole("alert")).toHaveTextContent("Some selected items are no longer available");
     expect(screen.queryByText(/You save/)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Submit a Booking Request" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Proceed with booking request" })).toBeDisabled();
   });
 
   it("shows the clear-cart animation before clearing", () => {

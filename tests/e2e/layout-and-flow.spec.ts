@@ -72,9 +72,9 @@ test.describe("critical public flow functionality", () => {
 
     await page.goto("/cart", { waitUntil: "domcontentloaded" });
     await expect(page.getByText("Your selected hire", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Submit a Booking Request" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Proceed with booking request" })).toBeVisible();
 
-    await page.getByRole("button", { name: "Submit a Booking Request" }).click();
+    await page.getByRole("button", { name: "Proceed with booking request" }).click();
     await expect(page).toHaveURL(/\/booking$/);
     await expect(page.getByText("Booking details", { exact: true })).toBeVisible();
   });

@@ -179,9 +179,9 @@ export function CartView() {
             <p className="text-sm text-muted-foreground">Availability and final pricing are confirmed before your hire is accepted.</p>
           </div>
           {datesValid && itemsValid ? (
-            <Button className="w-full md:w-auto md:min-w-56" nativeButton={false} render={<Link href="/booking" />}>Submit a Booking Request</Button>
+            <Button className="w-full md:w-auto md:min-w-56" nativeButton={false} render={<Link href="/booking" />}>Proceed with booking request</Button>
           ) : (
-            <Button className="w-full md:w-auto md:min-w-56" disabled>Submit a Booking Request</Button>
+            <Button className="w-full md:w-auto md:min-w-56" disabled>Proceed with booking request</Button>
           )}
         </CardContent>
       </Card>

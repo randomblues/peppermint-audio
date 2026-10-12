@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, Clock3, X } from "lucide-react";
+import { Dialog } from "@base-ui/react/dialog";
+import { ChevronDown, X } from "lucide-react";
+import { useState } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -13,227 +14,194 @@ type TimePickerProps = {
   error?: string;
 };
 
-const minutes = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0"));
-const hours = Array.from({ length: 12 }, (_, index) => String(index + 1));
+type Period = "AM" | "PM";
 
-function parseTime(value: string) {
+function getTimeParts(value: string): { time: string; period: Period } | null {
   const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
-  if (!match) {
-    return { hour: "9", minute: "00", meridiem: "AM" as const };
-  }
+  if (!match) return null;
 
-  const hour24 = Number(match[1]);
+  const hour = Number(match[1]);
   return {
-    hour: String(hour24 % 12 || 12),
-    minute: match[2],
-    meridiem: hour24 >= 12 ? ("PM" as const) : ("AM" as const),
+    time: `${String(hour % 12 || 12).padStart(2, "0")}:${match[2]}`,
+    period: hour < 12 ? "AM" : "PM",
   };
 }
 
-function toTimeValue(hour: string, minute: string, meridiem: "AM" | "PM") {
-  const hour12 = Number(hour) % 12;
-  const hour24 = hour12 + (meridiem === "PM" ? 12 : 0);
-  return `${String(hour24).padStart(2, "0")}:${minute}`;
+function formatTimeLabel(value: string) {
+  const match = /^(1[0-2]|0?[1-9]):([0-5]\d)$/.exec(value);
+  return match ? `${Number(match[1])}:${match[2]}` : "";
 }
 
-function formatTime(value: string) {
-  if (!value) {
-    return "Choose a time";
-  }
+function toStoredTime(value: string, period: Period) {
+  const match = /^(1[0-2]|0?[1-9]):([0-5]\d)$/.exec(value);
+  if (!match) return "";
 
-  const { hour, minute, meridiem } = parseTime(value);
-  return `${hour}:${minute} ${meridiem}`;
+  const hour = Number(match[1]) % 12 + (period === "PM" ? 12 : 0);
+  return `${String(hour).padStart(2, "0")}:${match[2]}`;
 }
+
+const halfHourOptions = Array.from({ length: 24 }, (_, index) => {
+  const totalMinutes = index * 30;
+  const hour = Math.floor(totalMinutes / 60) % 12 || 12;
+  const minute = totalMinutes % 60;
+  const value = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+
+  return { value, label: `${hour}:${String(minute).padStart(2, "0")}` };
+});
 
 export function TimePicker({ id, label, value, onChange, error }: TimePickerProps) {
+  const timeParts = getTimeParts(value);
+  const [emptyPeriod, setEmptyPeriod] = useState<Period>("AM");
   const [open, setOpen] = useState(false);
-  const [popupPosition, setPopupPosition] = useState({ left: 0, width: 0 });
-  const [draft, setDraft] = useState(() => parseTime(value));
-  const pickerRef = useRef<HTMLDivElement>(null);
+  const period = timeParts?.period ?? emptyPeriod;
+  const options = halfHourOptions.some((option) => option.value === timeParts?.time) || !timeParts
+    ? halfHourOptions
+    : [...halfHourOptions, { value: timeParts.time, label: formatTimeLabel(timeParts.time) }]
+      .sort((left, right) => left.value.localeCompare(right.value));
+  const errorId = `${id}-error`;
 
-  useEffect(() => {
-    function handlePointerDown(event: PointerEvent) {
-      if (!pickerRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
+  function handlePeriodChange(nextPeriod: Period) {
+    if (!timeParts) {
+      setEmptyPeriod(nextPeriod);
+      return;
     }
 
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    }
+    onChange(toStoredTime(timeParts.time, nextPeriod));
+  }
 
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, []);
+  function handleTimeChange(time: string) {
+    if (!time) setEmptyPeriod(period);
+    onChange(toStoredTime(time, period));
+  }
 
-  function updateDraft(next: Partial<typeof draft>) {
-    const nextDraft = { ...draft, ...next };
-    setDraft(nextDraft);
-    onChange(toTimeValue(nextDraft.hour, nextDraft.minute, nextDraft.meridiem));
+  function handleTimeSelect(time: string) {
+    onChange(toStoredTime(time, period));
+    setOpen(false);
+  }
+
+  function renderPeriodButtons(location: "mobile" | "dialog") {
+    return (
+      <div
+        role="group"
+        aria-label={`${label} period`}
+        className={cn(
+          location === "dialog"
+            ? "mt-4 grid w-full grid-cols-2 gap-2"
+            : "flex shrink-0 items-center rounded-lg bg-muted/70 p-0.5",
+        )}
+      >
+        {(["AM", "PM"] as const).map((option) => (
+          <button
+            key={option}
+            type="button"
+            data-testid={`${id}-${location}-${option.toLowerCase()}`}
+            aria-label={`${label} ${option}`}
+            aria-pressed={period === option}
+            className={cn(
+              "h-9 min-w-9 rounded-lg border px-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              period === option
+                ? location === "dialog"
+                  ? "w-full border-primary/50 bg-primary/10 text-primary shadow-sm"
+                  : "border-transparent bg-primary text-primary-foreground shadow-sm"
+                : location === "dialog"
+                  ? "w-full border-border/70 bg-background/70 text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => handlePeriodChange(option)}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+    );
   }
 
   return (
-    <div ref={pickerRef} className="relative space-y-1.5">
-      <label htmlFor={id} className="text-sm font-medium leading-none">
-        {label}
-      </label>
-      <button
-        id={`${id}-picker`}
-        type="button"
-        aria-label={label}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        className={cn(
-          "group flex h-12 w-full items-center justify-between rounded-xl border border-border/80 bg-background/70 px-3 text-left text-base outline-none transition-[border-color,background-color,box-shadow] sm:text-sm",
-          "[@media(pointer:coarse)]:hidden",
-          "hover:border-primary/35 hover:bg-background focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
-          value ? "text-foreground" : "text-muted-foreground",
-          open && "border-primary/45 bg-background shadow-[0_0_0_1px_color-mix(in_oklab,var(--primary)_25%,transparent)]",
-          error && "border-destructive ring-3 ring-destructive/20",
-        )}
-        onClick={(event) => {
-          if (!open) {
-            setDraft(parseTime(value));
-            const bounds = event.currentTarget.getBoundingClientRect();
-            const width = Math.min(416, document.documentElement.clientWidth - 16);
-            setPopupPosition({
-              left: Math.max(8, bounds.right - width) - bounds.left,
-              width,
-            });
-          }
-          setOpen((current) => !current);
-        }}
-      >
-        <span className="flex items-center gap-2">
-          <span className="inline-flex size-7 items-center justify-center rounded-md border border-border/80 bg-background/70">
-            <Clock3 className="size-3.5 text-muted-foreground" />
-          </span>
-          {formatTime(value)}
-        </span>
-        <ChevronDown className={cn("size-4 text-muted-foreground transition-transform group-hover:text-foreground", open && "rotate-180")} />
-      </button>
-      <input
-        id={id}
-        type="time"
-        value={value}
-        aria-invalid={Boolean(error)}
-        className={cn(
-          "hidden h-12 w-full rounded-lg border bg-background px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 [@media(pointer:coarse)]:flex sm:text-sm",
-          error && "border-destructive ring-3 ring-destructive/20",
-        )}
-        onChange={(event) => onChange(event.target.value)}
-      />
-
-      {open ? (
+    <div className="space-y-1.5">
+      <p id={`${id}-label`} className="text-sm font-medium leading-none">{label}</p>
+      <Dialog.Root open={open} onOpenChange={setOpen}>
         <div
-          role="dialog"
-          aria-label={`Choose ${label.toLowerCase()}`}
-          style={popupPosition}
-          className="absolute right-0 z-30 mt-2 w-[min(26rem,calc(100vw-1rem))] rounded-2xl border border-primary/20 bg-popover/96 p-4 text-popover-foreground shadow-[0_24px_48px_rgb(0_0_0/0.4)] backdrop-blur-xl [@media(pointer:coarse)]:hidden"
+          className={cn(
+            "flex h-12 w-full min-w-0 items-center rounded-xl border border-border/80 bg-background px-2 transition-colors hover:border-primary/35 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50",
+            error && "border-destructive ring-3 ring-destructive/20",
+          )}
         >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-2.5">
-              <span className="mt-0.5 inline-flex size-8 items-center justify-center rounded-lg border border-primary/30 bg-primary/10">
-                <Clock3 className="size-4 text-primary" />
-              </span>
-              <div>
-                <p className="text-base font-semibold leading-tight">{label}</p>
-                <p className="mt-1 text-xs text-muted-foreground">Choose a preferred time</p>
-              </div>
-            </div>
-            <button
-              type="button"
-              aria-label={`Clear ${label.toLowerCase()}`}
-              className="inline-flex size-8 items-center justify-center rounded-lg border border-border/80 text-muted-foreground hover:border-primary/30 hover:bg-muted hover:text-foreground"
-              onClick={() => {
-                onChange("");
-                setDraft(parseTime(""));
-                setOpen(false);
-              }}
+          <div className="relative min-w-0 flex-1 md:hidden">
+            <select
+              id={id}
+              aria-label={label}
+              value={timeParts?.time ?? ""}
+              aria-invalid={Boolean(error)}
+              aria-describedby={error ? errorId : undefined}
+              className="h-11 w-full min-w-0 appearance-none rounded-l-lg bg-transparent px-2 pr-8 text-base text-foreground outline-none"
+              onChange={(event) => handleTimeChange(event.currentTarget.value)}
             >
-              <X className="size-4" />
-            </button>
+              <option value="">Select time</option>
+              {options.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              aria-hidden="true"
+              className="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            />
           </div>
-
-          <div className="mt-4 rounded-xl border border-border/80 bg-background/55 p-3">
-            <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2 sm:grid-cols-[1fr_auto_1fr_auto]">
-            <label className="space-y-1 text-xs font-medium text-muted-foreground">
-              Hour
-                <span className="relative block">
-                  <select
-                    aria-label={`${label} hour`}
-                    value={draft.hour}
-                    className="h-12 w-full appearance-none rounded-xl border border-primary/25 bg-background px-3 pr-10 text-center text-[2rem] leading-none font-semibold tracking-tight text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                    onChange={(event) => updateDraft({ hour: event.target.value })}
-                  >
-                    {hours.map((hour) => <option key={hour}>{hour}</option>)}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                </span>
-            </label>
-            <span className="pb-3 text-3xl font-semibold text-primary/80">:</span>
-            <label className="space-y-1 text-xs font-medium text-muted-foreground">
-              Minute
-                <span className="relative block">
-                  <select
-                    aria-label={`${label} minute`}
-                    value={draft.minute}
-                    className="h-12 w-full appearance-none rounded-xl border border-primary/25 bg-background px-3 pr-10 text-center text-[2rem] leading-none font-semibold tracking-tight text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                    onChange={(event) => updateDraft({ minute: event.target.value })}
-                  >
-                    {minutes.map((minute) => <option key={minute}>{minute}</option>)}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                </span>
-            </label>
-            <div className="col-span-3 flex h-12 overflow-hidden rounded-xl border border-border/90 bg-background/60 p-0.5 sm:col-span-1">
-              {(["AM", "PM"] as const).map((meridiem) => (
+          <Dialog.Trigger
+            type="button"
+            data-testid={`${id}-desktop-trigger`}
+            aria-label={`${label}, ${timeParts ? `${formatTimeLabel(timeParts.time)} ${timeParts.period}` : "select time"}`}
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? errorId : undefined}
+            className="hidden h-11 min-w-0 flex-1 items-center justify-between rounded-lg px-3 text-left text-base text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring md:flex sm:text-sm"
+          >
+            <span className="truncate">
+              {timeParts ? `${formatTimeLabel(timeParts.time)} ${timeParts.period}` : "Select time"}
+            </span>
+            <ChevronDown aria-hidden="true" className="ml-3 size-4 shrink-0 text-muted-foreground" />
+          </Dialog.Trigger>
+          <div className="md:hidden">
+            {renderPeriodButtons("mobile")}
+          </div>
+        </div>
+        <Dialog.Portal>
+          <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0" />
+          <Dialog.Popup className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[min(92vw,24rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-popover p-4 text-popover-foreground shadow-2xl sm:p-5">
+            <div className="flex items-center justify-between gap-4">
+              <Dialog.Title className="min-w-0 text-base font-semibold">{label}</Dialog.Title>
+              <Dialog.Close
+                aria-label="Close time selection"
+                className="flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <X aria-hidden="true" className="size-4" />
+              </Dialog.Close>
+            </div>
+            {renderPeriodButtons("dialog")}
+            <div
+              data-testid={`${id}-time-options`}
+              className="mt-4 grid max-h-[min(58dvh,32rem)] grid-cols-4 gap-1.5 overflow-y-auto pr-1"
+            >
+              {options.map((option) => (
                 <button
-                  key={meridiem}
+                  key={option.value}
                   type="button"
-                  aria-pressed={draft.meridiem === meridiem}
+                  aria-label={`${label} ${option.label} ${period}`}
+                  aria-pressed={timeParts?.time === option.value}
                   className={cn(
-                    "w-14 flex-1 rounded-[0.625rem] text-sm font-semibold tracking-wide text-muted-foreground transition-colors hover:bg-muted sm:flex-none",
-                    draft.meridiem === meridiem && "bg-primary text-primary-foreground shadow-[0_8px_20px_color-mix(in_oklab,var(--primary)_35%,transparent)] hover:bg-primary/90",
+                    "h-9 rounded-lg border border-border bg-background/70 text-xs font-medium transition-colors hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    timeParts?.time === option.value && "border-primary/60 bg-primary/10 text-primary",
                   )}
-                  onClick={() => updateDraft({ meridiem })}
+                  onClick={() => handleTimeSelect(option.value)}
                 >
-                  {meridiem}
+                  {option.label}
                 </button>
               ))}
             </div>
-          </div>
-          </div>
-
-          <div className="mt-4 flex items-center justify-end gap-2">
-            <button
-              type="button"
-              className="inline-flex h-10 items-center justify-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              onClick={() => setOpen(false)}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="inline-flex h-10 min-w-28 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-              onClick={() => {
-                onChange(toTimeValue(draft.hour, draft.minute, draft.meridiem));
-                setOpen(false);
-              }}
-            >
-              <Check className="size-4" />
-              Done
-            </button>
-          </div>
-        </div>
-      ) : null}
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
+      {error ? <p id={errorId} className="text-xs text-destructive">{error}</p> : null}
     </div>
   );
 }

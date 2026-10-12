@@ -1,82 +1,76 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { TimePicker } from "./time-picker";
 
-function ControlledTimePicker({ onChange }: { onChange: (value: string) => void }) {
-  const [value, setValue] = useState("");
-  return (
-    <TimePicker
-      id="pickup-time"
-      label="Pickup time"
-      value={value}
-      onChange={(nextValue) => {
-        setValue(nextValue);
-        onChange(nextValue);
-      }}
-    />
-  );
-}
-
 describe("TimePicker", () => {
-  it("keeps a wide popup inside a narrow viewport", () => {
-    const viewport = vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(360);
-    render(<ControlledTimePicker onChange={vi.fn()} />);
-    const trigger = screen.getByRole("button", { name: "Pickup time" });
-    const bounds = vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue({
-      x: 64, y: 400, left: 64, right: 296, top: 400, bottom: 448, width: 232, height: 48,
-      toJSON: () => ({}),
-    });
-    fireEvent.click(trigger);
-    expect(screen.getByRole("dialog")).toHaveStyle({ left: "-56px", width: "344px" });
-    expect(screen.getByRole("button", { name: "AM" }).parentElement).toHaveClass("col-span-3", "sm:col-span-1");
-    bounds.mockRestore();
-    viewport.mockRestore();
-  });
-
-  it("sets a time with the segmented controls", () => {
+  it("uses a native dropdown with 30-minute options and a separate AM/PM switch", () => {
     const onChange = vi.fn();
-    render(<ControlledTimePicker onChange={onChange} />);
-
-    expect(screen.getByRole("button", { name: /Pickup time/ })).toHaveClass(
-      "[@media(pointer:coarse)]:hidden",
+    const { rerender } = render(
+      <TimePicker id="pickup-time" label="Pickup time" value="" onChange={onChange} />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /Pickup time/ }));
+
+    const select = screen.getByRole("combobox", { name: "Pickup time" });
+    expect(select).toHaveValue("");
+    expect(select).toHaveDisplayValue("Select time");
+    expect(screen.getAllByRole("option")).toHaveLength(25);
+    expect(screen.getByRole("option", { name: "12:00" })).toHaveValue("12:00");
+    expect(screen.getByRole("option", { name: "11:30" })).toHaveValue("11:30");
+    expect(screen.queryByRole("option", { name: "11:45" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Pickup time PM" }));
+    fireEvent.change(select, { target: { value: "03:00" } });
+    expect(onChange).toHaveBeenLastCalledWith("15:00");
+    rerender(<TimePicker id="pickup-time" label="Pickup time" value="15:00" onChange={onChange} />);
+    expect(screen.getByRole("combobox", { name: "Pickup time" })).toHaveValue("03:00");
+    expect(screen.getByRole("button", { name: "Pickup time PM" })).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Pickup time AM" }));
+    expect(onChange).toHaveBeenLastCalledWith("03:00");
+  });
+
+  it("opens a compact desktop modal without helper text and applies time selections immediately", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <TimePicker id="pickup-time" label="Pickup time" value="09:30" onChange={onChange} />,
+    );
+
+    fireEvent.click(screen.getByTestId("pickup-time-desktop-trigger"));
     const dialog = screen.getByRole("dialog");
-    fireEvent.change(within(dialog).getByLabelText("Pickup time hour"), { target: { value: "10" } });
-    fireEvent.change(within(dialog).getByLabelText("Pickup time minute"), { target: { value: "30" } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "PM" }));
-    expect(onChange).toHaveBeenLastCalledWith("22:30");
-    expect(screen.getByRole("button", { name: /Pickup time/ })).toHaveTextContent("10:30 PM");
+    expect(within(screen.getByTestId("pickup-time-time-options")).getAllByRole("button")).toHaveLength(24);
+    expect(within(dialog).queryByText("Choose a time in 15-minute steps.")).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: /save|cancel/i })).not.toBeInTheDocument();
 
+    fireEvent.click(within(dialog).getByRole("button", { name: "Pickup time PM" }));
+    expect(onChange).toHaveBeenLastCalledWith("21:30");
+    rerender(<TimePicker id="pickup-time" label="Pickup time" value="21:30" onChange={onChange} />);
+
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Pickup time 3:00 PM" }));
+    expect(onChange).toHaveBeenLastCalledWith("15:00");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("reflects controlled changes from the native time input", () => {
-    const onChange = vi.fn();
-    const view = render(<ControlledTimePicker onChange={onChange} />);
-
-    fireEvent.change(view.container.querySelector('input[type="time"]')!, { target: { value: "14:45" } });
-    expect(onChange).toHaveBeenLastCalledWith("14:45");
+  it("keeps existing times between half-hour options selectable", () => {
+    render(<TimePicker id="pickup-time" label="Pickup time" value="10:07" onChange={vi.fn()} />);
+    const select = screen.getByRole("combobox", { name: "Pickup time" });
+    expect(select).toHaveValue("10:07");
+    expect(select).toHaveDisplayValue("10:07");
+    expect(screen.getAllByRole("option")).toHaveLength(26);
   });
 
-  it("clears a selected time", () => {
+  it("applies a period selected before choosing a time", () => {
     const onChange = vi.fn();
-    render(<TimePicker id="pickup-time" label="Pickup time" value="10:00" onChange={onChange} />);
-
-    fireEvent.click(screen.getByRole("button", { name: /Pickup time/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Clear pickup time" }));
-    expect(onChange).toHaveBeenLastCalledWith("");
+    render(<TimePicker id="pickup-time" label="Pickup time" value="" onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "Pickup time PM" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Pickup time" }), { target: { value: "03:00" } });
+    expect(onChange).toHaveBeenLastCalledWith("15:00");
   });
 
-  it("commits the default draft when Done is pressed immediately", () => {
-    const onChange = vi.fn();
-    render(<ControlledTimePicker onChange={onChange} />);
+  it("shows validation errors on the dropdown", () => {
+    render(<TimePicker id="pickup-time" label="Pickup time" value="" onChange={vi.fn()} error="Enter a pickup time." />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Pickup time/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Done" }));
-
-    expect(onChange).toHaveBeenLastCalledWith("09:00");
-    expect(screen.getByRole("button", { name: /Pickup time/ })).toHaveTextContent("9:00 AM");
+    expect(screen.getByRole("combobox", { name: "Pickup time" })).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("combobox", { name: "Pickup time" })).toHaveAttribute("aria-describedby", "pickup-time-error");
+    expect(screen.getByText("Enter a pickup time.")).toBeInTheDocument();
   });
 });

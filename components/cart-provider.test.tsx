@@ -96,7 +96,7 @@ describe("CartProvider hire dates", () => {
     expect(screen.getByText(/Pickup: 20 October 2026/)).toBeInTheDocument();
     expect(screen.getByText("$860.00")).toBeInTheDocument();
     expect(screen.queryByLabelText("Pickup date")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Pickup time/ })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Pickup time" })).toHaveValue("10:00");
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("button", { name: "Next" }));

@@ -119,6 +119,7 @@ describe("billing document email copy", () => {
     expect(mocks.send.mock.lastCall?.[0].text).not.toContain("https://example.com/pay/token");
     expect(mocks.pdf).toHaveBeenCalledWith(expect.objectContaining({
       totalCents: 16000,
+      lineItems: expect.arrayContaining([expect.objectContaining({ status: "Paid" })]),
       notes: expect.arrayContaining(["This receipt confirms the hire payment only. The security deposit has not yet been authorised."]),
     }));
     await sendBillingDocument(admin as never, booking.id, "invoice");

@@ -216,7 +216,7 @@ function pdfDetails(documentType: BillingDocumentType, booking: InvoiceBooking, 
     : undefined;
   if (documentType === "payment_receipt") {
     if (invoice.payment_method === "stripe_card_hold") {
-      lineItems = [...hireLineItems.map((item) => formatLineItem(item, "Paid and captured")), { description: "Refundable security deposit", amountCents: deposit, status: booking.deposit_payment_status === "authorized" ? "Authorised, not captured" : "Pending authorisation" }];
+      lineItems = [...hireLineItems.map((item) => formatLineItem(item, "Paid")), { description: "Refundable security deposit", amountCents: deposit, status: booking.deposit_payment_status === "authorized" ? "Authorised, not captured" : "Pending authorisation" }];
       totalCents = hire;
       notes.unshift(booking.deposit_payment_status === "authorized"
         ? "This receipt confirms the hire payment. The security deposit is a separate temporary card hold, not an additional payment."

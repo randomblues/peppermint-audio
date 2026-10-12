@@ -49,8 +49,10 @@ describe("BookingForm", () => {
     expect(screen.queryByRole("button", { name: "23 October 2026" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Change dates" })).toHaveAttribute("href", "/cart");
     expect(screen.getByText(/Pickup: 20 October 2026/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Pickup time/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Drop-off time/ })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Pickup time" })).toHaveValue("10:00");
+    expect(screen.getByRole("combobox", { name: "Pickup time" })).toHaveDisplayValue("10:00");
+    expect(screen.getByRole("combobox", { name: "Drop-off time" })).toHaveValue("12:00");
+    expect(screen.getByRole("combobox", { name: "Drop-off time" })).toHaveDisplayValue("12:00");
     mockCart.hireDates.dropoffDate = "2026-10-21";
     rerender(<BookingForm />);
     expect(screen.getByText("Hire total · 1 night")).toBeInTheDocument();
@@ -58,6 +60,24 @@ describe("BookingForm", () => {
     expect(screen.queryByText(/You save/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByText("$55.00 each / night")).toBeInTheDocument();
+  });
+
+  it("keeps extra-details copy neutral about the pickup-and-drop-off hire", () => {
+    window.localStorage.setItem("peppermint-audio-booking-draft", JSON.stringify({
+      firstName: "Alex", lastName: "Smith", email: "alex@example.com", mobile: "0412345678",
+      eventType: "Party", eventAddress: "1 Example Street", pickupTime: "10:00", dropoffTime: "12:00",
+    }));
+    render(<BookingForm />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+    expect(screen.getByText("Review your selected items and add any additional details or special requests.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Additional details or special requests (optional)")).toHaveAttribute(
+      "placeholder",
+      "Share any additional details or special requests for your booking...",
+    );
+    expect(screen.queryByText(/venue access|access requirements|setup notes/i)).not.toBeInTheDocument();
   });
 
   afterEach(() => {

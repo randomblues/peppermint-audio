@@ -9,7 +9,7 @@ describe("DatePicker", () => {
     const onBlur = vi.fn();
     render(<DatePicker id="start" value="2026-10-15" onChange={onChange} onRangeChange={onRangeChange} onBlur={onBlur} />);
     fireEvent.click(screen.getByRole("button", { name: "15 October 2026" }));
-    expect(screen.getByRole("status")).toHaveTextContent("Select your start date, then your end date");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "30/10/2026" }));
     expect(onChange).toHaveBeenCalledWith("2026-10-30");
     expect(onBlur).not.toHaveBeenCalled();
@@ -51,14 +51,14 @@ describe("DatePicker", () => {
     fireEvent.click(screen.getByRole("button", { name: "20/10/2026" }));
     fireEvent.pointerDown(screen.getByRole("button", { name: "Outside" }));
     fireEvent.click(trigger);
-    expect(screen.getByRole("status")).toHaveTextContent("Select your start date, then your end date");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "22/10/2026" }));
     expect(onRangeChange).not.toHaveBeenCalled();
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
     fireEvent.click(trigger);
-    expect(screen.getByRole("status")).toHaveTextContent("Select your start date, then your end date");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("opens, changes month, and returns the selected date", () => {

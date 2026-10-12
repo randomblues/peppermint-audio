@@ -77,7 +77,7 @@ describe("PaymentCheckout", () => {
     expect(screen.getByText("Your $100.00 security deposit is a temporary card authorisation scheduled for 8 November 2099.").textContent).toContain("8\u00a0November\u00a02099");
     expect(screen.queryByText(/\b(?<!security )deposit\b/i)).not.toBeInTheDocument();
     expect(screen.getByRole("checkbox").parentElement).toHaveTextContent(
-      /security deposit hold on 8 November 2099 \(one day before pickup\)\. The hold is released after return unless charges apply under the hire terms\./,
+      "I authorise Peppermint Audio to charge my equipment hire fee of $110.00 and place a separate temporary security deposit hold of $100.00 before the scheduled pickup date.",
     );
     fireEvent.click(screen.getByRole("checkbox"));
     expect(pay).toBeEnabled();
@@ -182,7 +182,7 @@ describe("PaymentCheckout", () => {
     expect(screen.getByText("Total due today").parentElement?.parentElement?.nextElementSibling).toBeNull();
     expect(screen.getByText("Your $100.00 security deposit is a temporary card authorisation that will be placed as part of today's checkout.")).toBeInTheDocument();
     expect(screen.getByRole("checkbox").parentElement).toHaveTextContent(
-      /charge the hire and place a temporary \$100\.00 security deposit hold as part of this checkout\./,
+      "I authorise Peppermint Audio to charge my equipment hire fee of $110.00 and place a separate temporary security deposit hold of $100.00 before the scheduled pickup date.",
     );
     fireEvent.click(screen.getByRole("checkbox"));
     fireEvent.click(pay);
