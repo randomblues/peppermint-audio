@@ -49,7 +49,8 @@ describe("AdminPaymentPanel", () => {
       dropoff_date: "2026-10-04",
       hire_line_items: [catalogLineItemFromKey("equipment:bose-s1-pro:Single speaker")!, ...lineItems],
     })} onChanged={vi.fn()} />);
-    expect(screen.getAllByText("$210.00")).toHaveLength(2);
+    expect(screen.getByText("$210.00")).toBeInTheDocument();
+    expect(screen.getByText("$410.00")).toBeInTheDocument();
     expect(screen.getByText(/3 nights.*Every additional night half price/)).toBeInTheDocument();
     expect(screen.getByText("$55.00 each / night")).toBeInTheDocument();
     expect(screen.getByText("$100.00 each (flat charge)")).toBeInTheDocument();
@@ -136,6 +137,23 @@ describe("AdminPaymentPanel", () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/payments/bank-transfer", expect.objectContaining({
       body: JSON.stringify({ bookingId: "booking-1", securityDepositAmount: "100", gstInclusive: true, bankTransferOption: "payid" }),
+    })));
+  });
+
+  it("uses the default $200 security deposit when sending bank transfer details", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ reference: "PA-BOOKING1", hireAmountCents: 10000, securityDepositCents: 20000 }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AdminPaymentPanel booking={booking()} onChanged={vi.fn()} />);
+
+    expect(screen.getByLabelText("Security deposit amount")).toHaveValue("200");
+    fireEvent.click(screen.getByRole("radio", { name: /Bank transfer/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Send invoice" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/payments/bank-transfer", expect.objectContaining({
+      body: JSON.stringify({ bookingId: "booking-1", securityDepositAmount: "200", gstInclusive: true, bankTransferOption: "both" }),
     })));
   });
 

@@ -1,10 +1,14 @@
 export const bookingStatuses = ["submitted", "confirmed", "completed", "cancelled"] as const;
-type BookingStatus = (typeof bookingStatuses)[number];
+export type BookingStatus = (typeof bookingStatuses)[number];
 
 type DashboardBooking = {
   pickup_date?: string | null;
   status?: string | null;
 };
+
+export function activeBookings<T extends DashboardBooking>(bookings: T[]): T[] {
+  return bookings.filter((booking) => booking.status === "submitted" || booking.status === "confirmed");
+}
 
 export function filterBookings<T extends DashboardBooking>(
   bookings: T[],

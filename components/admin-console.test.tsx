@@ -79,20 +79,45 @@ describe("AdminConsole", () => {
     resolve(jsonResponse({ bookings: [booking] }));
     expect(await screen.findByText("Alex Smith")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Go to Peppermint Audio home" })).toHaveAttribute("href", "/");
-    expect(fetchMock).toHaveBeenCalledWith("/api/admin/bookings?", { cache: "no-store" });
+    expect(fetchMock).toHaveBeenCalledWith("/api/admin/bookings?all=true", { cache: "no-store" });
   });
 
-  it("sends search and status filters and updates the visible list", async () => {
+  it("applies search and status filters locally without narrowing the shared data", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ bookings: [booking] }));
     vi.stubGlobal("fetch", fetchMock);
     render(<AdminConsole />);
     await screen.findByText("Alex Smith");
 
     fireEvent.change(screen.getByLabelText("Search bookings"), { target: { value: "Alex" } });
-    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith("/api/admin/bookings?search=Alex", { cache: "no-store" }));
-    fireEvent.change(screen.getByLabelText("Filter by status"), { target: { value: "confirmed" } });
-    await waitFor(() => expect(screen.getByText("No bookings match these filters")).toBeInTheDocument());
-    expect(fetchMock).toHaveBeenLastCalledWith("/api/admin/bookings?search=Alex&status=confirmed", { cache: "no-store" });
+    fireEvent.change(screen.getByLabelText("Search bookings"), { target: { value: "No matching customer" } });
+    expect(screen.getByText("No bookings match these filters")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("includes additional selected statuses in Bookings and keeps Analytics defaults separate", async () => {
+    const completedBooking = { ...booking, id: "completed", first_name: "Jamie", last_name: "Jones", status: "completed" };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ bookings: [booking, completedBooking, { ...booking, id: "cancelled", first_name: "Casey", status: "cancelled" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AdminConsole />);
+
+    expect(await screen.findByText("Alex Smith")).toBeInTheDocument();
+    expect(screen.queryByText("Jamie Jones")).not.toBeInTheDocument();
+    expect(screen.queryByText("Casey Smith")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Completed" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Cancelled" }));
+    expect(screen.getByText("Jamie Jones")).toBeInTheDocument();
+    expect(screen.getByText("Casey Smith")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "Analytics" }));
+    expect(screen.getByRole("heading", { name: "Business performance" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Reporting period")).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Booking list" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "Bookings" }));
+    expect(screen.getByRole("checkbox", { name: "Cancelled" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Completed" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Submitted" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Confirmed" })).toBeChecked();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("searches email history by booking and opens the selected booking history", async () => {
@@ -252,8 +277,8 @@ describe("AdminConsole", () => {
     fireEvent.click(screen.getByRole("link", { name: "Archive export" }));
     expect(screen.getByRole("heading", { name: "Archive export" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: "Back to bookings" }));
-    expect(screen.getByRole("heading", { name: "Bookings overview" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    expect(screen.getByRole("heading", { name: "Bookings", level: 1 })).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: "Sign out" })[0]);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/logout", { method: "POST" }));
     expect(replace).toHaveBeenCalledWith("/admin/login");
   });

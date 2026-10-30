@@ -377,6 +377,13 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Prevention:** Wait for the keyword table itself to finish refreshing before auditing each page; confirm its displayed rows match the current page.
 - **Next action:** Use settled row data for each page when checking keyword status across a paginated Google Ads list.
 
+### 2026-10-30 — Optional Stripe forwarding blocked local UI startup
+
+- **Symptom:** The local app failed to start after the local database became healthy because Stripe CLI forwarding could not reach its OAuth endpoint through the proxy.
+- **Root cause:** Local Stripe webhook forwarding was enabled even though the UI validation did not involve Stripe webhooks.
+- **Prevention:** For local checks unrelated to Stripe webhooks, start the app with `LOCAL_STRIPE_WEBHOOKS=false`; enable forwarding only when webhook testing is intended and Stripe CLI authentication is available.
+- **Next action:** Keep unrelated local browser validation on the local Supabase stack without optional Stripe forwarding.
+
 # Agent working rules
 
 These rules are mandatory. Safety, preservation of existing work, bounded execution, and truthful verification take priority over speed.

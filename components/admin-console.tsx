@@ -1,18 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ComponentType, ReactNode } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Archive, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Clock3, CreditCard, Download, FileSpreadsheet,
-  ExternalLink, FileText, LayoutDashboard, LogOut, Mail, Menu, RefreshCw,
-  Search, ShieldCheck, UserRound, X, XCircle,
+  Archive, BarChart3, ChevronDown, ChevronRight, CreditCard, Download, FileSpreadsheet,
+  ExternalLink, LayoutDashboard, LogOut, Mail, Menu, RefreshCw,
+  Search, ShieldCheck, UserRound, X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { bookingStatuses, filterBookings, isUpcoming, statusCounts } from "@/lib/admin-dashboard";
+import { bookingStatuses } from "@/lib/admin-dashboard";
+import { AdminBookingsWorkspace } from "@/components/admin-bookings-workspace";
+import { AdminBusinessAnalytics } from "@/components/admin-business-analytics";
 import { buildBookingConfirmationEmail } from "@/lib/booking-confirmation-email";
 import { bookingReferenceForId } from "@/lib/booking-reference";
 import { lineItemHireTotalCents, lineItemsForBooking, lineItemsTotalCents } from "@/lib/booking-line-items";
@@ -136,17 +138,12 @@ async function responseError(response: Response, fallback: string) {
     return fallback;
   }
 }
-type SummaryCard = { key: string; label: string; icon: ComponentType<{ className?: string }>; color: string; count: number };
-type AdminSection = "bookings" | "email-history" | "tax-report" | "archive";
+type AdminSection = "bookings" | "analytics" | "email-history" | "tax-report" | "archive";
 
 export function AdminConsole() {
   const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [selected, setSelected] = useState<Booking | null>(null);
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
   const [emailHistorySearch, setEmailHistorySearch] = useState("");
   const [range, setRange] = useState({ from: "", to: "" });
   const [loading, setLoading] = useState(true);
@@ -166,8 +163,7 @@ export function AdminConsole() {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const query = new URLSearchParams({ ...(search ? { search } : {}), ...(status ? { status } : {}) });
-      const response = await fetch(`/api/admin/bookings?${query}`, { cache: "no-store" });
+      const response = await fetch("/api/admin/bookings?all=true", { cache: "no-store" });
       if (response.status === 401) {
         router.replace("/admin/login");
         return;
@@ -177,7 +173,7 @@ export function AdminConsole() {
       setBookings(data.bookings ?? []); setLastUpdated(new Date());
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not load bookings."); }
     finally { setLoading(false); }
-  }, [router, search, status]);
+  }, [router]);
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
@@ -185,7 +181,7 @@ export function AdminConsole() {
   useEffect(() => {
     const syncSection = () => {
       const hash = window.location.hash;
-      setSection(hash === "#archive" ? "archive" : hash === "#tax-report" ? "tax-report" : hash === "#email-history" ? "email-history" : "bookings");
+      setSection(hash === "#archive" ? "archive" : hash === "#tax-report" ? "tax-report" : hash === "#email-history" ? "email-history" : ["#analytics", "#all-bookings", "#historical-bookings"].includes(hash) ? "analytics" : "bookings");
       setMessage("");
     };
     syncSection();
@@ -198,9 +194,6 @@ export function AdminConsole() {
     return () => window.clearTimeout(timer);
   }, [message, messageType]);
 
-  const visibleBookings = useMemo(() => filterBookings(bookings, { status, from: dateFrom, to: dateTo }), [bookings, status, dateFrom, dateTo]);
-  const counts = useMemo(() => statusCounts(bookings), [bookings]);
-  const upcomingCount = useMemo(() => bookings.filter((booking) => isUpcoming(booking)).length, [bookings]);
   const filteredEmailHistoryBookings = useMemo(() => {
     const query = emailHistorySearch.trim().toLowerCase();
     if (!query) return bookings;
@@ -271,28 +264,30 @@ export function AdminConsole() {
     setMessage("");
     window.history.replaceState(null, "", `#${nextSection}`);
   }
-  const sectionHeading = section === "archive" ? "Archive export" : section === "tax-report" ? "Tax" : section === "email-history" ? "Email history" : "Booking management";
-  const sectionDescription = section === "archive" ? "Securely download booking records" : section === "tax-report" ? "Prepare tax figures and records" : section === "email-history" ? "Search customer email delivery records" : "Keep every event moving smoothly";
+  const sectionHeading = section === "analytics" ? "Analytics" : section === "archive" ? "Archive export" : section === "tax-report" ? "Tax" : section === "email-history" ? "Email history" : "Bookings";
+  const sectionDescription = section === "analytics" ? "Insights across all your bookings" : section === "archive" ? "Securely download booking records" : section === "tax-report" ? "Prepare tax figures and records" : section === "email-history" ? "Search customer email delivery records" : "Keep every event moving smoothly";
 
   return (
     <div className="admin-console-shell min-h-screen bg-muted/30">
       <AdminErrorDialog message={messageType === "error" ? message : ""} onClose={() => setMessage("")} />
       <aside className={`admin-console-sidebar fixed inset-y-0 left-0 z-30 w-64 border-r bg-card p-5 transition-transform md:translate-x-0 ${mobileNav ? "translate-x-0" : "-translate-x-full"}`}>
         <Link href="/" aria-label="Go to Peppermint Audio home" className="flex items-center gap-3 border-b pb-6"><div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground"><ShieldCheck className="size-5" /></div><div><p className="font-semibold">Peppermint Audio</p><p className="text-xs text-muted-foreground">Operations console</p></div></Link>
-        <nav className="mt-6 space-y-1" aria-label="Admin sections"><a className={`admin-console-nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${section === "bookings" ? "bg-primary/10 text-primary shadow-[inset_3px_0_0_var(--primary)]" : "text-muted-foreground hover:bg-muted"}`} href="#bookings" aria-current={section === "bookings" ? "page" : undefined} onClick={(event) => navigateSection("bookings", event)}><LayoutDashboard className="size-4" />Bookings</a><a className={`admin-console-nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${section === "email-history" ? "bg-primary/10 text-primary shadow-[inset_3px_0_0_var(--primary)]" : "text-muted-foreground hover:bg-muted"}`} href="#email-history" aria-current={section === "email-history" ? "page" : undefined} onClick={(event) => navigateSection("email-history", event)}><Mail className="size-4" />Email history</a><a className={`admin-console-nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${section === "tax-report" ? "bg-primary/10 text-primary shadow-[inset_3px_0_0_var(--primary)]" : "text-muted-foreground hover:bg-muted"}`} href="#tax-report" aria-current={section === "tax-report" ? "page" : undefined} onClick={(event) => navigateSection("tax-report", event)}><FileSpreadsheet className="size-4" />Tax</a><a className={`admin-console-nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${section === "archive" ? "bg-primary/10 text-primary shadow-[inset_3px_0_0_var(--primary)]" : "text-muted-foreground hover:bg-muted"}`} href="#archive" aria-current={section === "archive" ? "page" : undefined} onClick={(event) => navigateSection("archive", event)}><Archive className="size-4" />Archive export</a></nav>
+        <nav className="mt-6 space-y-1" aria-label="Admin sections">
+          <a className={`admin-console-nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${section === "bookings" ? "bg-primary/10 text-primary shadow-[inset_3px_0_0_var(--primary)]" : "text-muted-foreground hover:bg-muted"}`} href="#bookings" aria-current={section === "bookings" ? "page" : undefined} onClick={(event) => navigateSection("bookings", event)}><LayoutDashboard className="size-4" />Bookings</a>
+          <a className={`admin-console-nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${section === "analytics" ? "bg-primary/10 text-primary shadow-[inset_3px_0_0_var(--primary)]" : "text-muted-foreground hover:bg-muted"}`} href="#analytics" aria-current={section === "analytics" ? "page" : undefined} onClick={(event) => navigateSection("analytics", event)}><BarChart3 className="size-4" />Analytics</a>
+          <a className={`admin-console-nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${section === "email-history" ? "bg-primary/10 text-primary shadow-[inset_3px_0_0_var(--primary)]" : "text-muted-foreground hover:bg-muted"}`} href="#email-history" aria-current={section === "email-history" ? "page" : undefined} onClick={(event) => navigateSection("email-history", event)}><Mail className="size-4" />Email history</a>
+          <a className={`admin-console-nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${section === "tax-report" ? "bg-primary/10 text-primary shadow-[inset_3px_0_0_var(--primary)]" : "text-muted-foreground hover:bg-muted"}`} href="#tax-report" aria-current={section === "tax-report" ? "page" : undefined} onClick={(event) => navigateSection("tax-report", event)}><FileSpreadsheet className="size-4" />Tax</a>
+          <a className={`admin-console-nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${section === "archive" ? "bg-primary/10 text-primary shadow-[inset_3px_0_0_var(--primary)]" : "text-muted-foreground hover:bg-muted"}`} href="#archive" aria-current={section === "archive" ? "page" : undefined} onClick={(event) => navigateSection("archive", event)}><Archive className="size-4" />Archive export</a>
+        </nav>
         <div className="absolute bottom-5 left-5 right-5 border-t pt-4"><Button variant="ghost" className="w-full justify-start gap-3" onClick={() => void signOut()}><LogOut className="size-4" />Sign out</Button></div>
       </aside>
       {mobileNav && <button aria-label="Close navigation" className="fixed inset-0 z-20 bg-black/20 md:hidden" onClick={() => setMobileNav(false)} />}
       <div className="md:pl-64">
-        <header className="admin-console-topbar sticky top-0 z-10 border-b bg-background/95 backdrop-blur"><div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-8"><Button variant="ghost" size="icon" className="shrink-0 md:hidden" onClick={() => setMobileNav(true)}><Menu /></Button><div className="hidden min-w-0 md:block"><p className="text-sm font-medium">{sectionHeading}</p><p className="text-xs text-muted-foreground">{sectionDescription}</p></div><div className="flex shrink-0 items-center gap-3"><span className="hidden text-xs text-muted-foreground sm:inline">{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" })}` : "Not updated yet"}</span><Button variant="outline" size="sm" className="gap-2" onClick={() => void load()} disabled={loading}><RefreshCw className={loading ? "size-3.5 animate-spin" : "size-3.5"} />Refresh</Button><Button variant="ghost" size="icon" className="md:hidden" onClick={() => void signOut()}><LogOut /></Button></div></div></header>
+        <header className="admin-console-topbar sticky top-0 z-10 border-b bg-background/95 backdrop-blur"><div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-8"><Button aria-label="Open navigation" variant="ghost" size="icon" className="shrink-0 md:hidden" onClick={() => setMobileNav(true)}><Menu /></Button><div className="hidden min-w-0 md:block"><p className="text-sm font-medium">{sectionHeading}</p><p className="text-xs text-muted-foreground">{sectionDescription}</p></div><div className="flex shrink-0 items-center gap-3"><span className="hidden text-xs text-muted-foreground sm:inline">{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" })}` : "Not updated yet"}</span><Button variant="outline" size="sm" className="gap-2" onClick={() => void load()} disabled={loading}><RefreshCw className={loading ? "size-3.5 animate-spin" : "size-3.5"} />Refresh</Button><Button aria-label="Sign out" variant="ghost" size="icon" className="md:hidden" onClick={() => void signOut()}><LogOut /></Button></div></div></header>
         <main className="admin-console-main mx-auto w-full max-w-6xl space-y-7 p-4 sm:p-8">
           {message && messageType === "success" && <p role="status" className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm text-primary">{message}</p>}
-          {section === "bookings" ? <><section className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-medium text-primary">Good to see you</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Bookings overview</h1><p className="mt-1 text-sm text-muted-foreground">Review enquiries, confirm details, and prepare every event.</p></div><div className="flex items-center gap-2 text-xs text-muted-foreground"><Clock3 className="size-3.5" />{lastUpdated ? `Last updated ${lastUpdated.toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short" })}` : "Loading latest data"}</div></section>
-          <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">{([{ key: "upcoming", label: "Upcoming", icon: CalendarDays, color: "text-primary", count: upcomingCount }, { key: "submitted", label: "Submitted", icon: FileText, color: "text-amber-600", count: counts.submitted }, { key: "confirmed", label: "Confirmed", icon: CheckCircle2, color: "text-blue-600", count: counts.confirmed }, { key: "completed", label: "Completed", icon: CalendarDays, color: "text-emerald-600", count: counts.completed }, { key: "cancelled", label: "Cancelled", icon: XCircle, color: "text-red-600", count: counts.cancelled }] satisfies SummaryCard[]).map(({ key, label, icon: Icon, color, count }) => <Card key={key}><CardContent className="flex items-center justify-between p-4"><div><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-semibold">{count}</p></div><div className={`rounded-lg bg-muted p-2.5 ${color}`}><Icon className="size-5" /></div></CardContent></Card>)}</section>
-          <section id="bookings" className="space-y-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">All bookings</h2><p className="text-sm text-muted-foreground">{visibleBookings.length} {visibleBookings.length === 1 ? "booking" : "bookings"} in view</p></div></div>
-            <Card><CardContent className="grid gap-4 p-3 sm:grid-cols-[repeat(2,minmax(10rem,1fr))] lg:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(10rem,1fr))]"><label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground sm:col-span-2 lg:col-span-1"><span>Search</span><span className="relative"><Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" /><input aria-label="Search bookings" placeholder="Search name, email or event" value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 w-full min-w-0 rounded-lg border bg-background pl-9 pr-3 text-sm font-normal text-foreground outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring" /></span></label><label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground"><span>Status</span><select aria-label="Filter by status" value={status} onChange={(e) => setStatus(e.target.value)} className="h-10 w-full rounded-lg border bg-background px-3 text-sm font-normal text-foreground"><option value="">All statuses</option>{statuses.map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}</select></label><label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground"><span>Pickup from</span><input aria-label="Bookings from date" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm font-normal text-foreground" /></label><label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground"><span>Pickup to</span><input aria-label="Bookings to date" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm font-normal text-foreground" /></label></CardContent></Card>
-            {error ? <Card><CardContent className="flex flex-col items-center gap-3 p-10 text-center"><XCircle className="size-8 text-destructive" /><p className="font-medium">We couldn&apos;t load bookings</p><p className="text-sm text-muted-foreground">{error}</p><Button variant="outline" onClick={() => void load()}>Try again</Button></CardContent></Card> : loading ? <Card><CardContent className="p-10 text-center text-sm text-muted-foreground"><RefreshCw className="mx-auto mb-3 size-6 animate-spin" />Loading bookings…</CardContent></Card> : visibleBookings.length === 0 ? <Card><CardContent className="p-12 text-center"><CalendarDays className="mx-auto mb-3 size-8 text-muted-foreground" /><p className="font-medium">No bookings match these filters</p><p className="mt-1 text-sm text-muted-foreground">Try clearing a filter or check back after a new enquiry.</p></CardContent></Card> : <Card><div className="divide-y">{visibleBookings.map((booking) => <button key={booking.id} onClick={() => setSelected(booking)} className="flex w-full flex-wrap items-center gap-4 p-4 text-left transition-colors hover:bg-muted/50 sm:flex-nowrap"><div className="flex min-w-0 flex-1 items-center gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">{booking.first_name[0]}{booking.last_name[0]}</div><div className="min-w-0"><p className="truncate font-medium">{booking.first_name} {booking.last_name}</p><p className="truncate text-sm text-muted-foreground">{display(booking.email)}</p></div></div><div className="w-36"><p className="text-sm font-medium">{display(booking.event_type)}</p><p className="text-xs text-muted-foreground">{formatDate(booking.pickup_date)}</p></div><Badge className={statusClass(booking.status)}>{statusLabel(booking.status)}</Badge><ChevronRight className="ml-auto size-4 text-muted-foreground" /></button>)}</div></Card>}
-          </section>
+          {section === "analytics" ? <AdminBusinessAnalytics bookings={bookings} loading={loading} error={error} onRetry={() => void load()} /> : section === "bookings" ? <>
+            <AdminBookingsWorkspace bookings={bookings} loading={loading} error={error} onRetry={() => void load()} onSelect={setSelected} />
           </> : section === "email-history" ? <EmailHistoryPage bookings={filteredEmailHistoryBookings} search={emailHistorySearch} onSearch={setEmailHistorySearch} onSelect={setSelectedEmailHistory} /> : section === "tax-report" ? <TaxReportPage /> : <section id="archive" aria-labelledby="archive-title" className="space-y-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-medium text-primary">Data management</p><h1 id="archive-title" className="mt-1 text-3xl font-semibold tracking-tight">Archive export</h1><p className="mt-1 text-sm text-muted-foreground">Create a secure backup of booking records and private photo IDs.</p></div><a href="#bookings" onClick={(event) => navigateSection("bookings", event)} className="inline-flex items-center rounded-lg border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted">Back to bookings</a></div><div className="rounded-xl border border-dashed border-amber-400/30 bg-amber-500/[0.06] p-5 shadow-[0_12px_30px_color-mix(in_oklab,_#f59e0b_5%,_transparent)]"><div className="flex flex-wrap items-start justify-between gap-4"><div className="flex gap-3"><div className="rounded-lg bg-amber-400/15 p-2 text-amber-300"><Archive className="size-5" /></div><div><h2 className="font-semibold text-amber-200">Export booking archive</h2><p className="mt-1 max-w-xl text-sm text-amber-100/65">Download a ZIP of booking records and private photo IDs for a specific pickup date range. Handle this file securely.</p></div></div><div className="flex flex-wrap gap-2"><input aria-label="Archive from date" type="date" value={range.from} onChange={(e) => setRange({ ...range, from: e.target.value })} className="h-9 rounded-lg border border-amber-400/30 bg-background px-3 text-sm" /><input aria-label="Archive to date" type="date" value={range.to} onChange={(e) => setRange({ ...range, to: e.target.value })} className="h-9 rounded-lg border border-amber-400/30 bg-background px-3 text-sm" /><Button variant="outline" className="gap-2 border-amber-400/40 bg-background/60 hover:bg-amber-400/10" onClick={() => void exportArchive()}><Download className="size-4" />Export ZIP</Button></div></div></div></section>}
         </main>
       </div>

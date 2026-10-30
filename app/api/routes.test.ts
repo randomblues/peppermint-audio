@@ -101,6 +101,56 @@ describe("admin booking routes", () => {
     expect(query.or).toHaveBeenCalledWith("email.ilike.%Jane\\,\\_\\%%,first_name.ilike.%Jane\\,\\_\\%%,last_name.ilike.%Jane\\,\\_\\%%,event_type.ilike.%Jane\\,\\_\\%%");
   });
 
+  it("loads every page for analytics and batches email lookups", async () => {
+    const first = Array.from({ length: 500 }, (_, index) => ({ id: `booking-${index}` }));
+    const query = {
+      select: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(),
+      range: vi.fn().mockResolvedValueOnce({ data: first, error: null }).mockResolvedValueOnce({ data: [{ id: "last" }], error: null }),
+    };
+    const logs = {
+      select: vi.fn().mockReturnThis(), in: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      range: vi.fn().mockResolvedValue({ data: [], error: null }),
+    };
+    mocks.requireAdmin.mockResolvedValue(adminSession({
+      from: vi.fn((table: string) => table === "bookings" ? query : logs),
+    }));
+    const response = await getBookings(request("/api/admin/bookings?all=true"));
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.bookings).toHaveLength(501);
+    expect(query.range).toHaveBeenNthCalledWith(1, 0, 499);
+    expect(query.range).toHaveBeenNthCalledWith(2, 500, 999);
+    expect(logs.in).toHaveBeenCalledTimes(6);
+    expect(logs.in).toHaveBeenLastCalledWith("booking_id", ["last"]);
+  });
+
+  it("fails explicitly rather than returning partial analytics when a later page fails", async () => {
+    const query = {
+      select: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(),
+      range: vi.fn().mockResolvedValueOnce({ data: Array.from({ length: 500 }, (_, index) => ({ id: String(index) })), error: null })
+        .mockResolvedValueOnce({ data: null, error: { message: "Later page unavailable" } }),
+    };
+    mocks.requireAdmin.mockResolvedValue(adminSession({ from: vi.fn().mockReturnValue(query) }));
+    const response = await getBookings(request("/api/admin/bookings?all=true"));
+    expect(response.status).toBe(500);
+    expect(await responseJson(response)).toEqual({ error: "Later page unavailable" });
+  });
+
+  it("paginates email history as well as bookings in the complete dataset", async () => {
+    const query = { select: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(), range: vi.fn().mockResolvedValue({ data: [{ id: "one" }], error: null }) };
+    const logs = {
+      select: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(), in: vi.fn().mockReturnThis(),
+      range: vi.fn().mockResolvedValueOnce({ data: Array.from({ length: 500 }, (_, id) => ({ id: String(id), booking_id: "one" })), error: null })
+        .mockResolvedValueOnce({ data: [{ id: "last", booking_id: "one" }], error: null }),
+    };
+    mocks.requireAdmin.mockResolvedValue(adminSession({ from: vi.fn((table: string) => table === "bookings" ? query : logs) }));
+    const response = await getBookings(request("/api/admin/bookings?all=true"));
+    expect(response.status).toBe(200);
+    expect((await response.json()).bookings[0].email_logs).toHaveLength(501);
+    expect(logs.range).toHaveBeenLastCalledWith(500, 999);
+  });
+
   it("rejects unauthorised and reports list failures", async () => {
     mocks.requireAdmin.mockResolvedValueOnce(null);
     expect((await getBookings(request("/api/admin/bookings"))).status).toBe(401);

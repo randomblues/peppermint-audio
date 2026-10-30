@@ -206,6 +206,48 @@ or customer data and exercises the real decoder rather than a mocked conversion.
 
 Run `supabase/001_booking_management.sql` in the Supabase SQL editor, then create administrator users under Supabase Authentication > Users. Rerun the migration after schema changes so existing databases receive the pickup/drop-off time columns and email-history table. Customer hire selections are built in the cart and carried into the booking request form at `/booking`; requests are managed at `/admin` and changed to `confirmed` only after availability is reviewed. The customer automatically receives a confirmation email when the request is confirmed. Customer-facing email delivery metadata appears in each admin booking's **Email history** card and is automatically deleted after 30 days by the Supabase `pg_cron` job. Photo IDs remain in the private `booking-photo-ids` bucket and are only available through short-lived signed links.
 
+**Bookings** provides the full filter panel: search, multi-select status checkboxes,
+payment-state filtering, inclusive date ranges, Melbourne-based calendar/financial-year
+presets, pickup or request-received date basis, sorting, and filtered booking CSV export.
+Sorting lives at the top-right of the booking list, separate from the filters.
+Choose **Submitted** or **Hire Dates** and click the adjacent arrow to reverse
+ascending/descending order. Changing the field preserves the selected direction.
+The default (and reset) is newest submissions first. Rows show **Hire Dates:** followed by
+**Submitted On:** using the Melbourne submission date: "Today" or "Yesterday"
+for those calendar days, otherwise the usual date (for example, "12 Oct 2026").
+Missing submission dates
+are shown as "Not recorded" and sorted last in either submission-date order.
+Only **Submitted** and **Confirmed** statuses are selected by default.
+Select **Completed** or **Cancelled** to include those bookings; there are no
+separate hide controls. Reset filters restores the two default statuses, while
+Select all includes all four. The booking list and CSV use the same filters.
+**Analytics** is an independent historical business-performance dashboard, not
+a booking-list view. Its default period is the last 12 calendar months to date;
+30-day, 90-day, calendar-year, financial-year and custom historical periods are
+available. Completed hire sales, hire volume and average priced hire compare with
+the immediately preceding period of equal length. Completed hires are grouped by
+booked return date (pickup date if return is missing), not request date.
+
+The report includes repeat-customer hire share, zero-filled sales/hire/request
+trends, package/equipment sales contribution, event mix, weekday pickup patterns,
+median hire duration and booking notice. Request outcomes use a separate
+received-date cohort in Melbourne time and reflect current booking states, not
+a tracked historical conversion funnel. Repeat hires use earlier completed
+bookings with matching contact emails in retained history. Product allocation
+uses saved item prices and duration, reconciled to recorded hire totals.
+
+Sales exclude refundable deposits, cancelled and non-completed hires, and
+unpriced records; missing pricing is flagged and financial growth comparisons
+are withheld when either period has incomplete pricing. Charges include GST where
+applicable. Profit, advertising ROI and fleet utilisation are deliberately not
+inferred from booking data. Use the Tax section for tax reporting.
+
+The performance CSV contains only aggregate period results and breakdowns:
+no customer names, email addresses, booking IDs or individual-record drill-down.
+The separate Bookings CSV contains contact details and must be handled securely;
+private photo IDs are not exported. An empty booking-status selection shows no
+results in Bookings.
+
 The admin bookings view includes a **Send Email** menu with booking confirmation, pickup reminder, custom email, and invoice options. New Stripe payment links remain valid for at least 30 days and through return plus three days. Bank-transfer and cash-on-pickup invoices do not expose customer payment secrets.
 
 When a card payment request is active, use **Send invoice** to change hire items

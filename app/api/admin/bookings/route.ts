@@ -12,31 +12,56 @@ function escapePostgrestSearch(value: string) {
   return value.replace(/[\\%_(),.]/g, "\\$&");
 }
 
+async function readAllRows<T>(read: (offset: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>) {
+  const data: T[] = [];
+  let pageLength: number;
+  do {
+    const page = await read(data.length);
+    if (page.error) return { data: null, error: page.error };
+    data.push(...(page.data ?? []));
+    pageLength = page.data?.length ?? 0;
+  } while (pageLength === 500);
+  return { data, error: null };
+}
+
 export async function GET(request: Request) {
   const session = await requireAdmin();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const url = new URL(request.url);
   const search = url.searchParams.get("search")?.trim();
   const status = url.searchParams.get("status");
+  const all = url.searchParams.get("all") === "true";
   let query = session.admin.from("bookings").select("*").order("pickup_date", { ascending: true });
+  if (all) query = query.order("id", { ascending: true });
   if (status && ["submitted", "confirmed", "completed", "cancelled"].includes(status)) query = query.eq("status", status);
   if (search) {
     const escapedSearch = escapePostgrestSearch(search);
     query = query.or(`email.ilike.%${escapedSearch}%,first_name.ilike.%${escapedSearch}%,last_name.ilike.%${escapedSearch}%,event_type.ilike.%${escapedSearch}%`);
   }
-  const { data, error } = await query;
+  const { data: rows, error } = await (all ? readAllRows((offset) => query.range(offset, offset + 499)) : query);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  const bookingIds = (data ?? []).map((booking) => booking.id);
-  const emailLogs = bookingIds.length
-    ? await session.admin
+  const data = rows ?? [];
+  const bookingIds = data.map((booking) => booking.id);
+  const emailQuery = (ids: string[]) => session.admin
       .from("booking_email_log")
       .select("id,booking_id,recipient_email,email_type,provider_message_id,sent_at")
-      .in("booking_id", bookingIds)
-      .order("sent_at", { ascending: false })
+      .in("booking_id", ids)
+      .order("sent_at", { ascending: false });
+  const readLogs = (ids: string[]) => all
+    ? readAllRows((offset) => emailQuery(ids).order("id", { ascending: true }).range(offset, offset + 499))
+    : emailQuery(ids);
+  const emailLogs = bookingIds.length
+    ? await readLogs(bookingIds.slice(0, 100))
     : { data: [], error: null };
   if (emailLogs.error) return NextResponse.json({ error: emailLogs.error.message }, { status: 500 });
-  const logsByBooking = new Map<string, typeof emailLogs.data>();
-  for (const log of emailLogs.data ?? []) {
+  const emailLogData = [...(emailLogs.data ?? [])];
+  for (let offset = 100; offset < bookingIds.length; offset += 100) {
+    const logs = await readLogs(bookingIds.slice(offset, offset + 100));
+    if (logs.error) return NextResponse.json({ error: logs.error.message }, { status: 500 });
+    emailLogData.push(...(logs.data ?? []));
+  }
+  const logsByBooking = new Map<string, typeof emailLogData>();
+  for (const log of emailLogData) {
     const logs = logsByBooking.get(log.booking_id) ?? [];
     logs.push(log);
     logsByBooking.set(log.booking_id, logs);

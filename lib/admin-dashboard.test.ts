@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterBookings, isUpcoming, statusCounts } from "./admin-dashboard";
+import { activeBookings, filterBookings, isUpcoming, statusCounts } from "./admin-dashboard";
 
 const bookings = [
   { pickup_date: "2026-10-01", status: "submitted" },
@@ -20,6 +20,10 @@ describe("admin dashboard booking logic", () => {
       status: "confirmed", from: "2026-10-02", to: "2026-10-02",
     })).toHaveLength(1);
     expect(filterBookings(bookings, { status: "confirmed" })).toHaveLength(2);
+  });
+
+  it("keeps only submitted and confirmed bookings active", () => {
+    expect(activeBookings([...bookings, { status: "cancelled" }, {}])).toEqual(bookings.slice(0, 3));
   });
 
   it("excludes completed and cancelled bookings from upcoming", () => {

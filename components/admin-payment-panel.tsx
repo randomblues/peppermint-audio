@@ -45,7 +45,7 @@ export function AdminPaymentPanel({ booking, onChanged, collapsible = true }: { 
   const initialLineItems = lineItemsForBooking(booking);
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(existingMethod ?? recommendedMethod);
   const [bankTransferOption, setBankTransferOption] = useState<BankTransferOption>(booking.bank_transfer_option ?? "both");
-  const [depositAmount, setDepositAmount] = useState(booking.security_deposit_cents ? String(booking.security_deposit_cents / 100) : "");
+  const [depositAmount, setDepositAmount] = useState(booking.security_deposit_cents ? String(booking.security_deposit_cents / 100) : "200");
   const [gstInclusive, setGstInclusive] = useState(booking.gst_inclusive !== false);
   const [captureAmount, setCaptureAmount] = useState(booking.security_deposit_cents ? String(booking.security_deposit_cents / 100) : "");
   const [billToName, setBillToName] = useState("");
