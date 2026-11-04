@@ -193,6 +193,11 @@ keys in local tests. Use Stripe test-mode keys and keep calendar disabled.
 
 ## Booking and payment management
 
+The booking form accepts the front and back of a photo ID together or in separate
+file-picker selections or drops. New selections add to the existing files, up to
+two total; customers must remove a selected file before replacing it. Selections
+that exceed the limit show an error without changing the existing files.
+
 Booking photo-ID images may be up to 10 MB each. The browser converts HEIC/HEIF
 using the CSP-compatible `heic-to` decoder and resizes larger images to JPEG with a longest edge of 2400px
 and an encoded size of at most 1.5 MB per file. Processing stays in the browser;

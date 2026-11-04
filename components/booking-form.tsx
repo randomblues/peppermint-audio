@@ -175,9 +175,13 @@ export function BookingForm() {
   }
 
   function updateIdFiles(incomingFiles: File[]) {
-    const selected = incomingFiles.slice(0, 2);
-    setValues((current) => ({ ...current, idFiles: selected }));
+    if (!incomingFiles.length) return;
     setIdFilesTouched(true);
+    if (values.idFiles.length + incomingFiles.length > 2) {
+      setErrors((current) => ({ ...current, idFiles: "You can upload 2 files total. Remove a selected file before adding another, or choose fewer files." }));
+      return;
+    }
+    setValues((current) => ({ ...current, idFiles: [...current.idFiles, ...incomingFiles] }));
     setErrors((current) => ({ ...current, idFiles: "" }));
   }
 
@@ -408,7 +412,7 @@ export function BookingForm() {
                       <Upload className="size-5" aria-hidden="true" />
                     </div>
                     <p className="text-sm font-medium text-foreground">{isDragOver ? "Drop files to upload" : "Drag and drop your photo ID files here"}</p>
-                    <p className="text-xs text-muted-foreground">Front and back images or PDF, up to 2 files total.</p>
+                    <p className="text-xs text-muted-foreground">Front and back images or PDF, up to 2 files total. Add them one at a time or together.</p>
                     <Input
                       id="photo-id-files"
                       type="file"

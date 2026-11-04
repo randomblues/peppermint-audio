@@ -102,9 +102,13 @@ describe("BookingForm", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<BookingForm />);
     for (let step = 0; step < 3; step++) fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.change(screen.getByLabelText("Choose files"), {
+      target: { files: [
+        new File(["front"], "front.png", { type: "image/png" }),
+      ] },
+    });
     fireEvent.drop(screen.getByTestId("photo-id-dropzone"), {
       dataTransfer: { files: [
-        new File(["front"], "front.png", { type: "image/png" }),
         new File(["back"], "back.png", { type: "image/png" }),
       ] },
     });
@@ -123,6 +127,11 @@ describe("BookingForm", () => {
     expect(mockTrackBookingSubmission).toHaveBeenCalledOnce();
     expect(window.localStorage.getItem("peppermint-audio-booking-draft")).toBeNull();
     expect(fetchMock).toHaveBeenCalledOnce();
+    const submittedFiles = (fetchMock.mock.calls[0][1].body as FormData).getAll("idFiles");
+    expect(submittedFiles).toEqual([
+      expect.objectContaining({ name: "front.png" }),
+      expect.objectContaining({ name: "back.png" }),
+    ]);
   });
 
   it("uses a step-by-step flow and moves from your details to event details", () => {
@@ -183,7 +192,7 @@ describe("BookingForm", () => {
     expect(screen.queryByText("Please confirm that you have read and agree to the terms")).not.toBeInTheDocument();
   });
 
-  it("supports drag and drop photo ID uploads on step 4", () => {
+  it.each(["picker", "drop"] as const)("adds photo IDs separately using the %s, preserves files at the limit and allows replacement after removal", (method) => {
     window.localStorage.setItem(
       "peppermint-audio-booking-draft",
       JSON.stringify({
@@ -209,14 +218,45 @@ describe("BookingForm", () => {
     expect(screen.getByText("Upload clear photos of the front and back of your valid photo ID.")).toBeInTheDocument();
     expect(screen.queryByText(/automatically resized|PDF files must/)).not.toBeInTheDocument();
     const backFile = new File(["back"], "back-id.png", { type: "image/png" });
-    fireEvent.drop(screen.getByTestId("photo-id-dropzone"), {
-      dataTransfer: { files: [frontFile, backFile] },
-    });
+    const addFiles = (files: File[]) => {
+      if (method === "picker") {
+        fireEvent.change(screen.getByLabelText("Choose files"), { target: { files } });
+      } else {
+        fireEvent.drop(screen.getByTestId("photo-id-dropzone"), { dataTransfer: { files } });
+      }
+    };
+    const replacementFile = new File(["replacement"], "replacement.png", { type: "image/png" });
+    addFiles([frontFile, backFile, replacementFile]);
+    expect(screen.getByText(/You can upload 2 files total/)).toBeInTheDocument();
+    expect(screen.getByText("No files selected yet.")).toBeInTheDocument();
+    addFiles([frontFile]);
+    addFiles([]);
+    expect(screen.getByRole("button", { name: "Remove front-id.png" })).toBeInTheDocument();
+    addFiles([backFile, replacementFile]);
+    expect(screen.getByText(/You can upload 2 files total/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove back-id.png" })).not.toBeInTheDocument();
+    addFiles([backFile]);
 
     expect(screen.getByRole("button", { name: "Remove front-id.png" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove back-id.png" })).toBeInTheDocument();
+    expect(screen.queryByText(/You can upload 2 files total/)).not.toBeInTheDocument();
+    addFiles([replacementFile]);
+    expect(screen.getByText(/You can upload 2 files total/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove front-id.png" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove back-id.png" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove replacement.png" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Remove back-id.png" }));
     expect(screen.queryByRole("button", { name: "Remove back-id.png" })).not.toBeInTheDocument();
+    addFiles([replacementFile]);
+    expect(screen.getByRole("button", { name: "Remove front-id.png" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove replacement.png" })).toBeInTheDocument();
+    expect(screen.queryByText(/You can upload 2 files total/)).not.toBeInTheDocument();
     expect(screen.queryByText("Please upload the front and back of your photo ID.")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Remove front-id.png" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove replacement.png" }));
+    addFiles([frontFile, backFile]);
+    expect(screen.getByRole("button", { name: "Remove front-id.png" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove back-id.png" })).toBeInTheDocument();
+    expect(screen.queryByText(/You can upload 2 files total/)).not.toBeInTheDocument();
   });
 });
