@@ -8,7 +8,7 @@ import { recordCustomerEmail, type CustomerEmailType } from "@/lib/email-log";
 import { buildInvoicePdf, type InvoicePdfDetails, type InvoicePdfLineItem } from "@/lib/invoice-pdf";
 import { invoiceNumberForBooking } from "@/lib/invoice-reference";
 import { invoiceEmailRecipients, type InvoiceRecipientOverrides } from "@/lib/invoice-recipient";
-import { type BankTransferDetails, type BankTransferOption } from "@/lib/bank-transfer";
+import { formatBankTransferInstructions, type BankTransferDetails, type BankTransferOption } from "@/lib/bank-transfer";
 import { gstIncludedCents } from "@/lib/gst";
 import { createAdminClient } from "@/lib/supabase";
 
@@ -63,12 +63,16 @@ function amount(value: number | null | undefined) {
   return value;
 }
 
-function bankTransferDetails() {
+export function configuredBankTransferDetails(option: BankTransferOption = "both") {
   const accountName = process.env.BANK_TRANSFER_ACCOUNT_NAME;
   const bsb = process.env.BANK_TRANSFER_BSB?.trim();
   const accountNumber = process.env.BANK_TRANSFER_ACCOUNT_NUMBER?.trim();
   const payId = process.env.BANK_TRANSFER_PAYID?.trim();
-  if (!accountName || (!payId && (!bsb || !accountNumber))) throw new Error("Bank transfer details are not configured.");
+  if (!accountName
+    || (option !== "bank_account" && !payId)
+    || (option !== "payid" && (!bsb || !accountNumber))) {
+    throw new Error("Bank transfer details are not configured for the selected invoice.");
+  }
   return { accountName, bsb, accountNumber, payId } satisfies BankTransferDetails;
 }
 
@@ -111,6 +115,7 @@ export async function ensureInvoice(admin: AdminClient, booking: InvoiceBooking,
         gst_inclusive: gstInclusive,
         total_amount_cents: hireAmountCents + securityDepositCents,
         bank_transfer_option: selectedBankTransferOption,
+        ...(paymentMethodChanged && paymentUrl === undefined ? { payment_url: null } : {}),
         updated_at: new Date().toISOString(),
       }).eq("id", existing.data.id);
       if (update.error) throw new Error(`Invoice amount update failed: ${update.error.message}`);
@@ -120,6 +125,7 @@ export async function ensureInvoice(admin: AdminClient, booking: InvoiceBooking,
       existing.data.total_amount_cents = hireAmountCents + securityDepositCents;
       existing.data.payment_method = booking.payment_method;
       existing.data.bank_transfer_option = selectedBankTransferOption;
+      if (paymentMethodChanged && paymentUrl === undefined) existing.data.payment_url = null;
     }
     if (paymentUrl !== undefined && existing.data.payment_url !== paymentUrl) {
       const update = await admin.from("invoices").update({ payment_url: paymentUrl, updated_at: new Date().toISOString() }).eq("id", existing.data.id);
@@ -177,8 +183,12 @@ export function billingDocumentIntro(documentType: BillingDocumentType, customer
 function pdfDetails(documentType: BillingDocumentType, booking: InvoiceBooking, invoice: InvoiceRecord, recipient?: InvoiceRecipientOverrides): InvoicePdfDetails {
   const hire = invoice.hire_amount_cents;
   const deposit = invoice.security_deposit_cents;
-  const method = invoice.payment_method === "bank_transfer"
-    ? "Bank transfer"
+  const offersBankTransfer = documentType === "invoice" && (invoice.payment_method === "bank_transfer"
+    || (invoice.payment_method === "stripe_card_hold" && invoice.bank_transfer_option === "both"));
+  const method = offersBankTransfer && invoice.payment_method === "stripe_card_hold"
+    ? "Card payment or bank transfer"
+    : invoice.payment_method === "bank_transfer"
+      ? "Bank transfer"
     : invoice.payment_method === "cash_on_pickup"
       ? "Cash on pickup"
       : "Stripe card payment and security-deposit authorisation";
@@ -199,14 +209,19 @@ function pdfDetails(documentType: BillingDocumentType, booking: InvoiceBooking, 
   const notes = [
     "The security deposit is refundable when all equipment is returned on time and in the agreed condition.",
   ];
-  if (invoice.payment_method === "stripe_card_hold" && booking.deposit_hold_date && documentType === "invoice") {
-    notes.unshift(isMelbourneDateInFuture(booking.deposit_hold_date)
-      ? `The hire payment is due now. The ${formatAudCents(deposit)} security deposit is a temporary card hold scheduled for ${formatDate(booking.deposit_hold_date)} (one day before pickup).`
-      : isImmediateDepositBooking(booking.pickup_date)
-        ? `The hire payment is due now. The ${formatAudCents(deposit)} security deposit is a temporary card hold placed as part of checkout.`
-        : `The ${formatAudCents(deposit)} security deposit is a separate temporary card hold, not part of the hire payment.`);
+  if (invoice.payment_method === "stripe_card_hold" && deposit > 0 && documentType === "invoice") {
+    const cardDepositDetails = booking.deposit_hold_date
+      ? isMelbourneDateInFuture(booking.deposit_hold_date)
+        ? `For card payments, the ${formatAudCents(deposit)} security deposit is a temporary card hold scheduled for ${formatDate(booking.deposit_hold_date)} (one day before pickup).`
+        : isImmediateDepositBooking(booking.pickup_date)
+          ? `For card payments, the ${formatAudCents(deposit)} security deposit is a temporary card hold placed as part of checkout.`
+          : `For card payments, the ${formatAudCents(deposit)} security deposit is a separate temporary card hold.`
+      : `For card payments, the ${formatAudCents(deposit)} security deposit is a separate temporary card hold.`;
+    notes.unshift(offersBankTransfer
+      ? `If paying by bank transfer, include the refundable security deposit in the transfer. ${cardDepositDetails}`
+      : `The hire payment is due now. ${cardDepositDetails}`);
   }
-  const bank = invoice.payment_method === "bank_transfer" ? bankTransferDetails() : undefined;
+  const bank = offersBankTransfer ? configuredBankTransferDetails(invoice.bank_transfer_option) : undefined;
   const bankTransfer = bank
     ? {
       ...bank,
@@ -243,7 +258,9 @@ function pdfDetails(documentType: BillingDocumentType, booking: InvoiceBooking, 
     gstCents = 0;
     notes.unshift("This document records the amount captured from the security deposit.");
   } else if (invoice.payment_url) {
-    notes.unshift(`Pay securely online: ${invoice.payment_url}`);
+    notes.unshift(offersBankTransfer
+      ? `Choose one payment method: pay securely online by card at ${invoice.payment_url}, or use the bank-transfer details below.`
+      : `Pay securely online: ${invoice.payment_url}`);
   } else if (invoice.payment_method === "cash_on_pickup") {
     notes.unshift("Payment is due in cash on the day of pickup. Please bring the hire amount and refundable security deposit.");
   }
@@ -311,6 +328,10 @@ export async function sendBillingDocument(admin: AdminClient, bookingId: string,
   const emailIntro = billingDocumentIntro(documentType, customerName, gstInclusive, Boolean(claim.record.provider_message_id));
   const pdf = await buildInvoicePdf(details);
   const customerPaymentUrl = documentType === "invoice" ? invoice.payment_url : null;
+  const bankTransfer = documentType === "invoice" ? details.bankTransfer : undefined;
+  const bankTransferText = bankTransfer
+    ? `\n${customerPaymentUrl ? "Or pay by bank transfer: " : ""}${formatBankTransferInstructions(formatAudCents(bankTransfer.amountCents), bankTransfer.reference, bankTransfer, invoice.bank_transfer_option)}`
+    : "";
   const bodyText = [
     "Hello,",
     "",
@@ -319,6 +340,7 @@ export async function sendBillingDocument(admin: AdminClient, bookingId: string,
     customerPaymentUrl ? "Having trouble opening the payment page? No worries — copy and paste the link below into your browser." : "",
     customerPaymentUrl ? `Pay securely online: ${customerPaymentUrl}` : "",
     customerPaymentUrl ? "Powered by Stripe." : "",
+    bankTransferText,
     `Event: ${booking.event_type}`,
     `Pickup: ${formatDate(booking.pickup_date)} · Return: ${formatDate(booking.dropoff_date)}`,
     booking.event_address ? `Event address: ${booking.event_address}` : "",
@@ -349,6 +371,10 @@ export async function sendBillingDocument(admin: AdminClient, bookingId: string,
         <div style="margin-top:18px;padding-top:14px;border-top:1px solid #cfe5d6">
           <p style="margin:0;color:#1d2823;font-size:13px;font-weight:700">Powered by Stripe</p>
         </div>
+      `, "accent") : ""}
+      ${bankTransfer ? emailPanel(`
+        <p style="margin:0 0 10px;color:#1d2823;font-size:14px;line-height:1.6"><strong>${customerPaymentUrl ? "Or pay by bank transfer" : "Pay by bank transfer"}</strong></p>
+        <p style="margin:0;color:#718078;font-size:12px;line-height:1.5">Amount: ${escapeEmailHtml(formatAudCents(bankTransfer.amountCents))}<br />${bankTransfer.payId ? `PayID: ${escapeEmailHtml(bankTransfer.payId)}<br />` : ""}${bankTransfer.bsb && bankTransfer.accountNumber ? `Account name: ${escapeEmailHtml(bankTransfer.accountName)}<br />BSB: ${escapeEmailHtml(bankTransfer.bsb)}<br />Account number: ${escapeEmailHtml(bankTransfer.accountNumber)}<br />` : ""}Reference: ${escapeEmailHtml(bankTransfer.reference)}</p>
       `, "accent") : ""}
       ${invoice.payment_method === "cash_on_pickup" ? emailPanel("<p style=\"margin:0;color:#1d2823;font-size:14px;line-height:1.6\"><strong>Payment due in cash on pickup.</strong><br />Please bring the hire amount and refundable security deposit on the day of collection.</p>", "accent") : ""}
       <p style="margin:26px 0 0;color:#718078;font-size:13px;line-height:1.6">The detailed ${escapeEmailHtml(documentTitle(documentType, gstInclusive).toLowerCase())} is attached as a PDF for your records.</p>

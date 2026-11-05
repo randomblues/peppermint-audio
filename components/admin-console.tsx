@@ -7,8 +7,8 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@base-ui/react/dialog";
 import {
-  Archive, BarChart3, Boxes, ChevronDown, ChevronLeft, ChevronRight, CreditCard, Download, FileSpreadsheet,
-  ExternalLink, LayoutDashboard, LogOut, Mail, Menu, RefreshCw,
+  Archive, BarChart3, Boxes, ChevronDown, ChevronLeft, ChevronRight, Download, FileSpreadsheet,
+  CalendarDays, ExternalLink, Hash, LayoutDashboard, LogOut, Mail, Menu, RefreshCw,
   ShieldCheck, UserRound, X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -19,12 +19,11 @@ import { AdminBookingsWorkspace } from "@/components/admin-bookings-workspace";
 import { AdminBusinessAnalytics } from "@/components/admin-business-analytics";
 import { buildBookingConfirmationEmail } from "@/lib/booking-confirmation-email";
 import { bookingReferenceForId } from "@/lib/booking-reference";
-import { lineItemHireTotalCents, lineItemsForBooking, lineItemsTotalCents } from "@/lib/booking-line-items";
-import { formatAudCents, rentalDays } from "@/lib/payment-flow";
+import { lineItemsForBooking } from "@/lib/booking-line-items";
 import { buildPickupReminderEmail } from "@/lib/pickup-reminders";
 import { calculateMedicareLevy, calculateResidentIncomeTax, type IncomeTaxYear } from "@/lib/income-tax";
 import type { BankTransferOption } from "@/lib/bank-transfer";
-import { AdminPaymentPanel } from "@/components/admin-payment-panel";
+import { AdminHireItems, AdminPaymentPanel } from "@/components/admin-payment-panel";
 import { AdminInventory } from "@/components/admin-inventory";
 import { AdminErrorDialog } from "@/components/admin-error-dialog";
 import { PdfAttachmentPreview } from "@/components/pdf-attachment-preview";
@@ -71,10 +70,10 @@ const formatSentAt = (value: string) => new Intl.DateTimeFormat("en-AU", {
   timeStyle: "short",
 }).format(new Date(value));
 const statusClass = (value: string) => ({
-  submitted: "border-amber-200 bg-amber-50 text-amber-700",
-  confirmed: "border-blue-200 bg-blue-50 text-blue-700",
-  completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  cancelled: "border-red-200 bg-red-50 text-red-700",
+  submitted: "border-amber-300/35 bg-gradient-to-b from-amber-400/20 to-amber-500/5 text-amber-200 shadow-[0_2px_12px_rgb(245_158_11/0.12)]",
+  confirmed: "border-blue-300/35 bg-gradient-to-b from-blue-400/20 to-blue-500/5 text-blue-200 shadow-[0_2px_12px_rgb(59_130_246/0.12)]",
+  completed: "border-emerald-300/35 bg-gradient-to-b from-emerald-400/20 to-emerald-500/5 text-emerald-200 shadow-[0_2px_12px_rgb(16_185_129/0.12)]",
+  cancelled: "border-red-300/35 bg-gradient-to-b from-red-400/20 to-red-500/5 text-red-200 shadow-[0_2px_12px_rgb(239_68_68/0.12)]",
 }[value] ?? "border-border bg-muted text-muted-foreground");
 
 const emailTemplates = [
@@ -200,9 +199,11 @@ export function AdminConsole() {
 
   async function update(id: string, values: { status?: string; internal_notes?: string; payment_received?: boolean }) {
     const booking = bookings.find((item) => item.id === id);
-    if (values.status === "confirmed" && booking?.payment_method === "bank_transfer"
-      && !["paid", "succeeded", "bank_transfer_received"].includes(booking.hire_payment_status ?? "")
-      && values.payment_received !== true) {
+    const bankTransferAvailable = booking?.payment_method === "bank_transfer"
+    || (booking?.payment_method === "stripe_card_hold" && booking.bank_transfer_option === "both");
+    const waitingForManualPayment = !["paid", "succeeded", "bank_transfer_received"].includes(booking?.hire_payment_status ?? "");
+    if (values.status === "confirmed" && booking && bankTransferAvailable && waitingForManualPayment
+    && values.payment_received !== true) {
       setPaymentConfirmation(booking);
       return;
     }
@@ -211,7 +212,7 @@ export function AdminConsole() {
       const response = await fetch("/api/admin/bookings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...values }) });
       const data = await response.json() as {
         error?: string;
-        payment?: Pick<Booking, "hire_payment_status" | "deposit_payment_status">;
+        payment?: Pick<Booking, "hire_payment_status" | "deposit_payment_status" | "payment_method" | "bank_transfer_option" | "payment_token" | "stripe_hire_payment_intent_id" | "stripe_deposit_payment_intent_id">;
         booking?: Partial<Booking>;
       };
       if (!response.ok) {
@@ -361,22 +362,6 @@ export function AdminConsole() {
   );
 }
 
-function SavedHireItems({ booking }: { booking: Booking }) {
-  const items = lineItemsForBooking(booking);
-  const nights = rentalDays(booking.pickup_date, booking.dropoff_date ?? booking.pickup_date);
-  return <section aria-labelledby="saved-hire-items-title" className="rounded-xl border p-4">
-    <div>
-      <h3 id="saved-hire-items-title" className="text-sm font-semibold">Hire items</h3>
-      <p className="mt-1 text-xs text-muted-foreground">Current items saved to this booking. {nights === null ? "Invalid hire dates." : `${nights} ${nights === 1 ? "night" : "nights"}.`}</p>
-    </div>
-    {items.length ? <div className="mt-3 divide-y rounded-lg border">{items.map((item) => <div key={item.id} className="flex items-start justify-between gap-3 p-3 text-sm"><div className="min-w-0"><p className="break-words font-medium">{item.name}</p>{item.option ? <p className="text-xs text-muted-foreground">{item.option}</p> : null}<p className="text-xs text-muted-foreground">Quantity: {item.quantity} · {formatAudCents(item.unitPriceCents)} each{item.kind === "custom" ? " (flat charge)" : " / night"}</p></div><p className="shrink-0 font-medium">{nights === null ? "Invalid dates" : formatAudCents(lineItemHireTotalCents(item, nights))}</p></div>)}</div> : <p className="mt-3 rounded-lg bg-muted p-3 text-sm text-muted-foreground">No saved hire items.</p>}
-    <div className="mt-3 flex items-center justify-end gap-3 border-t pt-3">
-      <span className="text-sm text-muted-foreground">Total</span>
-      <p aria-label="Hire items total" className="text-sm font-semibold">{nights === null ? "Invalid dates" : formatAudCents(lineItemsTotalCents(items, nights))}</p>
-    </div>
-  </section>;
-}
-
 function CommunicationsSection({ booking, onSendEmail }: { booking: Booking; onSendEmail: () => void }) {
   const logs = (booking.email_logs ?? []).slice().sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime());
   const [expanded, setExpanded] = useState(false);
@@ -449,81 +434,105 @@ function CommunicationsSection({ booking, onSendEmail }: { booking: Booking; onS
 
 function BookingDetail({ booking, onClose, onUpdate, onPhoto, onDelete, onSendEmail, onPaymentUpdated }: { booking: Booking; onClose: () => void; onUpdate: (id: string, values: { status?: string; internal_notes?: string }) => Promise<void>; onPhoto: (path: string) => Promise<void>; onDelete: (id: string) => Promise<void>; onSendEmail: (id: string, subject: string, message: string, attachment: File | null) => Promise<boolean>; onPaymentUpdated: (id: string, values: Partial<Booking>) => void }) {
   const [notes, setNotes] = useState(booking.internal_notes ?? "");
+  const [notesOpen, setNotesOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
   const [emailTemplate, setEmailTemplate] = useState("");
   const [customSubject, setCustomSubject] = useState("");
   const [customMessage, setCustomMessage] = useState("");
   const [customFile, setCustomFile] = useState<File | null>(null);
-  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [hireItemsDirty, setHireItemsDirty] = useState(false);
   return (
     <Dialog.Root open onOpenChange={(open) => { if (!open) onClose(); }}>
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-[50] bg-black/45 backdrop-blur-md" />
         <Dialog.Popup aria-labelledby="booking-detail-title" className="fixed inset-0 z-[51] m-auto flex h-[min(92vh,920px)] w-[calc(100%-1rem)] flex-col overflow-hidden rounded-2xl border bg-background shadow-[0_30px_120px_rgba(0,0,0,.45)] sm:w-[calc(100%-2rem)] sm:max-w-3xl">
-      <div className="relative shrink-0 overflow-hidden border-b bg-[radial-gradient(circle_at_top_right,_color-mix(in_oklab,_var(--primary)_22%,_transparent),_transparent_46%),linear-gradient(135deg,_color-mix(in_oklab,_var(--primary)_8%,_var(--background)),_var(--background)_68%)] p-4 sm:p-6"><div className="pointer-events-none absolute -right-16 -top-20 size-48 rounded-full border border-primary/15 bg-primary/5 blur-2xl" /><div className="pointer-events-none absolute -bottom-20 left-1/3 size-32 rounded-full bg-primary/5 blur-3xl" /><div className="relative flex items-start justify-between gap-4"><div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Booking details</p><h2 id="booking-detail-title" className="mt-3 break-words text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">{booking.first_name} {booking.last_name}</h2><p className="mt-2 break-words text-sm text-muted-foreground">{display(booking.event_type)} <span className="text-primary/60">•</span> {formatDate(booking.pickup_date)}</p><div className="mt-4 flex flex-wrap gap-2"><p className="inline-flex max-w-full items-center rounded-lg border border-primary/20 bg-background/50 px-2.5 py-1.5 text-xs font-medium text-primary">Booking reference: {bookingReferenceForId(booking.id)}</p></div></div><Button className="relative shrink-0 border border-white/10 bg-white/5 hover:bg-white/10" variant="ghost" size="icon" onClick={onClose} aria-label="Close details"><X /></Button></div></div>
-      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4 sm:p-5">
-        <section aria-labelledby="booking-workflow-title" className="rounded-xl border border-primary/15 bg-primary/[0.04] p-3 shadow-[0_0_24px_color-mix(in_oklab,_var(--primary)_8%,_transparent)] sm:p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <span id="booking-workflow-title" className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Workflow state</span>
-              <Badge className={`self-start sm:self-auto ${statusClass(booking.status)}`}>{statusLabel(booking.status)}</Badge>
+      <div className="relative shrink-0 overflow-hidden border-b bg-[radial-gradient(circle_at_top_right,_color-mix(in_oklab,_var(--primary)_22%,_transparent),_transparent_46%),linear-gradient(135deg,_color-mix(in_oklab,_var(--primary)_8%,_var(--background)),_var(--background)_68%)] p-4 sm:p-6">
+        <div className="pointer-events-none absolute -right-16 -top-20 size-48 rounded-full border border-primary/15 bg-primary/5 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-20 left-1/3 size-32 rounded-full bg-primary/5 blur-3xl" />
+        <div className="relative flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Booking details</p>
+            <div className="mt-3 flex flex-col items-start gap-2 sm:flex-row sm:justify-between sm:gap-3">
+              <h2 id="booking-detail-title" className="min-w-0 w-full break-words text-2xl font-semibold leading-tight tracking-tight sm:w-auto sm:flex-1 sm:text-3xl">{booking.first_name} {booking.last_name}</h2>
+              <Badge role="status" aria-label={`Booking status: ${statusLabel(booking.status)}`} className={`h-8 shrink-0 gap-2 rounded-full px-3 text-sm font-semibold tracking-wide shadow-sm ring-1 ring-white/10 backdrop-blur-md sm:mt-1 ${statusClass(booking.status)}`}>
+                <span aria-hidden="true" className="size-1.5 rounded-full bg-current shadow-[0_0_10px_currentColor] ring-2 ring-current/20" />
+                {statusLabel(booking.status)}
+              </Badge>
             </div>
-            <label className="flex min-w-0 w-full items-center gap-2 text-xs font-medium text-muted-foreground sm:w-auto">
-              <span className="shrink-0">Status</span>
-              <span className="relative min-w-0 flex-1 sm:flex-none">
-                <select aria-label="Update booking status" value={booking.status} onChange={(event) => void onUpdate(booking.id, { status: event.target.value })} className="h-9 w-full appearance-none rounded-lg border bg-background px-3 pr-9 text-sm font-normal text-foreground shadow-sm sm:w-auto">
-                  {statuses.map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}
-                </select>
-                <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.035] px-2.5 py-1 text-xs text-muted-foreground">
+                <CalendarDays aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground/80" />
+                {formatDate(booking.pickup_date)}
               </span>
-            </label>
+            </div>
+            <div className="mt-2">
+              <p className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-white/10 bg-background/35 px-2.5 py-1 text-[11px] text-muted-foreground">
+                <Hash aria-hidden="true" className="size-3 shrink-0 text-primary/80" />
+                <span className="truncate">Booking reference: {bookingReferenceForId(booking.id)}</span>
+              </p>
+            </div>
           </div>
-        </section>
+          <Button className="relative shrink-0 border border-white/10 bg-white/5 hover:bg-white/10" variant="ghost" size="icon" onClick={onClose} aria-label="Close details"><X /></Button>
+        </div>
+      </div>
+      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4 sm:p-5">
         <div className="grid grid-cols-1 gap-x-5 gap-y-3 rounded-xl border p-3 text-sm sm:grid-cols-2 sm:p-4">
           <Detail label="Customer" value={`${booking.first_name} ${booking.last_name}`} icon={<UserRound />} />
           <Detail label="Email" value={display(booking.email)} icon={<Mail />} />
           <Detail label="Booking reference" value={bookingReferenceForId(booking.id)} />
           <Detail label="Mobile" value={display(booking.mobile)} />
+          <Detail label="Event type" value={display(booking.event_type)} />
           <Detail label="Event address" value={display(booking.event_address)} />
           <Detail label="Pickup" value={`${formatDate(booking.pickup_date)} at ${formatTime(booking.pickup_time)}`} />
           <Detail label="Drop-off" value={`${formatDate(booking.dropoff_date)} at ${formatTime(booking.dropoff_time)}`} />
           {booking.photo_id_paths?.length ? (
             <div>
-              <h3 className="mb-2 text-sm font-semibold">Photo ID</h3>
+              <p className="text-xs text-muted-foreground">Photo ID</p>
               <div className="flex flex-wrap gap-2">
-                {booking.photo_id_paths.map((path) => <Button key={path} variant="outline" size="sm" onClick={() => void onPhoto(path)}>View private ID <ExternalLink /></Button>)}
+                {booking.photo_id_paths.map((path) => <Button key={path} variant="link" size="xs" className="h-6 px-1" onClick={() => void onPhoto(path)}>View ID <ExternalLink /></Button>)}
               </div>
             </div>
           ) : null}
-        </div>
-        <SavedHireItems booking={booking} />
-        <section>
-          <h3 className="mb-2 text-sm font-semibold">Additional details</h3>
-          <p className="break-words rounded-lg bg-muted p-3 text-sm leading-relaxed">{display(booking.additional_details)}</p>
-        </section>
-        <section>
-          <h3 className="mb-2 text-sm font-semibold">Internal notes</h3>
-          <textarea value={notes} onChange={(event) => setNotes(event.target.value)} className="min-h-24 w-full resize-y rounded-lg border bg-background p-3 text-sm" placeholder="Add a private note for the team…" />
-          <Button size="sm" className="mt-2" onClick={() => void onUpdate(booking.id, { internal_notes: notes })}>Save notes</Button>
-        </section>
-        <Card>
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-center gap-2"><CreditCard className="size-4 text-primary" /><h3 className="text-base font-semibold">Payment collection</h3></div>
-            <p className="mt-1 text-sm text-muted-foreground">Create, update, and manage payment for this booking.</p>
-            <Button className="mt-4 w-full" onClick={() => setPaymentOpen(true)}>Open payment collection</Button>
-          </CardContent>
-        </Card>
-        <CommunicationsSection booking={booking} onSendEmail={() => setEmailOpen(true)} />
-        <Button variant="destructive" className="w-full" onClick={() => void onDelete(booking.id)}>Permanently delete booking</Button>
-      </div>
-      {paymentOpen ? (
-        <div role="dialog" aria-modal="true" aria-labelledby="payment-collection-title" className="fixed inset-0 z-[60] flex items-stretch justify-center bg-black/40 sm:items-center sm:p-4">
-          <div className="flex h-full w-full max-w-3xl flex-col overflow-y-auto border bg-background shadow-2xl sm:max-h-[90vh] sm:rounded-2xl">
-            <header className="flex shrink-0 items-center justify-between gap-4 border-b px-5 py-4 sm:px-6"><h2 id="payment-collection-title" className="text-lg font-semibold">Payment collection</h2><Button variant="ghost" size="icon" onClick={() => setPaymentOpen(false)} aria-label="Close payment collection"><X /></Button></header>
-            <div className="p-4 sm:p-6"><AdminPaymentPanel key={`modal-${booking.id}`} booking={booking} collapsible={false} onChanged={(values) => onPaymentUpdated(booking.id, values)} /></div>
+          <label className="block min-w-0 space-y-1 sm:col-start-1 sm:row-start-5">
+            <span className="block text-xs text-muted-foreground">Status</span>
+            <span className="relative block w-full max-w-48">
+              <select aria-label="Update booking status" value={booking.status} onChange={(event) => void onUpdate(booking.id, { status: event.target.value })} className="h-9 w-full max-w-48 appearance-none rounded-lg border bg-background px-3 pr-9 text-sm font-normal text-foreground shadow-sm">
+                {statuses.map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}
+              </select>
+              <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            </span>
+          </label>
+          <div className="min-w-0 sm:col-start-2 sm:row-start-5">
+            <p className="text-xs text-muted-foreground">Additional details</p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">{booking.additional_details?.trim() || "-"}</p>
           </div>
         </div>
-      ) : null}
+        <AdminHireItems key={`booking-hire-items-${booking.id}`} booking={booking} onChanged={(values) => onPaymentUpdated(booking.id, values)} onDirtyChange={setHireItemsDirty} />
+        <section className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold">Internal notes</h3>
+            <Button
+              type="button"
+              variant="link"
+              size="xs"
+              aria-label={notesOpen ? "Hide internal notes" : booking.internal_notes?.trim() ? "Edit internal notes" : "Add internal notes"}
+              aria-expanded={notesOpen}
+              aria-controls={`booking-internal-notes-${booking.id}`}
+              onClick={() => setNotesOpen((current) => !current)}
+              className="h-6 px-0"
+            >
+              {notesOpen ? "Hide notes" : booking.internal_notes?.trim() ? "Edit notes" : "Add notes"}
+            </Button>
+          </div>
+          <div id={`booking-internal-notes-${booking.id}`} hidden={!notesOpen} className="space-y-2 rounded-xl border p-3">
+            <textarea value={notes} onChange={(event) => setNotes(event.target.value)} className="min-h-24 w-full resize-y rounded-lg border bg-background p-3 text-sm" placeholder="Add a private note for the team…" />
+            <Button size="sm" onClick={() => void onUpdate(booking.id, { internal_notes: notes })}>Save notes</Button>
+          </div>
+        </section>
+        <CommunicationsSection booking={booking} onSendEmail={() => setEmailOpen(true)} />
+        <AdminPaymentPanel key={`booking-payment-${booking.id}`} booking={booking} onChanged={(values) => onPaymentUpdated(booking.id, values)} hireItemsDirty={hireItemsDirty} />
+        <Button variant="destructive" className="w-full" onClick={() => void onDelete(booking.id)}>Permanently delete booking</Button>
+      </div>
       {emailOpen ? (
         <div role="dialog" aria-modal="true" aria-labelledby="send-email-title" className="fixed inset-0 z-[60] flex items-stretch justify-center bg-black/40 sm:items-center sm:p-4">
           <div className="flex h-full w-full max-w-2xl flex-col overflow-hidden border bg-background shadow-2xl sm:h-auto sm:max-h-[min(90vh,840px)] sm:rounded-2xl">

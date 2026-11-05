@@ -1,7 +1,8 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AdminPaymentPanel } from "./admin-payment-panel";
+import { AdminHireItems, AdminPaymentPanel } from "./admin-payment-panel";
 import { catalogLineItemFromKey } from "@/lib/booking-line-items";
 
 const lineItems = [{
@@ -23,32 +24,49 @@ function booking(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function renderOpenPaymentPanel(value: ReturnType<typeof booking> = booking(), onChanged = vi.fn()) {
+  const rendered = render(<AdminPaymentPanel booking={value} onChanged={onChanged} />);
+  fireEvent.click(screen.getByRole("button", { name: /^Payment/ }));
+  return rendered;
+}
+
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
 describe("AdminPaymentPanel", () => {
-  it("offers card holds for three nights but not four nights", () => {
-    const { rerender } = render(<AdminPaymentPanel booking={booking({ dropoff_date: "2026-10-04" })} onChanged={vi.fn()} />);
-    expect(screen.getByRole("radio", { name: /Stripe Available for hires of 3 nights/ })).toBeEnabled();
+  it("offers Standard for up to three nights and Bank Transfer Only for any hire length", () => {
+    const { rerender } = renderOpenPaymentPanel(booking({ dropoff_date: "2026-10-04" }));
+    expect(screen.getByRole("radio", { name: /Standard Card or bank transfer. Available for hires of 3 nights or less./ })).toBeEnabled();
+    expect(screen.getByRole("radio", { name: /Bank Transfer Only/ })).toBeEnabled();
     rerender(<AdminPaymentPanel booking={booking({ dropoff_date: "2026-10-05" })} onChanged={vi.fn()} />);
-    expect(screen.getByRole("radio", { name: /Stripe Available for hires of 3 nights/ })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: /Standard Card or bank transfer. Available for hires of 3 nights or less./ })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: /Bank Transfer Only/ })).toBeEnabled();
   });
 
   it("shows scheduled deposit state and errors separately from the paid hire", () => {
-    render(<AdminPaymentPanel booking={booking({
+    renderOpenPaymentPanel(booking({
       payment_method: "stripe_card_hold", hire_payment_status: "paid", deposit_payment_status: "scheduled",
       deposit_error: "Authentication is required before pickup.",
-    })} onChanged={vi.fn()} />);
+    }));
     expect(screen.getByText(/paid hire does not yet mean the deposit is secured/)).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("Authentication is required");
   });
   it("includes extra nights in catalogue pricing but not custom charges or deposits", () => {
-    render(<AdminPaymentPanel booking={booking({
+    render(
+      <>
+        <AdminHireItems booking={booking({
       dropoff_date: "2026-10-04",
       hire_line_items: [catalogLineItemFromKey("equipment:bose-s1-pro:Single speaker")!, ...lineItems],
-    })} onChanged={vi.fn()} />);
+        })} onChanged={vi.fn()} />
+        <AdminPaymentPanel booking={booking({
+          dropoff_date: "2026-10-04",
+          hire_line_items: [catalogLineItemFromKey("equipment:bose-s1-pro:Single speaker")!, ...lineItems],
+        })} onChanged={vi.fn()} />
+      </>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Payment/ }));
     expect(screen.getByText("$210.00")).toBeInTheDocument();
     expect(screen.getByText("$410.00")).toBeInTheDocument();
     expect(screen.getByText(/3 nights.*Every additional night half price/)).toBeInTheDocument();
@@ -56,45 +74,52 @@ describe("AdminPaymentPanel", () => {
     expect(screen.getByText("$100.00 each (flat charge)")).toBeInTheDocument();
   });
 
-  it("shows that a fresh booking has not received a payment request", () => {
+  it("shows a concise not-sent status for a fresh booking", () => {
     render(<AdminPaymentPanel booking={booking({ status: "submitted", hire_payment_status: "unpaid" })} onChanged={vi.fn()} />);
 
-    expect(screen.getByText("Payment request yet to be sent")).toBeInTheDocument();
-    expect(screen.getByText("Payment request yet to be sent")).toHaveClass("max-w-full", "whitespace-normal");
+    const toggle = screen.getByRole("button", { name: /^Payment/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByLabelText("Security deposit amount")).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    const requestStatus = screen.getAllByText("Not sent");
+    const mobileRequestStatus = requestStatus.find((element) => element.classList.contains("sm:hidden"));
+    expect(mobileRequestStatus).toHaveClass("max-w-full", "whitespace-normal");
+    expect(requestStatus).toHaveLength(3);
     expect(screen.getByText("Payment status").parentElement).toHaveClass("flex-wrap");
-    expect(screen.queryByText("Security deposit")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Security deposit amount")).toBeInTheDocument();
   });
 
   it("shows the requested payment method in the payment status", () => {
-    render(<AdminPaymentPanel booking={booking({ hire_payment_status: "bank_transfer_pending", payment_method: "bank_transfer" })} onChanged={vi.fn()} />);
+    renderOpenPaymentPanel(booking({ hire_payment_status: "bank_transfer_pending", payment_method: "bank_transfer" }));
 
-    expect(screen.getByText("Bank transfer requested")).toBeInTheDocument();
+    expect(screen.getAllByText("Bank transfer requested")).toHaveLength(3);
   });
 
   it("hides a payment link while switching to a different payment method", () => {
-    render(<AdminPaymentPanel booking={booking({ hire_payment_status: "pending", payment_method: "stripe_card_hold", payment_token: "token-123" })} onChanged={vi.fn()} />);
+    renderOpenPaymentPanel(booking({ hire_payment_status: "pending", payment_method: "stripe_card_hold", payment_token: "token-123" }));
 
     expect(screen.getByText("Customer payment link")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("radio", { name: /Bank transfer/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /Bank Transfer Only/ }));
     expect(screen.queryByText("Customer payment link")).not.toBeInTheDocument();
   });
 
-  it("allows Stripe selection while an unpaid cash request is still pending", () => {
-    render(<AdminPaymentPanel booking={booking({ hire_payment_status: "cash_due", payment_method: "cash_on_pickup" })} onChanged={vi.fn()} />);
+  it("allows Standard selection while an unpaid cash request is still pending", () => {
+    renderOpenPaymentPanel(booking({ hire_payment_status: "cash_due", payment_method: "cash_on_pickup" }));
 
-    expect(screen.getByRole("radio", { name: /^Stripe Available/ })).toBeEnabled();
+    expect(screen.getByRole("radio", { name: /^Standard/ })).toBeEnabled();
   });
 
   it("collapses and reopens payment collection", () => {
     render(<AdminPaymentPanel booking={booking()} onChanged={vi.fn()} />);
 
-    const toggle = screen.getByRole("button", { name: "Payment collection" });
+    const toggle = screen.getByRole("button", { name: /^Payment/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByLabelText("Security deposit amount")).toBeInTheDocument();
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByLabelText("Security deposit amount")).not.toBeInTheDocument();
-    fireEvent.click(toggle);
-    expect(screen.getByLabelText("Security deposit amount")).toBeInTheDocument();
   });
 
   it("creates one payment link using the stored hire items", async () => {
@@ -104,39 +129,38 @@ describe("AdminPaymentPanel", () => {
     });
 
     vi.stubGlobal("fetch", fetchMock);
-    render(<AdminPaymentPanel booking={booking()} onChanged={vi.fn()} />);
+    renderOpenPaymentPanel();
 
     fireEvent.change(screen.getByLabelText("Security deposit amount"), { target: { value: "100" } });
     fireEvent.click(screen.getByRole("button", { name: "Send invoice" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/payments/create-checkout", expect.objectContaining({
-      body: JSON.stringify({ bookingId: "booking-1", securityDepositAmount: "100", gstInclusive: true }),
+      body: JSON.stringify({ bookingId: "booking-1", securityDepositAmount: "100", gstInclusive: true, bankTransferOption: "both" }),
     })));
-    expect(await screen.findByText("One payment link created for the hire and deposit authorisation.")).toBeInTheDocument();
+    expect(await screen.findByText("Standard payment request sent with card and bank-transfer options.")).toBeInTheDocument();
     expect(screen.getByText("https://example.com/pay/token")).toBeInTheDocument();
   });
 
   it("allows requesting payment while the booking is still submitted", () => {
-    render(<AdminPaymentPanel booking={booking({ status: "submitted" })} onChanged={vi.fn()} />);
+    renderOpenPaymentPanel(booking({ status: "submitted" }));
 
     expect(screen.getByRole("button", { name: "Send invoice" })).toBeEnabled();
   });
 
-  it("allows selecting bank transfer for a short hire", async () => {
+  it("sends both PayID and bank-account details for Bank Transfer Only", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ reference: "PA-BOOKING1", hireAmountCents: 10000, securityDepositCents: 10000 }),
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<AdminPaymentPanel booking={booking()} onChanged={vi.fn()} />);
+    renderOpenPaymentPanel();
 
-    fireEvent.click(screen.getByRole("radio", { name: /Bank transfer/i }));
-    fireEvent.click(screen.getByRole("radio", { name: "PayID only" }));
+    fireEvent.click(screen.getByRole("radio", { name: /Bank Transfer Only/i }));
     fireEvent.change(screen.getByLabelText("Security deposit amount"), { target: { value: "100" } });
     fireEvent.click(screen.getByRole("button", { name: "Send invoice" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/payments/bank-transfer", expect.objectContaining({
-      body: JSON.stringify({ bookingId: "booking-1", securityDepositAmount: "100", gstInclusive: true, bankTransferOption: "payid" }),
+      body: JSON.stringify({ bookingId: "booking-1", securityDepositAmount: "100", gstInclusive: true, bankTransferOption: "both" }),
     })));
   });
 
@@ -146,10 +170,10 @@ describe("AdminPaymentPanel", () => {
       json: async () => ({ reference: "PA-BOOKING1", hireAmountCents: 10000, securityDepositCents: 20000 }),
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<AdminPaymentPanel booking={booking()} onChanged={vi.fn()} />);
+    renderOpenPaymentPanel();
 
     expect(screen.getByLabelText("Security deposit amount")).toHaveValue("200");
-    fireEvent.click(screen.getByRole("radio", { name: /Bank transfer/i }));
+    fireEvent.click(screen.getByRole("radio", { name: /Bank Transfer Only/i }));
     fireEvent.click(screen.getByRole("button", { name: "Send invoice" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/payments/bank-transfer", expect.objectContaining({
@@ -163,7 +187,7 @@ describe("AdminPaymentPanel", () => {
       json: async () => ({ paymentUrl: "https://example.com/pay/token", paymentToken: "token", hireAmountCents: 10000, securityDepositCents: 10000 }),
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<AdminPaymentPanel booking={booking()} onChanged={vi.fn()} />);
+    renderOpenPaymentPanel();
 
     fireEvent.change(screen.getByLabelText("Security deposit amount"), { target: { value: "100" } });
     fireEvent.change(screen.getByLabelText("Bill to name"), { target: { value: "Acme Events" } });
@@ -175,6 +199,7 @@ describe("AdminPaymentPanel", () => {
         bookingId: "booking-1",
         securityDepositAmount: "100",
         gstInclusive: true,
+        bankTransferOption: "both",
         billToName: "Acme Events",
         billToEmail: "accounts@example.com",
       }),
@@ -182,7 +207,7 @@ describe("AdminPaymentPanel", () => {
   });
 
   it("keeps alternate Bill to details collapsed by default", () => {
-    render(<AdminPaymentPanel booking={booking()} onChanged={vi.fn()} />);
+    renderOpenPaymentPanel();
 
     const summary = screen.getByText(/Alternative Bill to details/);
     const details = summary.closest("details");
@@ -191,18 +216,18 @@ describe("AdminPaymentPanel", () => {
     expect(details).toHaveAttribute("open");
   });
 
-  it("allows switching a pending bank transfer to Stripe", () => {
-    render(<AdminPaymentPanel booking={booking({
+  it("allows switching a pending bank transfer to Standard", () => {
+    renderOpenPaymentPanel(booking({
       payment_method: "bank_transfer",
       hire_payment_status: "bank_transfer_pending",
       deposit_payment_status: "bank_transfer_pending",
-    })} onChanged={vi.fn()} />);
+    }));
 
-    const stripeOption = screen.getByRole("radio", { name: /^Stripe Available/i });
+    const stripeOption = screen.getByRole("radio", { name: /^Standard/ });
     expect(stripeOption).toBeEnabled();
     fireEvent.click(stripeOption);
     expect(stripeOption).toBeChecked();
-    expect(screen.queryByRole("checkbox", { name: "Confirm payment" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "PayID only" })).not.toBeInTheDocument();
   });
 
   it("updates a pending invoice on the same booking and reference", async () => {
@@ -211,13 +236,13 @@ describe("AdminPaymentPanel", () => {
       json: async () => ({ reference: "PA-BOOKING1", bookingId: "booking-1" }),
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<AdminPaymentPanel booking={booking({
+    renderOpenPaymentPanel(booking({
       payment_method: "bank_transfer",
       security_deposit_cents: 10000,
       gst_inclusive: true,
       hire_payment_status: "bank_transfer_pending",
       deposit_payment_status: "bank_transfer_pending",
-    })} onChanged={vi.fn()} />);
+    }));
 
     fireEvent.click(screen.getByLabelText("GST-inclusive hire cost"));
     fireEvent.click(screen.getByRole("button", { name: "Send invoice" }));
@@ -241,11 +266,11 @@ describe("AdminPaymentPanel", () => {
       json: async () => ({ ok: true }),
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<AdminPaymentPanel booking={booking({
+    renderOpenPaymentPanel(booking({
       payment_method: "bank_transfer",
       hire_payment_status: "bank_transfer_received",
       deposit_payment_status: "not_required",
-    })} onChanged={vi.fn()} />);
+    }));
 
     fireEvent.click(screen.getByRole("button", { name: "Send invoice" }));
 
@@ -262,25 +287,26 @@ describe("AdminPaymentPanel", () => {
       text: async () => "<html>Bad gateway</html>",
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<AdminPaymentPanel booking={booking({
+    renderOpenPaymentPanel(booking({
       payment_method: "bank_transfer",
       hire_payment_status: "bank_transfer_received",
       deposit_payment_status: "not_required",
-    })} onChanged={vi.fn()} />);
+    }));
 
     fireEvent.click(screen.getByRole("button", { name: "Send invoice" }));
 
     expect(await screen.findByText("Payment update failed (502): The server returned an invalid response.")).toBeInTheDocument();
   });
 
-  it("saves line items without creating or sending a payment request", async () => {
+  it("saves order edits without creating or sending a payment request", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       text: async () => JSON.stringify({ ok: true, hireAmountCents: 20000 }),
     });
+    const onChanged = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<AdminPaymentPanel booking={booking()} onChanged={vi.fn()} />);
+    render(<AdminHireItems booking={booking()} onChanged={onChanged} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Increase Audio hire quantity" }));
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -294,35 +320,64 @@ describe("AdminPaymentPanel", () => {
         saveOnly: true,
       }),
     }));
-    expect(await screen.findByRole("status")).toHaveTextContent("Hire items saved to this booking. Send the invoice when you are ready.");
-    expect(screen.getByRole("status")).toHaveClass("animate-toast-enter");
+    expect(await screen.findByRole("status")).toHaveTextContent("Hire items saved to this booking.");
+    expect(onChanged).toHaveBeenCalledWith({
+      hire_line_items: [{ ...lineItems[0], quantity: 2 }],
+      hire_amount_cents: 20000,
+    });
   });
 
-  it("slides the save confirmation out after the progress period", async () => {
-    vi.useFakeTimers();
+  it("keeps hire items visible while payment collection is collapsed", () => {
+    render(
+      <>
+        <AdminHireItems booking={booking()} onChanged={vi.fn()} />
+        <AdminPaymentPanel booking={booking()} onChanged={vi.fn()} />
+      </>,
+    );
+    expect(screen.getByRole("heading", { name: "Hire items" })).toBeVisible();
+    expect(screen.getByRole("button", { name: /^Payment/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByLabelText("Increase Audio hire quantity")).toBeVisible();
+    expect(screen.queryByLabelText("Security deposit amount")).not.toBeInTheDocument();
+  });
+
+  it("requires unsaved hire-item edits to be saved before sending an invoice", () => {
+    render(<AdminPaymentPanel booking={booking({ status: "submitted" })} onChanged={vi.fn()} hireItemsDirty />);
+    fireEvent.click(screen.getByRole("button", { name: /^Payment/ }));
+
+    expect(screen.getByText("Save the hire-item changes above before sending an invoice.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send invoice" })).toBeDisabled();
+  });
+
+  it("unblocks payment collection after order edits are saved", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       text: async () => JSON.stringify({ ok: true, hireAmountCents: 20000 }),
     });
+    const value = booking({ status: "submitted" });
     vi.stubGlobal("fetch", fetchMock);
-    render(<AdminPaymentPanel booking={booking()} onChanged={vi.fn()} />);
+    function PaymentEditor() {
+      const [dirty, setDirty] = useState(false);
+      return (
+        <>
+          <AdminHireItems booking={value} onChanged={vi.fn()} onDirtyChange={setDirty} />
+          <AdminPaymentPanel booking={value} onChanged={vi.fn()} hireItemsDirty={dirty} />
+        </>
+      );
+    }
 
+    render(<PaymentEditor />);
     fireEvent.click(screen.getByRole("button", { name: "Increase Audio hire quantity" }));
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    await act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    fireEvent.click(screen.getByRole("button", { name: /^Payment/ }));
+    expect(screen.getByRole("button", { name: "Send invoice" })).toBeDisabled();
 
-    expect(screen.getByRole("status")).toBeInTheDocument();
-    act(() => vi.advanceTimersByTime(3500));
-    expect(screen.getByRole("status")).toHaveClass("animate-toast-exit");
-    act(() => vi.advanceTimersByTime(400));
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Send invoice" })).toBeEnabled());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith("/api/admin/payments/update-booking", expect.any(Object));
   });
 
-  it("adds a catalogue item and recalculates the hire total", () => {
-    render(<AdminPaymentPanel booking={booking({ hire_line_items: [] })} onChanged={vi.fn()} />);
+  it("adds a catalogue item and recalculates the visible hire total", () => {
+    render(<AdminHireItems booking={booking({ hire_line_items: [] })} onChanged={vi.fn()} />);
 
     const catalogueSelect = screen.getByLabelText("Add catalogue item");
     expect([...catalogueSelect.querySelectorAll("optgroup")].map((group) => group.label)).toEqual([
@@ -330,14 +385,9 @@ describe("AdminPaymentPanel", () => {
     ]);
     fireEvent.change(screen.getByLabelText("Add catalogue item"), { target: { value: "package:standard-party-events" } });
     fireEvent.click(screen.getByRole("button", { name: "Add item" }));
-    fireEvent.change(screen.getByLabelText("Security deposit amount"), { target: { value: "300" } });
 
-    expect(screen.getByText(/Hire total is calculated from these items/)).toBeInTheDocument();
-    expect(screen.getByText("Total with deposit")).toBeInTheDocument();
-    expect(screen.getByText("$540.00")).toBeInTheDocument();
-    const hireTotal = screen.getByText("Calculated hire total");
+    expect(screen.getByLabelText("Hire items total")).toHaveTextContent("$240.00");
     const saveButton = screen.getByRole("button", { name: "Save" });
     expect(saveButton).toBeInTheDocument();
-    expect(hireTotal.compareDocumentPosition(saveButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { requireAdminJson } from "@/lib/admin-request";
 import { isBankTransferOption, type BankTransferOption } from "@/lib/bank-transfer";
 import { lineItemsTotalCents, parseBookingLineItems, type BookingLineItem } from "@/lib/booking-line-items";
-import { sendInvoiceEmail } from "@/lib/invoice-service";
+import { configuredBankTransferDetails, sendInvoiceEmail } from "@/lib/invoice-service";
 import { invoiceNumberForBooking } from "@/lib/invoice-reference";
 import { parseInvoiceRecipient } from "@/lib/invoice-recipient";
 import { MAX_STRIPE_HIRE_DAYS, depositHoldDate, isImmediateDepositBooking, paymentLinkExpiry, parseAmountCents, rentalDays } from "@/lib/payment-flow";
@@ -127,7 +127,20 @@ export async function POST(request: Request) {
   const targetMethod = paymentMethod ?? existing.data.payment_method as PaymentMethod | null;
   const depositCents = securityDepositCents ?? existing.data.security_deposit_cents ?? 0;
   const gstInclusive = body.gstInclusive ?? existing.data.gst_inclusive ?? true;
-  const bankTransferOption: BankTransferOption = body.bankTransferOption ?? existing.data.bank_transfer_option ?? "both";
+  if ((targetMethod === "stripe_card_hold" || targetMethod === "bank_transfer")
+    && body.bankTransferOption !== undefined && body.bankTransferOption !== "both") {
+    return NextResponse.json({ error: "Payment invoices include both PayID and bank-account details." }, { status: 400 });
+  }
+  const bankTransferOption: BankTransferOption = targetMethod === "stripe_card_hold" || targetMethod === "bank_transfer"
+    ? "both"
+    : body.bankTransferOption ?? existing.data.bank_transfer_option ?? "both";
+  if (targetMethod === "stripe_card_hold" || targetMethod === "bank_transfer") {
+    try {
+      configuredBankTransferDetails(bankTransferOption);
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Bank transfer details are not configured." }, { status: 503 });
+    }
+  }
   const update: Record<string, unknown> = {
     hire_line_items: hireLineItems,
     hire_amount_cents: hireAmountCents,
@@ -266,6 +279,8 @@ export async function POST(request: Request) {
         : null;
       Object.assign(update, {
         payment_method: "stripe_card_hold",
+        bank_transfer_option: bankTransferOption,
+        bank_transfer_reference: invoiceNumberForBooking(bookingId),
         hire_payment_status: "pending",
         deposit_payment_status: depositStatus,
         deposit_hold_date: holdDate,
@@ -274,7 +289,6 @@ export async function POST(request: Request) {
         stripe_deposit_payment_intent_id: depositPaymentIntent?.id ?? null,
         payment_token: crypto.randomUUID(),
         payment_token_expires_at: paymentLinkExpiry(existing.data.dropoff_date),
-        bank_transfer_reference: null,
       });
     }
 
@@ -287,7 +301,7 @@ export async function POST(request: Request) {
       bookingId,
       nextPaymentUrl,
       true,
-      targetMethod === "bank_transfer" ? bankTransferOption : undefined,
+      targetMethod === "cash_on_pickup" ? undefined : bankTransferOption,
       recipientResult.recipient,
       true,
       true,

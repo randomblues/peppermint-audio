@@ -20,14 +20,15 @@ The deposit is not implemented as a captured charge followed by a refund. When t
 
 ## Rental-length rule
 
-Stripe card authorisations are used only for hires of three nights or less.
+The admin payment panel offers three payment requests:
 
-- `1–3` hire nights: Stripe card payment plus deposit authorisation is available.
-- Four or more hire nights: bank transfer or cash on pickup.
+- **Standard** (up to three hire nights): the invoice includes secure Stripe card checkout and both PayID and bank-account transfer details. Customers choose one method. A bank transfer includes the hire and refundable deposit; Stripe charges the hire and handles the deposit authorisation separately.
+- **Bank Transfer Only** (any hire length): the invoice includes PayID and bank-account details, with no Stripe payment link.
+- **Cash on Pickup** (any hire length): the invoice states that hire and deposit are due in cash at pickup.
 
 The rule is defined in [`lib/payment-flow.ts`](../lib/payment-flow.ts) as `MAX_STRIPE_HIRE_DAYS = 3`. Nights are the date difference between pickup and return, with a one-night minimum for same-day hire. It is enforced again by the server when an admin creates or updates a payment request; changing only the admin UI is not sufficient.
 
-The three-night limit leaves time for return and check-in within the actual card-hold expiry. Bank transfer avoids depending on an authorisation remaining valid throughout a longer hire.
+The three-night limit leaves time for return and check-in within the actual card-hold expiry. For Standard requests paid by bank transfer, the admin confirms the received transfer before confirming the booking; this closes the unused Stripe payment request and records bank transfer as the actual payment method.
 
 ## Customer payment flow
 
@@ -38,9 +39,10 @@ An admin configures the booking in the admin payment panel:
 - hire line items and hire amount;
 - security-deposit amount;
 - GST-inclusive setting;
+- payment request type;
 - customer billing name and email.
 
-For an eligible short hire, the server:
+For an eligible Standard request, the server:
 
 1. Validates the booking and amounts.
 2. Creates or recovers the Stripe Customer.
@@ -49,7 +51,9 @@ For an eligible short hire, the server:
 5. For pickup today or tomorrow in Melbourne, creates the deposit PaymentIntent with `capture_method: "manual"` when the deposit is greater than zero. For later pickup, configures the hire intent to save the card for off-session use and schedules the deposit hold for the day before pickup instead of creating it immediately.
 6. Stores the Stripe IDs and payment state in Supabase.
 7. Generates a random payment token valid for at least 30 days and through return plus three days.
-8. Sends the customer a secure payment link.
+8. Sends the customer an invoice with the Stripe payment link and both PayID and bank-account details.
+
+Bank Transfer Only sends the same invoice details without a Stripe payment link or card authorisation. Cash on Pickup sends cash instructions only.
 
 The implementation is in [`app/api/admin/payments/create-checkout/route.ts`](../app/api/admin/payments/create-checkout/route.ts).
 

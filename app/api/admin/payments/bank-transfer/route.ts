@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { requireAdminJson } from "@/lib/admin-request";
 import { lineItemsForBooking, lineItemsTotalCents } from "@/lib/booking-line-items";
 import { isBankTransferOption, type BankTransferOption } from "@/lib/bank-transfer";
-import { sendInvoiceEmail } from "@/lib/invoice-service";
+import { configuredBankTransferDetails, sendInvoiceEmail } from "@/lib/invoice-service";
 import { invoiceNumberForBooking } from "@/lib/invoice-reference";
 import { parseInvoiceRecipient } from "@/lib/invoice-recipient";
 import { parseAmountCents, rentalDays } from "@/lib/payment-flow";
@@ -26,6 +26,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "GST-inclusive selection must be true or false." }, { status: 400 });
   }
   const bankTransferOption: BankTransferOption = isBankTransferOption(body.bankTransferOption) ? body.bankTransferOption : "both";
+  if (!cashOnPickup && bankTransferOption !== "both") {
+    return NextResponse.json({ error: "Bank Transfer Only invoices include both PayID and bank-account details." }, { status: 400 });
+  }
+  if (!cashOnPickup) {
+    try {
+      configuredBankTransferDetails("both");
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Bank transfer details are not configured." }, { status: 503 });
+    }
+  }
   const gstInclusive = body.gstInclusive !== false;
   const securityDepositCents = parseAmountCents(body.securityDepositAmount);
   if (!bookingId || securityDepositCents === null || securityDepositCents < 0) {

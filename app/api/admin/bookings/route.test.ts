@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   markInvoiceStatus: vi.fn(),
   sendBillingDocument: vi.fn(),
   releaseCancelledDeferredDeposit: vi.fn(),
+  getStripe: vi.fn(),
 }));
 
 vi.mock("@/lib/admin-request", () => ({ requireAdminJson: mocks.requireAdminJson }));
@@ -20,6 +21,7 @@ vi.mock("@/lib/invoice-service", () => ({
   sendBillingDocument: mocks.sendBillingDocument,
 }));
 vi.mock("@/lib/deferred-deposits", () => ({ releaseCancelledDeferredDeposit: mocks.releaseCancelledDeferredDeposit }));
+vi.mock("@/lib/stripe", () => ({ getStripe: mocks.getStripe }));
 
 import { PATCH } from "./route";
 
@@ -48,11 +50,11 @@ const booking = {
   security_deposit_cents: 0,
 };
 
-function session(reservation: unknown = { data: { ok: true }, error: null }, bookingLookup = true) {
+function session(reservation: unknown = { data: { ok: true }, error: null }, bookingLookup = true, bookingData = booking) {
   const lookup = {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
-    single: vi.fn().mockResolvedValue({ data: booking, error: null }),
+    single: vi.fn().mockResolvedValue({ data: bookingData, error: null }),
   };
   const update = {
     update: vi.fn().mockReturnThis(),
@@ -76,6 +78,12 @@ describe("admin booking inventory guards", () => {
     mocks.markInvoiceStatus.mockResolvedValue(undefined);
     mocks.sendBillingDocument.mockResolvedValue(undefined);
     mocks.releaseCancelledDeferredDeposit.mockResolvedValue(undefined);
+    mocks.getStripe.mockReturnValue({
+      paymentIntents: {
+        retrieve: vi.fn().mockResolvedValue({ status: "requires_payment_method" }),
+        cancel: vi.fn().mockResolvedValue({ status: "canceled" }),
+      },
+    });
   });
 
   it("blocks confirmation and customer confirmation email when inventory is short", async () => {
@@ -104,6 +112,80 @@ describe("admin booking inventory guards", () => {
     });
     expect(admin.update.update).toHaveBeenCalledWith(expect.objectContaining({ status: "confirmed" }));
     expect(mocks.sendTrackedBookingConfirmation).toHaveBeenCalled();
+  });
+
+  it("switches an unpaid Standard request to bank transfer when recording receipt", async () => {
+    const stripe = {
+      paymentIntents: {
+        retrieve: vi.fn().mockResolvedValue({ status: "requires_payment_method" }),
+        cancel: vi.fn().mockResolvedValue({ status: "canceled" }),
+      },
+    };
+    mocks.getStripe.mockReturnValue(stripe);
+    const standardBooking = {
+      ...booking,
+      payment_method: "stripe_card_hold",
+      bank_transfer_option: "both",
+      hire_payment_status: "pending",
+      deposit_payment_status: "scheduled",
+      security_deposit_cents: 10000,
+      stripe_hire_payment_intent_id: "pi_hire",
+      stripe_deposit_payment_intent_id: "pi_deposit",
+    };
+    const admin = session(undefined, true, standardBooking);
+    mocks.requireAdminJson.mockResolvedValue({ session: admin, body: { id: booking.id, status: "confirmed", payment_received: true } });
+
+    const response = await PATCH(new Request("http://localhost/api/admin/bookings", { method: "PATCH" }));
+
+    expect(response.status).toBe(200);
+    expect(stripe.paymentIntents.cancel).toHaveBeenCalledTimes(2);
+    expect(admin.update.update).toHaveBeenCalledWith(expect.objectContaining({
+      status: "confirmed",
+      payment_method: "bank_transfer",
+      payment_token: null,
+      stripe_hire_payment_intent_id: null,
+      stripe_deposit_payment_intent_id: null,
+      hire_payment_status: "bank_transfer_received",
+      deposit_payment_status: "bank_transfer_received",
+    }));
+    expect(mocks.sendBillingDocument).toHaveBeenCalledWith(
+      admin.admin,
+      booking.id,
+      "payment_receipt",
+      undefined,
+      false,
+      "both",
+      undefined,
+      true,
+    );
+  });
+
+  it("does not record a Standard bank transfer while a Stripe payment is processing", async () => {
+    const stripe = {
+      paymentIntents: {
+        retrieve: vi.fn().mockResolvedValueOnce({ status: "processing" }).mockResolvedValueOnce({ status: "requires_capture" }),
+        cancel: vi.fn().mockResolvedValue({ status: "canceled" }),
+      },
+    };
+    mocks.getStripe.mockReturnValue(stripe);
+    const standardBooking = {
+      ...booking,
+      payment_method: "stripe_card_hold",
+      bank_transfer_option: "both",
+      hire_payment_status: "pending",
+      deposit_payment_status: "scheduled",
+      stripe_hire_payment_intent_id: "pi_hire",
+      stripe_deposit_payment_intent_id: "pi_deposit",
+    };
+    const admin = session(undefined, true, standardBooking);
+    mocks.requireAdminJson.mockResolvedValue({ session: admin, body: { id: booking.id, status: "confirmed", payment_received: true } });
+
+    const response = await PATCH(new Request("http://localhost/api/admin/bookings", { method: "PATCH" }));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining("could not be closed safely") });
+    expect(admin.update.update).not.toHaveBeenCalled();
+    expect(stripe.paymentIntents.cancel).not.toHaveBeenCalled();
   });
 
   it("releases the inventory reservation when a booking is cancelled", async () => {

@@ -79,6 +79,36 @@ describe("AdminConsole", () => {
     expect(screen.queryByRole("dialog", { name: "Has payment been received?" })).not.toBeInTheDocument();
   });
 
+  it("asks how to record payment when Standard is paid by bank transfer", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ bookings: [{
+        ...booking,
+        payment_method: "stripe_card_hold",
+        bank_transfer_option: "both",
+        hire_payment_status: "pending",
+        deposit_payment_status: "scheduled",
+      }] }))
+      .mockResolvedValue(jsonResponse({ ok: true, payment: {
+        payment_method: "bank_transfer",
+        bank_transfer_option: "both",
+        hire_payment_status: "bank_transfer_received",
+        deposit_payment_status: "bank_transfer_received",
+      } }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AdminConsole />);
+    fireEvent.click(await screen.findByText("Alex Smith"));
+
+    fireEvent.change(screen.getByLabelText("Update booking status"), { target: { value: "confirmed" } });
+    expect(screen.getByRole("dialog", { name: "Has payment been received?" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Yes, confirm booking" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/bookings", expect.objectContaining({
+      body: JSON.stringify({ id: "one", status: "confirmed", payment_received: true }),
+    })));
+    await waitFor(() => expect(screen.getByLabelText("Update booking status")).toHaveValue("confirmed"));
+    expect(screen.queryByRole("dialog", { name: "Has payment been received?" })).not.toBeInTheDocument();
+  });
+
   it.each([
     { payment_method: "stripe_card_hold", hire_payment_status: "paid" },
     { payment_method: "bank_transfer", hire_payment_status: "bank_transfer_received" },
@@ -120,7 +150,8 @@ describe("AdminConsole", () => {
     fireEvent.click(await screen.findByText("Alex Smith"));
     expect(screen.getByLabelText("Hire items total")).toHaveTextContent("$110.00");
     expect(screen.getByText(/Current items saved to this booking.*3 nights/)).toBeInTheDocument();
-    expect(screen.getByText("Quantity: 1 · $55.00 each / night")).toBeInTheDocument();
+    expect(screen.getByText("$55.00 each / night")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Increase .* quantity/ })).toBeEnabled();
   });
 
   it("loads bookings and shows the loading state", async () => {
@@ -237,14 +268,38 @@ describe("AdminConsole", () => {
     expect(document.querySelector(".backdrop-blur-md")).toBeInTheDocument();
     expect(screen.getAllByText("Booking reference: PA-ONE").length).toBeGreaterThan(0);
     expect(screen.getByText("PA-ONE")).toBeInTheDocument();
-    expect(screen.getByLabelText("Update booking status")).toHaveClass("appearance-none", "pr-9");
+    expect(within(bookingDialog).getByText("Event type")).toBeInTheDocument();
+    expect(within(bookingDialog).getByText("Party", { exact: true })).toBeInTheDocument();
+    expect(within(bookingDialog).getByText("1 Oct 2026").closest("span.inline-flex")).toHaveClass("rounded-lg", "border-white/10", "bg-white/[0.035]");
+    expect(within(bookingDialog).getByText("Booking reference: PA-ONE").closest("p")).toHaveClass("text-[11px]", "bg-background/35");
+    expect(screen.getByLabelText("Update booking status")).toHaveClass("appearance-none", "max-w-48", "pr-9");
+    expect(screen.getByLabelText("Update booking status").parentElement).toHaveClass("relative", "max-w-48");
+    const detailGrid = screen.getByText("Customer").closest(".grid");
+    const statusControl = screen.getByLabelText("Update booking status");
+    expect(statusControl.closest(".grid")).toBe(detailGrid);
+    const statusControlItem = statusControl.closest("label")!;
+    expect(statusControlItem).toHaveClass("sm:col-start-1", "sm:row-start-5");
+    expect(statusControlItem).not.toHaveClass("sm:col-span-2");
+    const additionalDetailsLabel = screen.getByText("Additional details", { exact: true });
+    expect(statusControlItem.compareDocumentPosition(additionalDetailsLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(additionalDetailsLabel.parentElement).toHaveClass("sm:col-start-2", "sm:row-start-5");
+    expect(additionalDetailsLabel).toHaveClass("text-xs", "text-muted-foreground");
+    expect(screen.getByText("Photo ID", { exact: true })).toHaveClass("text-xs", "text-muted-foreground");
+    const statusBadge = within(bookingDialog).getByRole("status", { name: "Booking status: Submitted" });
+    expect(statusBadge).toHaveTextContent("Submitted");
+    expect(statusBadge).toHaveClass("h-8", "rounded-full", "px-3", "text-sm", "tracking-wide", "ring-white/10", "backdrop-blur-md", "border-amber-300/35", "bg-gradient-to-b", "text-amber-200");
+    expect(statusBadge.querySelector("span[aria-hidden='true']")).toHaveClass("size-1.5", "rounded-full", "bg-current", "ring-current/20");
+    const bookingTitle = within(bookingDialog).getByRole("heading", { level: 2, name: "Alex Smith" });
+    expect(bookingTitle.parentElement).toHaveClass("flex-col", "sm:flex-row");
+    expect(bookingTitle).toHaveClass("w-full", "sm:w-auto");
+    expect(within(bookingDialog).queryByText("Workflow state")).not.toBeInTheDocument();
     expect(screen.getByText("Customer").closest(".grid")).toHaveClass("sm:grid-cols-2");
-    const photoIdActions = screen.getByRole("heading", { name: "Photo ID" }).nextElementSibling as HTMLElement;
+    const photoIdActions = screen.getByText("Photo ID", { exact: true }).nextElementSibling as HTMLElement;
     expect(photoIdActions).toHaveClass("flex", "flex-wrap", "gap-2");
-    const privateIdButtons = within(photoIdActions).getAllByRole("button", { name: "View private ID" });
+    const privateIdButtons = within(photoIdActions).getAllByRole("button", { name: "View ID" });
     expect(privateIdButtons).toHaveLength(2);
     for (const button of privateIdButtons) {
-      expect(button).toHaveClass("h-7");
+      expect(button).toHaveClass("h-6", "px-1", "underline-offset-4");
       expect(button).not.toHaveClass("w-full");
     }
     expect(screen.getAllByRole("heading", { name: "Hire items" })).toHaveLength(1);
@@ -252,17 +307,24 @@ describe("AdminConsole", () => {
     const savedHireItem = within(savedHireItems).getByText("Wireless microphone");
     const savedHireItemsTotal = within(savedHireItems).getByLabelText("Hire items total");
     expect(savedHireItem.compareDocumentPosition(savedHireItemsTotal) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    const additionalDetails = screen.getByRole("heading", { name: "Additional details" });
-    const internalNotes = screen.getByRole("heading", { name: "Internal notes" });
-    const paymentCollection = screen.getByRole("button", { name: "Open payment collection" });
+    const additionalDetails = screen.getByText("Additional details", { exact: true });
+    expect(additionalDetails.closest(".grid")).toHaveClass("sm:grid-cols-2");
+    expect(screen.getByText("Please call on arrival.")).not.toHaveClass("rounded-lg", "bg-muted", "p-3");
+    const internalNotes = screen.getByRole("button", { name: "Edit internal notes" });
+    expect(internalNotes).toHaveClass("h-6", "px-0");
+    expect(internalNotes).toHaveTextContent("Edit notes");
+    expect(internalNotes).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByPlaceholderText("Add a private note for the team…")).not.toBeVisible();
+    const paymentCollection = screen.getByRole("button", { name: /^Payment/ });
+    expect(paymentCollection).toHaveAttribute("aria-expanded", "false");
     expect(additionalDetails.compareDocumentPosition(paymentCollection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(internalNotes.compareDocumentPosition(paymentCollection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Communications/ }).compareDocumentPosition(paymentCollection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(paymentCollection);
-    expect(screen.getByRole("dialog", { name: "Payment collection" })).toBeInTheDocument();
-    expect(screen.getByRole("dialog", { name: "Payment collection" }).querySelector('button[aria-expanded]')).toBeNull();
-    expect(screen.getAllByRole("heading", { name: "Hire items" })).toHaveLength(2);
-    fireEvent.click(screen.getByRole("button", { name: "Close payment collection" }));
+    expect(paymentCollection).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Payment method")).toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "Payment collection" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: "Hire items" })).toHaveLength(1);
     expect(screen.queryByText("Add-ons")).not.toBeInTheDocument();
     expect(screen.queryByText("Package", { exact: true })).not.toBeInTheDocument();
     expect(screen.queryByText("Guests", { exact: true })).not.toBeInTheDocument();
@@ -277,6 +339,10 @@ describe("AdminConsole", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/bookings", expect.objectContaining({
       method: "PATCH", body: JSON.stringify({ id: "one", status: "confirmed" }),
     })));
+    await waitFor(() => expect(within(bookingDialog).getByRole("status", { name: "Booking status: Confirmed" })).toHaveTextContent("Confirmed"));
+    fireEvent.click(internalNotes);
+    expect(internalNotes).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByPlaceholderText("Add a private note for the team…")).toHaveValue("Call about access");
     fireEvent.change(screen.getByPlaceholderText("Add a private note for the team…"), { target: { value: "Ready for pickup" } });
     fireEvent.click(screen.getByRole("button", { name: "Save notes" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/bookings", expect.objectContaining({
@@ -298,6 +364,36 @@ describe("AdminConsole", () => {
     fireEvent.click(privateIdButtons[0]);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/photo-link?path=private%2Falex-id.jpg"));
     expect(open).toHaveBeenCalledWith("https://signed.example/id.jpg", "_blank", "noopener,noreferrer");
+  });
+
+  it("shows an add-notes option before opening the private notes editor", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
+      bookings: [{ ...booking, internal_notes: "" }],
+    })));
+    render(<AdminConsole />);
+    fireEvent.click(await screen.findByText("Alex Smith"));
+
+    const addNotes = screen.getByRole("button", { name: "Add internal notes" });
+    expect(addNotes).toHaveClass("h-6", "px-0");
+    expect(addNotes).toHaveTextContent("Add notes");
+    expect(addNotes).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByPlaceholderText("Add a private note for the team…")).not.toBeVisible();
+
+    fireEvent.click(addNotes);
+    expect(addNotes).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByPlaceholderText("Add a private note for the team…")).toBeVisible();
+  });
+
+  it("uses a compact dash when the customer provided no additional details", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
+      bookings: [{ ...booking, additional_details: "" }],
+    })));
+    render(<AdminConsole />);
+    fireEvent.click(await screen.findByText("Alex Smith"));
+
+    const additionalDetails = screen.getByText("Additional details", { exact: true });
+    expect(additionalDetails.nextElementSibling).toHaveTextContent("-");
+    expect(additionalDetails.nextElementSibling).not.toHaveClass("rounded-lg", "bg-muted", "p-3");
   });
 
   it("exports an archive after confirmation", async () => {

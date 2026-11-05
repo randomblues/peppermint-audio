@@ -37,7 +37,7 @@ describe("PhotoIdCapture", () => {
     expect(screen.queryByText(/Photos stay on your device/)).not.toBeInTheDocument();
   });
 
-  it("opens a full-screen guide and lets customers review a low-light photo before using it", async () => {
+  it("lets customers use an ID photo with a quality warning after checking the details", async () => {
     const stop = vi.fn();
     const stream = { getTracks: () => [{ stop }] } as unknown as MediaStream;
     const getUserMedia = vi.fn().mockResolvedValue(stream);
@@ -80,18 +80,20 @@ describe("PhotoIdCapture", () => {
     fireEvent.canPlay(preview);
     fireEvent.click(screen.getByRole("button", { name: "Capture front" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/too dark/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/a little dark/i);
     const [, cropX, cropY, cropWidth, cropHeight] = drawImage.mock.calls[0];
     expect(cropX).toBeGreaterThan(0);
     expect(cropY).toBeGreaterThan(0);
     expect(cropWidth / cropHeight).toBeCloseTo(1.586, 2);
     expect(screen.getByRole("img", { name: "Captured front of photo ID" })).toHaveAttribute("src", "blob:photo-id-preview");
     expect(screen.queryByText("Front side preview")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Use photo anyway" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Use this photo" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Retake photo" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Use photo anyway" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Retake photo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use photo anyway" }));
+    await waitFor(() => expect(onCapture).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "photo-id-front.jpg", type: "image/jpeg" }),
+    ));
     fireEvent.canPlay(await screen.findByLabelText("Live photo ID camera preview"));
     const neutralPixels = new Uint8ClampedArray(160 * 101 * 4);
     for (let index = 0; index < neutralPixels.length; index += 4) {
@@ -102,8 +104,8 @@ describe("PhotoIdCapture", () => {
     }
     getImageData.mockReturnValue({ data: neutralPixels } as unknown as ImageData);
     fireEvent.click(screen.getByRole("button", { name: "Capture front" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/may be blurry/i);
-    expect(screen.queryByRole("button", { name: "Use this photo" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent(/may be a little blurry/i);
+    expect(screen.getByRole("button", { name: "Use photo anyway" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retake photo" }));
     fireEvent.canPlay(await screen.findByLabelText("Live photo ID camera preview"));
 

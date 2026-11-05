@@ -54,6 +54,7 @@ export function PhotoIdCapture({
   const [reviewFile, setReviewFile] = useState<File | null>(null);
   const [reviewUrl, setReviewUrl] = useState("");
   const [qualityTip, setQualityTip] = useState("");
+  const [canUseReviewPhoto, setCanUseReviewPhoto] = useState(false);
   const [liveGuidance, setLiveGuidance] = useState("Place your ID inside the frame and keep all four edges visible.");
   const videoRef = useRef<HTMLVideoElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -209,9 +210,10 @@ export function PhotoIdCapture({
     setReviewFile(null);
     setReviewUrl("");
     setQualityTip("");
+    setCanUseReviewPhoto(false);
   }
 
-  async function getQualityTip(canvas: HTMLCanvasElement): Promise<string> {
+  async function getQualityTip(canvas: HTMLCanvasElement): Promise<{ message: string; canUsePhoto: boolean }> {
     const sample = document.createElement("canvas");
     sample.width = 160;
     sample.height = 101;
@@ -246,11 +248,11 @@ export function PhotoIdCapture({
     }
 
     const averageBrightness = brightnessTotal / grayscale.length;
-    if (averageBrightness < 75 || darkPixelCount / grayscale.length > 0.45) {
-      return "This photo looks too dark. Add more light and try again.";
-    }
-    if (brightPixelCount / grayscale.length > 0.35) {
-      return "Some details may be washed out by glare. Tilt the ID slightly and try again.";
+    let qualityWarning = "";
+    if (averageBrightness < 65 || darkPixelCount / grayscale.length > 0.55) {
+      qualityWarning = "This photo looks a little dark. Check that the details are readable before using it.";
+    } else if (brightPixelCount / grayscale.length > 0.98) {
+      qualityWarning = "There may be some glare. Check that the details are readable before using this photo.";
     }
 
     let laplacianTotal = 0;
@@ -270,7 +272,9 @@ export function PhotoIdCapture({
       }
     }
     const laplacianVariance = laplacianSquaredTotal / sampleCount - (laplacianTotal / sampleCount) ** 2;
-    if (laplacianVariance < 18) return "This photo may be blurry. Hold steady and try again.";
+    if (!qualityWarning && laplacianVariance < 12) {
+      qualityWarning = "This photo may be a little blurry. Check that the details are readable before using it.";
+    }
 
     if (!ocrWorkerRef.current) {
       ocrWorkerRef.current = import("tesseract.js")
@@ -290,9 +294,9 @@ export function PhotoIdCapture({
         break;
       }
     }
-    if (!recognizedId) return unrecognizedPhotoIdMessage;
+    if (!recognizedId) return { message: unrecognizedPhotoIdMessage, canUsePhoto: false };
 
-    return "";
+    return { message: qualityWarning, canUsePhoto: true };
   }
 
   function rotateCanvas(source: HTMLCanvasElement, degrees: number): HTMLCanvasElement {
@@ -327,12 +331,12 @@ export function PhotoIdCapture({
       if (!context) throw new Error("Photo capture is unavailable in this browser.");
       context.drawImage(video, source.x, source.y, source.width, source.height, 0, 0, canvas.width, canvas.height);
 
-      let nextQualityTip: string;
+      let qualityResult: { message: string; canUsePhoto: boolean };
       try {
-        nextQualityTip = await getQualityTip(canvas);
+        qualityResult = await getQualityTip(canvas);
       } catch (error) {
         console.error("Photo ID content check failed:", error);
-        nextQualityTip = "We couldn’t check this photo. Please try again or choose an image file.";
+        qualityResult = { message: "We couldn’t check this photo. Please try again or choose an image file.", canUsePhoto: false };
       }
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
       if (!blob) throw new Error("We could not capture that photo. Please try again or choose an image file.");
@@ -340,7 +344,8 @@ export function PhotoIdCapture({
       const file = new File([blob], `photo-id-${side}.jpg`, { type: "image/jpeg" });
       setReviewFile(file);
       setReviewUrl(URL.createObjectURL(blob));
-      setQualityTip(nextQualityTip);
+      setQualityTip(qualityResult.message);
+      setCanUseReviewPhoto(qualityResult.canUsePhoto);
       setIsReady(false);
       setStream(null);
     } catch (error) {
@@ -355,15 +360,17 @@ export function PhotoIdCapture({
     setReviewFile(null);
     setReviewUrl("");
     setQualityTip("");
+    setCanUseReviewPhoto(false);
     void startCamera();
   }
 
   function usePhoto() {
-    if (!reviewFile || qualityTip) return;
+    if (!reviewFile || !canUseReviewPhoto) return;
     onCapture(reviewFile);
     setReviewFile(null);
     setReviewUrl("");
     setQualityTip("");
+    setCanUseReviewPhoto(false);
     if (capturedCount === 1) {
       closeCamera();
     } else {
@@ -467,6 +474,10 @@ export function PhotoIdCapture({
                 {!qualityTip ? (
                   <Button type="button" onClick={usePhoto} className="w-full sm:flex-1">
                     Use this photo
+                  </Button>
+                ) : canUseReviewPhoto ? (
+                  <Button type="button" onClick={usePhoto} className="w-full sm:flex-1">
+                    Use photo anyway
                   </Button>
                 ) : null}
               </div>

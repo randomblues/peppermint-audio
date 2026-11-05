@@ -12,6 +12,13 @@ import { depositHoldDate, melbourneDateKey } from "./payment-flow";
 
 afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks(); });
 
+function configureBankTransferDetails() {
+  vi.stubEnv("BANK_TRANSFER_ACCOUNT_NAME", "Peppermint Audio");
+  vi.stubEnv("BANK_TRANSFER_BSB", "123-456");
+  vi.stubEnv("BANK_TRANSFER_ACCOUNT_NUMBER", "12345678");
+  vi.stubEnv("BANK_TRANSFER_PAYID", "payments@example.com");
+}
+
 describe("billing delivery tracking and retry safety", () => {
   function setup(status = "pending", providerMessageId: string | null = null) {
     vi.stubEnv("RESEND_API_KEY", "re_test_placeholder");
@@ -100,6 +107,7 @@ describe("billing document email copy", () => {
   it.each([true, false])("a scheduled card deposit is not represented as money received (GST %s)", async gstInclusive => {
     vi.stubEnv("RESEND_API_KEY", "re_test_placeholder");
     vi.stubEnv("ENQUIRY_FROM_EMAIL", "test@example.com");
+    configureBankTransferDetails();
     mocks.pdf.mockResolvedValue(Buffer.from("test-pdf"));
     mocks.send.mockResolvedValue({ data: { id: "test-email" }, error: null });
     const booking = {
@@ -128,10 +136,19 @@ describe("billing document email copy", () => {
     }));
     await sendBillingDocument(admin as never, booking.id, "invoice");
     expect(mocks.send.mock.lastCall?.[0].text).toContain("https://example.com/pay/token");
+    expect(mocks.send.mock.lastCall?.[0].text).toContain("PayID payments@example.com");
+    expect(mocks.send.mock.lastCall?.[0].text).toContain("BSB 123-456");
+    expect(mocks.send.mock.lastCall?.[0].text).toContain("account 12345678");
     expect(mocks.pdf).toHaveBeenLastCalledWith(expect.objectContaining({
       notes: expect.arrayContaining([
-        expect.stringContaining("The $100.00 security deposit is a temporary card hold scheduled for 8 November 2099 (one day before pickup)."),
+        expect.stringContaining("If paying by bank transfer, include the refundable security deposit in the transfer."),
       ]),
+      paymentMethod: "Card payment or bank transfer",
+      bankTransfer: expect.objectContaining({
+        payId: "payments@example.com",
+        bsb: "123-456",
+        accountNumber: "12345678",
+      }),
     }));
     await sendBillingDocument(admin as never, booking.id, "deposit_release");
     const releaseEmail = mocks.send.mock.lastCall?.[0];
@@ -144,6 +161,7 @@ describe("billing document email copy", () => {
   it("describes a last-minute deposit hold as part of checkout on the invoice", async () => {
     vi.stubEnv("RESEND_API_KEY", "re_test_placeholder");
     vi.stubEnv("ENQUIRY_FROM_EMAIL", "test@example.com");
+    configureBankTransferDetails();
     mocks.pdf.mockResolvedValue(Buffer.from("test-pdf"));
     mocks.send.mockResolvedValue({ data: { id: "test-email" }, error: null });
     const pickupDate = melbourneDateKey();
@@ -169,7 +187,7 @@ describe("billing document email copy", () => {
     expect(mocks.pdf).toHaveBeenCalledWith(expect.objectContaining({
       totalCents: 26000,
       notes: expect.arrayContaining([
-        "The hire payment is due now. The $100.00 security deposit is a temporary card hold placed as part of checkout.",
+        expect.stringContaining("If paying by bank transfer, include the refundable security deposit in the transfer."),
       ]),
     }));
   });
@@ -199,6 +217,8 @@ describe("billing document email copy", () => {
     const admin = { from: vi.fn((table: string) => query(table === "bookings" ? booking : table === "invoices" ? invoice : { id: "document-1", status: "pending" })) };
     for (const document of ["invoice", "payment_receipt"] as const) {
       await sendBillingDocument(admin as never, booking.id, document);
+      expect(mocks.send.mock.lastCall?.[0].text).not.toContain("PayID");
+      expect(mocks.send.mock.lastCall?.[0].text).not.toContain("BSB");
       expect(mocks.pdf).toHaveBeenLastCalledWith(expect.objectContaining({
         title: document === "invoice" ? (gstInclusive ? "Tax Invoice" : "Invoice") : "Payment receipt",
         totalCents: 42000,
@@ -209,6 +229,42 @@ describe("billing document email copy", () => {
         ],
       }));
     }
+  });
+
+  it("sends bank-transfer-only invoices with PayID and account details but no Stripe link", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test_placeholder");
+    vi.stubEnv("ENQUIRY_FROM_EMAIL", "test@example.com");
+    configureBankTransferDetails();
+    mocks.pdf.mockResolvedValue(Buffer.from("test-pdf"));
+    mocks.send.mockResolvedValue({ data: { id: "bank-transfer-email" }, error: null });
+    const booking = {
+      id: "booking-bank", email: "test@example.com", first_name: "Test", last_name: "Customer", event_type: "Party",
+      pickup_date: "2026-10-09", dropoff_date: "2026-10-10",
+      hire_line_items: [catalogLineItemFromKey("package:standard-party-events")],
+      hire_amount_cents: 16000, security_deposit_cents: 10000, payment_method: "bank_transfer",
+      bank_transfer_reference: "PA-TEST-BANK",
+    };
+    const invoice = {
+      id: "invoice-bank", booking_id: booking.id, invoice_number: "PA-TEST-BANK", payment_method: "bank_transfer",
+      hire_amount_cents: 16000, security_deposit_cents: 10000, total_amount_cents: 26000,
+      gst_inclusive: true, bank_transfer_option: "both", status: "issued", payment_url: null,
+    };
+    const query = (data: unknown) => ({
+      select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), update: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data, error: null }), maybeSingle: vi.fn().mockResolvedValue({ data, error: null }),
+    });
+    const admin = { from: vi.fn((table: string) => query(table === "bookings" ? booking : table === "invoices" ? invoice : { id: "doc-bank", status: "pending" })) };
+
+    await sendBillingDocument(admin as never, booking.id, "invoice");
+
+    expect(mocks.send.mock.lastCall?.[0].text).toContain("PayID payments@example.com");
+    expect(mocks.send.mock.lastCall?.[0].text).toContain("BSB 123-456");
+    expect(mocks.send.mock.lastCall?.[0].text).toContain("account 12345678");
+    expect(mocks.send.mock.lastCall?.[0].text).not.toContain("Pay securely online");
+    expect(mocks.pdf).toHaveBeenCalledWith(expect.objectContaining({
+      paymentMethod: "Bank transfer",
+      bankTransfer: expect.objectContaining({ reference: "PA-TEST-BANK", amountCents: 26000 }),
+    }));
   });
 
   it("uses the correct invoice label for the GST setting", () => {

@@ -215,11 +215,12 @@ fails, the form explains how to retry rather than submitting an oversized file.
 On phones, **Scan photo ID** opens a full-screen camera guide with a card
 outline, live framing guidance for distance, lighting, glare, and focus, and
 browser-local OCR that looks for photo-ID labels and identity fields. Customers
-can review and retake each side; photos without recognizable ID text or that
-fail a quality check cannot be used from the scanner. This is a content/quality
-check, not identity or authenticity verification. Tesseract's worker and
-English OCR data are downloaded by the browser; captured images and recognized
-text stay on-device and are only uploaded when the booking request is submitted.
+can review and retake each side. Lighting, glare, and focus checks give
+suggestions rather than blocking a photo when OCR recognizes ID text; photos
+without recognizable ID text cannot be used from the scanner. This is a
+content/quality check, not identity or authenticity verification. Tesseract's
+worker and English OCR data are downloaded by the browser; captured images and
+recognized text stay on-device and are only uploaded when the booking request is submitted.
 The existing file upload remains available as a fallback.
 The browser regression test uses `tests/fixtures/synthetic-photo.heic`, an
 800x500 generated colour gradient encoded with macOS `sips`; it contains no ID
@@ -271,7 +272,7 @@ The separate Bookings CSV contains contact details and must be handled securely;
 private photo IDs are not exported. An empty booking-status selection shows no
 results in Bookings.
 
-The admin bookings view includes a **Send Email** menu with booking confirmation, pickup reminder, custom email, and invoice options. New Stripe payment links remain valid for at least 30 days and through return plus three days. Bank-transfer and cash-on-pickup invoices do not expose customer payment secrets.
+The admin payment panel offers **Standard** for hires of up to three nights, **Bank Transfer Only** for any hire length, and **Cash on Pickup**. Standard invoices include a Stripe card link and both PayID and bank-account details; customers choose one method. Bank-transfer-only invoices include both bank methods without a Stripe link, while cash invoices contain cash instructions only. Stripe payment links remain valid for at least 30 days and through return plus three days.
 
 When a card payment request is active, use **Send invoice** to change hire items
 and replace the payment link together. Saving changed items alone is rejected so
@@ -282,10 +283,12 @@ Invalid deposit amounts are rejected rather than retaining an earlier amount.
 Booking confirmation saves the confirmed status before sending the customer
 email. A successful Stripe hire payment automatically confirms submitted bookings;
 deposit-only events do not confirm bookings, and cancelled/completed bookings are
-never reopened. Review availability before sending a Stripe payment link.
-For bank transfers, choose **Confirmed** in the booking status control and answer
-the payment-received dialog. **Yes, confirm booking** records hire and deposit
-receipt, confirms the booking, and sends the confirmation and payment receipt.
+never reopened. Review availability before sending a Standard payment request.
+For bank transfers, including transfers from a Standard invoice, choose
+**Confirmed** in the booking status control and answer the payment-received
+dialog. **Yes, confirm booking** records the transfer and deposit receipt,
+closes the unused Stripe request when applicable, confirms the booking, and
+sends the confirmation and payment receipt.
 The separate **Confirm payment** checkbox is no longer needed. Cash-on-pickup
 bookings can still be confirmed while payment is due.
 If delivery fails, the booking remains confirmed and the admin can retry

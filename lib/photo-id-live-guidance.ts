@@ -33,7 +33,7 @@ export function getPhotoIdLiveGuidance({ data, width, height }: FramePixels): st
   }
 
   const isTooDark = brightnessTotal / grayscale.length < 65 || darkPixels / grayscale.length > 0.55;
-  const hasGlare = brightPixels / grayscale.length > 0.3;
+  const hasGlare = brightPixels / grayscale.length > 0.98;
 
   const verticalEdges = new Array<number>(width).fill(0);
   const horizontalEdges = new Array<number>(height).fill(0);
@@ -45,14 +45,14 @@ export function getPhotoIdLiveGuidance({ data, width, height }: FramePixels): st
   for (let x = 1; x < width - 1; x += 1) {
     let edgeCount = 0;
     for (let y = yStart; y < yEnd; y += 1) {
-      if (Math.abs(grayscale[y * width + x] - grayscale[y * width + x - 1]) >= 32) edgeCount += 1;
+      if (Math.abs(grayscale[y * width + x] - grayscale[y * width + x - 1]) >= 24) edgeCount += 1;
     }
     verticalEdges[x] = edgeCount / Math.max(1, yEnd - yStart);
   }
   for (let y = 1; y < height - 1; y += 1) {
     let edgeCount = 0;
     for (let x = xStart; x < xEnd; x += 1) {
-      if (Math.abs(grayscale[y * width + x] - grayscale[(y - 1) * width + x]) >= 32) edgeCount += 1;
+      if (Math.abs(grayscale[y * width + x] - grayscale[(y - 1) * width + x]) >= 24) edgeCount += 1;
     }
     horizontalEdges[y] = edgeCount / Math.max(1, xEnd - xStart);
   }
@@ -61,14 +61,14 @@ export function getPhotoIdLiveGuidance({ data, width, height }: FramePixels): st
   const right = strongestEdge(verticalEdges, Math.ceil(width * 0.6), width - 1);
   const top = strongestEdge(horizontalEdges, 1, Math.floor(height * 0.4));
   const bottom = strongestEdge(horizontalEdges, Math.ceil(height * 0.6), height - 1);
-  if (Math.min(left.strength, right.strength, top.strength, bottom.strength) < 0.38) {
+  if (Math.min(left.strength, right.strength, top.strength, bottom.strength) < 0.25) {
     const borderHasCardEdge = Math.max(
       ...verticalEdges.slice(1, Math.ceil(width * 0.04)),
       ...verticalEdges.slice(Math.floor(width * 0.96), width - 1),
       ...horizontalEdges.slice(1, Math.ceil(height * 0.04)),
       ...horizontalEdges.slice(Math.floor(height * 0.96), height - 1),
-    ) >= 0.38;
-    if (borderHasCardEdge) return "Move back a little so all four corners fit in the frame.";
+    ) >= 0.25;
+    if (borderHasCardEdge) return "Move back slightly so all four corners fit in the frame.";
     if (isTooDark) return "Add more light so the details are visible.";
     if (hasGlare) return "Reduce glare by tilting the card slightly.";
     return "Place your ID in the frame and keep all four edges visible.";
@@ -82,11 +82,11 @@ export function getPhotoIdLiveGuidance({ data, width, height }: FramePixels): st
   const cardHeight = bottomRatio - topRatio;
   const cardArea = cardWidth * cardHeight;
 
-  if (leftRatio < 0.04 || rightRatio > 0.96 || topRatio < 0.04 || bottomRatio > 0.96 || cardArea > 0.88) {
-    return "Move back a little so all four corners fit in the frame.";
+  if (leftRatio < 0.02 || rightRatio > 0.98 || topRatio < 0.02 || bottomRatio > 0.98 || cardArea > 0.94) {
+    return "Move back slightly so all four corners fit in the frame.";
   }
-  if (cardWidth < 0.68 || cardHeight < 0.58 || cardArea < 0.5) {
-    return "Move closer so your ID fills more of the frame.";
+  if (cardWidth < 0.55 || cardHeight < 0.45 || cardArea < 0.28) {
+    return "If the card looks small, move a little closer.";
   }
   if (isTooDark) return "Add more light so the details are visible.";
   if (hasGlare) return "Reduce glare by tilting the card slightly.";
@@ -109,7 +109,7 @@ export function getPhotoIdLiveGuidance({ data, width, height }: FramePixels): st
     }
   }
   const laplacianVariance = laplacianSquaredTotal / sampleCount - (laplacianTotal / sampleCount) ** 2;
-  if (laplacianVariance < 18) return "Hold steady so the card stays in focus.";
+  if (laplacianVariance < 12) return "Hold steady so the card stays in focus.";
 
   return "Looks good. Hold steady and capture.";
 }

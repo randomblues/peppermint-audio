@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, CalendarDays, ChevronLeft, ChevronRight, Download, Filter, RotateCcw, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, CalendarDays, ChevronLeft, ChevronRight, Clock3, Download, Filter, Mail, RotateCcw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { bookingStatuses, type BookingStatus } from "@/lib/admin-dashboard";
@@ -157,9 +157,17 @@ export function AdminBookingsWorkspace<T extends AnalyticsBooking>({
                 {shown.length ? <div className="divide-y">{shown.map((booking) => <button key={booking.id} onClick={() => onSelect(booking)} className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 p-4 text-left transition-colors hover:bg-muted/50 sm:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_auto]">
                   <span className="min-w-0">
                     <span className="block break-words font-medium">{booking.first_name} {booking.last_name}</span>
-                    <span className="mt-1 block break-all text-xs text-muted-foreground">{booking.email || "No email"}</span>
-                    <span className="mt-2 block text-xs text-muted-foreground">Hire Dates: {prettyDate(booking.pickup_date)}{booking.dropoff_date ? ` – ${prettyDate(booking.dropoff_date)}` : ""}</span>
-                    <span className="mt-1 block text-xs text-muted-foreground">Submitted On: {submittedDate(booking)}</span>
+                    <span className="mt-1 flex min-w-0 items-center gap-1.5 break-all text-xs text-muted-foreground"><Mail aria-hidden="true" className="size-3.5 shrink-0 text-primary/70" />{booking.email || "No email"}</span>
+                    <span className="mt-2 flex flex-wrap gap-1.5">
+                      <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-primary/15 bg-primary/[0.04] px-2 py-1 text-xs leading-tight text-muted-foreground">
+                        <CalendarDays aria-hidden="true" className="size-3.5 shrink-0 text-primary/80" />
+                        <span className="break-words">Hire Dates: {prettyDate(booking.pickup_date)}{booking.dropoff_date ? ` – ${prettyDate(booking.dropoff_date)}` : ""}</span>
+                      </span>
+                      <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.025] px-2 py-1 text-xs leading-tight text-muted-foreground">
+                        <Clock3 aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground/80" />
+                        <span className="break-words">Submitted On: {submittedDate(booking)}</span>
+                      </span>
+                    </span>
                   </span>
                   <span className="col-start-1 row-start-2 min-w-0 sm:col-start-2 sm:row-start-1"><span className="block break-words text-sm text-muted-foreground">{booking.event_type}</span><span className="mt-1 block text-sm font-medium">{bookingHireValue(booking) === null ? "Not priced" : formatAudCents(bookingHireValue(booking)!)} <span className="text-xs font-normal text-muted-foreground">hire</span></span></span>
                   <span className="col-start-2 row-start-1 flex items-center gap-2 sm:col-start-3"><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles[booking.status] ?? "bg-muted"}`}>{booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}</span><ChevronRight className="size-4 text-muted-foreground" /></span>

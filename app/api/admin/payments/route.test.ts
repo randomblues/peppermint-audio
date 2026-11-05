@@ -8,12 +8,16 @@ const mocks = vi.hoisted(() => ({
   paymentIntentCreate: vi.fn(),
   paymentIntentRetrieve: vi.fn(),
   paymentIntentCancel: vi.fn(),
+  configuredBankTransferDetails: vi.fn(),
   sendInvoiceEmail: vi.fn(),
 }));
 
 vi.mock("@/lib/admin-auth", () => ({ requireAdmin: mocks.requireAdmin }));
 vi.mock("@/lib/stripe", () => ({ getStripe: mocks.getStripe }));
-vi.mock("@/lib/invoice-service", () => ({ sendInvoiceEmail: mocks.sendInvoiceEmail }));
+vi.mock("@/lib/invoice-service", () => ({
+  configuredBankTransferDetails: mocks.configuredBankTransferDetails,
+  sendInvoiceEmail: mocks.sendInvoiceEmail,
+}));
 
 import { POST as createCheckout } from "./create-checkout/route";
 import { POST as createBankTransfer } from "./bank-transfer/route";
@@ -133,6 +137,16 @@ describe("admin payment routes", () => {
     vi.clearAllMocks();
     vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_key");
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://www.example.com");
+    vi.stubEnv("BANK_TRANSFER_ACCOUNT_NAME", "Peppermint Audio");
+    vi.stubEnv("BANK_TRANSFER_BSB", "123-456");
+    vi.stubEnv("BANK_TRANSFER_ACCOUNT_NUMBER", "12345678");
+    vi.stubEnv("BANK_TRANSFER_PAYID", "payments@example.com");
+    mocks.configuredBankTransferDetails.mockReturnValue({
+      accountName: "Peppermint Audio",
+      bsb: "123-456",
+      accountNumber: "12345678",
+      payId: "payments@example.com",
+    });
     mocks.requireAdmin.mockResolvedValue({ user: { id: "admin-1" } });
     mocks.getStripe.mockReturnValue({
       customers: { create: mocks.customerCreate, retrieve: mocks.customerRetrieve },
@@ -223,7 +237,17 @@ describe("admin payment routes", () => {
       deposit_hold_date: "2099-09-30",
       deposit_consent_at: null,
       payment_method: "stripe_card_hold",
+      bank_transfer_option: "both",
+      bank_transfer_reference: "PA-BOOKING1",
     }));
+    expect(mocks.sendInvoiceEmail).toHaveBeenCalledWith(
+      session.admin,
+      "booking-1",
+      expect.stringMatching(/^https:\/\/www\.example\.com\/pay\//),
+      false,
+      "both",
+      {},
+    );
   });
 
   it("creates hire and deposit intents together for pickup-day checkout", async () => {
@@ -490,7 +514,7 @@ describe("admin payment routes", () => {
     });
   });
 
-  it("updates a pending bank-transfer booking without changing its reference", async () => {
+  it("updates a pending bank-transfer booking with both transfer methods", async () => {
     const read = {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
@@ -511,7 +535,7 @@ describe("admin payment routes", () => {
       hireLineItems: [{ ...hireLineItems[0], unitPriceCents: 12500 }],
       securityDepositAmount: "100",
       gstInclusive: false,
-      bankTransferOption: "payid",
+      bankTransferOption: "both",
     }));
 
     expect(response.status).toBe(200);
@@ -520,7 +544,7 @@ describe("admin payment routes", () => {
       payment_method: "bank_transfer",
       gst_inclusive: false,
     }));
-    expect(mocks.sendInvoiceEmail).toHaveBeenCalledWith(expect.anything(), "booking-original", null, true, "payid", {}, true, true);
+    expect(mocks.sendInvoiceEmail).toHaveBeenCalledWith(expect.anything(), "booking-original", null, true, "both", {}, true, true);
   });
 
   it("saves hire items without sending or changing the payment request", async () => {

@@ -21,9 +21,12 @@ describe("booking workspace", () => {
       ...records[0], dropoff_date: "2026-10-12", created_at: "2026-09-30T14:30:00Z",
     }]} />);
     const row = screen.getByRole("button", { name: /Alex Active/ });
-    const hireDates = within(row).getByText("Hire Dates: 10 Oct 2026 – 12 Oct 2026");
-    const submitted = within(row).getByText("Submitted On: 1 Oct 2026");
+    const hireDates = within(row).getByText("Hire Dates: 10 Oct 2026 – 12 Oct 2026").parentElement!;
+    const submitted = within(row).getByText("Submitted On: 1 Oct 2026").parentElement!;
     expect(hireDates.nextElementSibling).toBe(submitted);
+    expect(hireDates).toHaveClass("rounded-md", "border-primary/15", "bg-primary/[0.04]");
+    expect(submitted).toHaveClass("rounded-md", "border-white/10", "bg-white/[0.025]");
+    expect(within(row).getByText("alex@example.invalid").querySelector("svg")).toHaveAttribute("aria-hidden", "true");
   });
   it.each([
     ["2026-10-29T13:05:00Z", "2026-10-29T13:01:00Z", "Today"],

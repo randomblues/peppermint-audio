@@ -24,8 +24,12 @@ function makeFrame(cardScale: number, options: { brightness?: number; blur?: boo
 }
 
 describe("getPhotoIdLiveGuidance", () => {
-  it("prompts the customer to move closer when the ID is small in the frame", () => {
-    expect(getPhotoIdLiveGuidance(makeFrame(0.55))).toMatch(/move closer/i);
+  it("accepts a card that fills a little over half the frame", () => {
+    expect(getPhotoIdLiveGuidance(makeFrame(0.55))).toMatch(/looks good/i);
+  });
+
+  it("gently prompts the customer to move closer when the ID is very small", () => {
+    expect(getPhotoIdLiveGuidance(makeFrame(0.4))).toMatch(/move a little closer/i);
   });
 
   it("prompts the customer to move back when the card nearly fills the frame", () => {
@@ -45,8 +49,19 @@ describe("getPhotoIdLiveGuidance", () => {
 
   it("gives lighting, glare and focus tips", () => {
     expect(getPhotoIdLiveGuidance(makeFrame(0.8, { brightness: 25 }))).toMatch(/more light/i);
-    expect(getPhotoIdLiveGuidance(makeFrame(0.8, { brightness: 255 }))).toMatch(/glare/i);
+    const overexposed = new Uint8ClampedArray(160 * 101 * 4);
+    for (let index = 0; index < overexposed.length; index += 4) {
+      overexposed[index] = 255;
+      overexposed[index + 1] = 255;
+      overexposed[index + 2] = 255;
+      overexposed[index + 3] = 255;
+    }
+    expect(getPhotoIdLiveGuidance({ data: overexposed, width: 160, height: 101 })).toMatch(/glare/i);
     expect(getPhotoIdLiveGuidance(makeFrame(0.8, { blur: true }))).toMatch(/focus/i);
+  });
+
+  it("does not mistake a bright ID background for glare", () => {
+    expect(getPhotoIdLiveGuidance(makeFrame(0.8, { brightness: 255 }))).toMatch(/looks good/i);
   });
 
   it("confirms a well-framed clear card", () => {

@@ -8,6 +8,22 @@ import { markInvoiceStatus, sendBillingDocument } from "@/lib/invoice-service";
 import { lineItemsTotalCents, parseBookingLineItems, type BookingLineItem } from "@/lib/booking-line-items";
 import { rentalDays } from "@/lib/payment-flow";
 import { releaseCancelledDeferredDeposit } from "@/lib/deferred-deposits";
+import { getStripe } from "@/lib/stripe";
+
+async function closeStripePaymentIntents(paymentIntentIds: Array<string | null | undefined>) {
+  const ids = paymentIntentIds.filter((id): id is string => Boolean(id));
+  if (!ids.length) return;
+  const stripe = getStripe();
+  const intents = await Promise.all(ids.map((id) => stripe.paymentIntents.retrieve(id)));
+  if (intents.some((intent) => intent.status === "succeeded" || intent.status === "processing")) {
+    throw new Error("A Stripe payment is already processing. Refresh the booking before recording a bank transfer.");
+  }
+  const pendingIntents = intents.filter((intent) => intent.status !== "canceled");
+  const cancelledIntents = await Promise.all(pendingIntents.map((intent) => stripe.paymentIntents.cancel(intent.id)));
+  if (cancelledIntents.some((intent) => intent.status !== "canceled")) {
+    throw new Error("The Stripe payment request could not be closed.");
+  }
+}
 
 function escapePostgrestSearch(value: string) {
   return value.replace(/[\\%_(),.]/g, "\\$&");
@@ -110,10 +126,11 @@ export async function PATCH(request: Request) {
     additional_details?: string | null;
     confirmation_email_sent: boolean;
   } | null = null;
-  let paymentUpdate: { hire_payment_status: string; deposit_payment_status: string; payment_received_at: string } | null = null;
+  let paymentUpdate: Record<string, unknown> & { hire_payment_status: string; deposit_payment_status: string; payment_received_at: string } | null = null;
+  let standardBankTransferReceived = false;
   if (body.status === "confirmed") {
     const result = await session.admin.from("bookings")
-      .select("id,email,first_name,event_type,pickup_date,dropoff_date,pickup_time,dropoff_time,created_at,hire_line_items,additional_details,confirmation_email_sent,hire_payment_status,payment_method,security_deposit_cents")
+      .select("id,email,first_name,event_type,pickup_date,dropoff_date,pickup_time,dropoff_time,created_at,hire_line_items,additional_details,confirmation_email_sent,hire_payment_status,payment_method,security_deposit_cents,deposit_payment_status,bank_transfer_option,stripe_hire_payment_intent_id,stripe_deposit_payment_intent_id")
       .eq("id", body.id)
       .single();
     if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 });
@@ -121,12 +138,25 @@ export async function PATCH(request: Request) {
     const paymentReady = ["paid", "succeeded", "bank_transfer_received"].includes(result.data.hire_payment_status ?? "")
       || (result.data.payment_method === "cash_on_pickup" && result.data.hire_payment_status === "cash_due");
     if (!paymentReady) {
-      if (result.data.payment_method !== "bank_transfer" || body.payment_received !== true) {
+      const bankTransferAvailable = result.data.payment_method === "bank_transfer"
+        || (result.data.payment_method === "stripe_card_hold" && result.data.bank_transfer_option === "both");
+      if (!bankTransferAvailable || body.payment_received !== true) {
         return NextResponse.json({ error: result.data.payment_method === "bank_transfer"
           ? "Confirm that payment has been received before confirming this booking."
           : "A paid Stripe payment or a bank-transfer or cash-on-pickup invoice is required before confirming this booking." }, { status: 409 });
       }
+      standardBankTransferReceived = result.data.payment_method === "stripe_card_hold";
       paymentUpdate = {
+        payment_method: "bank_transfer",
+        bank_transfer_option: "both",
+        payment_token: null,
+        payment_token_expires_at: null,
+        stripe_hire_payment_intent_id: null,
+        stripe_deposit_payment_intent_id: null,
+        deposit_hold_date: null,
+        deposit_consent_at: null,
+        deposit_capture_before: null,
+        deposit_error: null,
         hire_payment_status: "bank_transfer_received",
         deposit_payment_status: result.data.security_deposit_cents > 0 ? "bank_transfer_received" : "not_required",
         payment_received_at: new Date().toISOString(),
@@ -142,6 +172,17 @@ export async function PATCH(request: Request) {
     }
     if (!reservation.data?.ok) {
       return NextResponse.json({ error: reservation.data?.error ?? "The booking cannot be reserved with current inventory." }, { status: 409 });
+    }
+    if (standardBankTransferReceived) {
+      try {
+        await closeStripePaymentIntents([
+          result.data.stripe_hire_payment_intent_id,
+          result.data.stripe_deposit_payment_intent_id,
+        ]);
+      } catch (error) {
+        console.error("Standard Stripe request could not be closed before recording bank transfer:", error);
+        return NextResponse.json({ error: "The Stripe payment request could not be closed safely. Refresh the booking before recording a bank transfer." }, { status: 409 });
+      }
     }
     confirmation = result.data;
   }
@@ -181,7 +222,7 @@ export async function PATCH(request: Request) {
         sendTrackedBookingConfirmation(session.admin, body.id, confirmation),
         ...(paymentUpdate ? [(async () => {
           await markInvoiceStatus(session.admin, bookingId, "paid", paymentUpdate.payment_received_at);
-          await sendBillingDocument(session.admin, bookingId, "payment_receipt");
+          await sendBillingDocument(session.admin, bookingId, "payment_receipt", undefined, false, "both", undefined, standardBankTransferReceived);
         })()] : []),
       ]);
       const failures = outcomes.filter((outcome) => outcome.status === "rejected");

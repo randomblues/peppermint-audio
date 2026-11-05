@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 
 import { requireAdminJson } from "@/lib/admin-request";
 import { lineItemsForBooking, lineItemsTotalCents } from "@/lib/booking-line-items";
+import { isBankTransferOption, type BankTransferOption } from "@/lib/bank-transfer";
 import { MAX_STRIPE_HIRE_DAYS, depositHoldDate, isImmediateDepositBooking, paymentLinkExpiry, parseAmountCents, rentalDays } from "@/lib/payment-flow";
-import { sendInvoiceEmail } from "@/lib/invoice-service";
+import { configuredBankTransferDetails, sendInvoiceEmail } from "@/lib/invoice-service";
 import { invoiceNumberForBooking } from "@/lib/invoice-reference";
 import { parseInvoiceRecipient } from "@/lib/invoice-recipient";
 import { getStripe } from "@/lib/stripe";
@@ -11,6 +12,7 @@ import { getStripe } from "@/lib/stripe";
 type PaymentRequest = {
   bookingId?: string;
   securityDepositAmount?: unknown;
+  bankTransferOption?: unknown;
   gstInclusive?: unknown;
   billToName?: unknown;
   billToEmail?: unknown;
@@ -83,6 +85,18 @@ export async function POST(request: Request) {
   if (recipientResult.error) return NextResponse.json({ error: recipientResult.error }, { status: 400 });
   if (body.gstInclusive !== undefined && typeof body.gstInclusive !== "boolean") {
     return NextResponse.json({ error: "GST-inclusive selection must be true or false." }, { status: 400 });
+  }
+  if (body.bankTransferOption !== undefined && !isBankTransferOption(body.bankTransferOption)) {
+    return NextResponse.json({ error: "A valid bank-transfer option is required." }, { status: 400 });
+  }
+  const bankTransferOption: BankTransferOption = body.bankTransferOption === undefined ? "both" : body.bankTransferOption;
+  if (bankTransferOption !== "both") {
+    return NextResponse.json({ error: "Standard invoices include both PayID and bank-account details." }, { status: 400 });
+  }
+  try {
+    configuredBankTransferDetails(bankTransferOption);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Bank transfer details are not configured." }, { status: 503 });
   }
   const gstInclusive = body.gstInclusive !== false;
   const securityDepositCents = parseAmountCents(body.securityDepositAmount);
@@ -162,6 +176,7 @@ export async function POST(request: Request) {
 
     const update = await session.admin.from("bookings").update({
       payment_method: "stripe_card_hold",
+      bank_transfer_option: bankTransferOption,
       hire_line_items: hireLineItems,
       hire_amount_cents: hireAmountCents,
       security_deposit_cents: securityDepositCents,
@@ -178,12 +193,12 @@ export async function POST(request: Request) {
       stripe_deposit_payment_intent_id: depositPaymentIntent?.id ?? null,
       payment_token: paymentToken,
       payment_token_expires_at: paymentTokenExpiresAt,
-      bank_transfer_reference: null,
+      bank_transfer_reference: invoiceNumber,
       updated_at: new Date().toISOString(),
     }).eq("id", bookingId);
     if (update.error) throw new Error(`Payment details could not be saved: ${update.error.message}`);
     bookingSaved = true;
-    const invoiceEmailId = await sendInvoiceEmail(session.admin, bookingId, `${siteUrl(request)}/pay/${paymentToken}`, false, undefined, recipientResult.recipient);
+    const invoiceEmailId = await sendInvoiceEmail(session.admin, bookingId, `${siteUrl(request)}/pay/${paymentToken}`, false, bankTransferOption, recipientResult.recipient);
 
     return NextResponse.json({
       ok: true,

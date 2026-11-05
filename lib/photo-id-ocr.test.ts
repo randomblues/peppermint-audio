@@ -8,7 +8,11 @@ describe("hasPhotoIdText", () => {
     "AUSTRALIAN PASSPORT SURNAME SMITH GIVEN NAMES ALEX DATE OF BIRTH",
     "PROOF OF AGE PHOTO CARD ADDRESS 10 SAMPLE STREET",
     "QUEENSLAND DRIVER LICENCE EXPIRY 12/05/2030",
-  ])("recognizes ID document type and identity fields: %s", (text) => {
+    "PERMANENT ACCOUNT NUMBER",
+    "AADHAAR GOVERNMENT OF INDIA DATE OF BIRTH",
+    "DOB 09/24/1996 SURNAME DAVIS",
+    "NAME ADDRESS DATE OF BIRTH",
+  ])("recognizes ID labels or multiple identity fields: %s", (text) => {
     expect(hasPhotoIdText(text)).toBe(true);
   });
 
@@ -16,8 +20,8 @@ describe("hasPhotoIdText", () => {
     "",
     "A landscape with trees, clouds, and a mountain.",
     "A portrait of a person in front of a wall.",
+    "name",
     "DRIVER LICENSE",
-    "NAME ADDRESS DATE OF BIRTH",
   ])("rejects images without enough ID text: %s", (text) => {
     expect(hasPhotoIdText(text)).toBe(false);
   });
