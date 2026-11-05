@@ -1,6 +1,9 @@
-import { EquipmentCard } from "@/components/equipment-card";
+import { Suspense } from "react";
+import Link from "next/link";
+
+import { EquipmentCatalogue, EquipmentCatalogueFallback } from "@/components/equipment-catalogue";
 import { Section } from "@/components/section";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { equipmentCatalog } from "@/lib/site-content";
 import { createPageMetadata } from "@/lib/seo";
 
@@ -14,23 +17,22 @@ export const metadata = createPageMetadata({
 export default function EquipmentPage() {
   return (
     <Section
-      eyebrow="Individual equipments"
+      eyebrow="Individual equipment"
       title="Hire exactly what you need"
       headingAs="h1"
-      description="You do not need to hire a full package. Choose a single item or a pair, select the setup that suits you, and send an enquiry for availability."
+      description="Find the right speakers, microphones, lighting, and extras. Add what you need to your cart, and we will confirm availability for your dates."
     >
-      <Card className="mb-8 border-primary/30 bg-primary/5">
-        <CardHeader>
-          <CardTitle>Prefer everything ready to go?</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          Our complete packages include speakers, microphones, mixers, cables, and the essentials for a smooth event setup.
-        </CardContent>
-      </Card>
-      <div className="grid gap-6 md:grid-cols-2">
-        {equipmentCatalog.map((item, index) => (
-          <EquipmentCard key={item.slug} item={item} priority={index < 2} />
-        ))}
+      <Suspense fallback={<EquipmentCatalogueFallback items={equipmentCatalog} />}>
+        <EquipmentCatalogue items={equipmentCatalog} />
+      </Suspense>
+      <div className="mt-8 flex flex-col items-start justify-between gap-4 rounded-2xl border border-primary/15 bg-primary/[0.03] p-5 sm:flex-row sm:items-center">
+        <div>
+          <h2 className="font-medium">Prefer everything ready to go?</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Explore complete PA packages with the essentials already included.</p>
+        </div>
+        <Button variant="outline" nativeButton={false} render={<Link href="/packages" />} className="min-h-11 shrink-0 rounded-xl">
+          Explore packages
+        </Button>
       </div>
     </Section>
   );

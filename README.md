@@ -31,6 +31,8 @@ The locally served homepage photo, `public/home-live-sound.jpg`, is [A Stage wit
 
 The FAQ leads with five conversational questions about choosing a package, booking ahead, self-setup, specific requirements, and individual equipment hire. Multi-night pricing, pickup/delivery, and booking steps sit in a collapsed "A few practical bits" section. All answers and their contextual links live in `lib/site-content.ts`; FAQ structured data uses the same answers.
 
+The individual equipment catalogue supports instant search across product names, categories, descriptions, features, and hire options, a category dropdown, and sorting by starting nightly price or name. Filters use the `q`, `category`, and `sort` URL parameters so filtered views can be shared and restored with browser navigation. The same compact category dropdown is used on desktop and mobile; prices and cart selections remain unchanged.
+
 Administrative routes are under `/admin`; they require a Supabase session and an explicit admin role or email in `ADMIN_EMAILS`.
 
 Public browsing pages include a fixed **Check availability** contact prompt. On mobile it uses a dark two-line button with a stronger border, with footer clearance to keep the enquiry link accessible; at tablet/desktop widths it retains the original dark floating treatment. The calendar icon uses the same translucent mint background, mint outline, and staggered pulse animation at every width; the pulse respects reduced-motion preferences. It opens WhatsApp, phone, and email options, and stays hidden during booking, payment, and admin flows.
