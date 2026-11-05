@@ -86,6 +86,7 @@ describe("PhotoIdCapture", () => {
     expect(cropY).toBeGreaterThan(0);
     expect(cropWidth / cropHeight).toBeCloseTo(1.586, 2);
     expect(screen.getByRole("img", { name: "Captured front of photo ID" })).toHaveAttribute("src", "blob:photo-id-preview");
+    expect(screen.queryByText("Front side preview")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Use photo anyway" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Use this photo" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retake photo" })).toBeInTheDocument();

@@ -448,10 +448,6 @@ export function PhotoIdCapture({
                 {/* Object URLs are already local, compressed files and should not be sent through Next image optimization. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={reviewUrl} alt={`Captured ${capturedCount === 0 ? "front" : "back"} of photo ID`} className="max-h-[54dvh] max-w-full rounded-2xl object-contain" />
-                <span className="absolute bottom-4 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full border border-white/15 bg-black/70 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-md">
-                  <Check className="size-3.5 text-primary" aria-hidden="true" />
-                  {capturedCount === 0 ? "Front side preview" : "Back side preview"}
-                </span>
               </div>
               {qualityTip ? (
                 <p role="alert" className="flex max-w-md items-start gap-2 rounded-xl border border-amber-300/35 bg-amber-950/75 px-4 py-3 text-center text-sm text-amber-50 shadow-lg backdrop-blur-md">
