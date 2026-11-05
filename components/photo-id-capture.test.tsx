@@ -3,20 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PhotoIdCapture } from "./photo-id-capture";
 
-const mockRecognize = vi.hoisted(() => vi.fn());
-
-vi.mock("tesseract.js", () => ({
-  createWorker: vi.fn(async () => ({
-    recognize: mockRecognize,
-    terminate: vi.fn(),
-  })),
-}));
-
 describe("PhotoIdCapture", () => {
   beforeEach(() => {
-    mockRecognize.mockReset().mockResolvedValue({
-      data: { text: "DRIVER LICENCE DOB 09/24/1996 4d DLN 62821123" },
-    });
     Object.defineProperty(URL, "createObjectURL", {
       configurable: true,
       value: vi.fn(() => "blob:photo-id-preview"),
@@ -37,7 +25,7 @@ describe("PhotoIdCapture", () => {
     expect(screen.queryByText(/Photos stay on your device/)).not.toBeInTheDocument();
   });
 
-  it("lets customers use an ID photo with a quality warning after checking the details", async () => {
+  it("lets customers use a photo with quality warnings after visual review", async () => {
     const stop = vi.fn();
     const stream = { getTracks: () => [{ stop }] } as unknown as MediaStream;
     const getUserMedia = vi.fn().mockResolvedValue(stream);
@@ -87,10 +75,9 @@ describe("PhotoIdCapture", () => {
     expect(cropWidth / cropHeight).toBeCloseTo(1.586, 2);
     expect(screen.getByRole("img", { name: "Captured front of photo ID" })).toHaveAttribute("src", "blob:photo-id-preview");
     expect(screen.queryByText("Front side preview")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Use this photo" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Use photo anyway" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Use this photo" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Use photo anyway" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use this photo" }));
     await waitFor(() => expect(onCapture).toHaveBeenCalledWith(
       expect.objectContaining({ name: "photo-id-front.jpg", type: "image/jpeg" }),
     ));
@@ -105,7 +92,7 @@ describe("PhotoIdCapture", () => {
     getImageData.mockReturnValue({ data: neutralPixels } as unknown as ImageData);
     fireEvent.click(screen.getByRole("button", { name: "Capture front" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/may be a little blurry/i);
-    expect(screen.getByRole("button", { name: "Use photo anyway" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Use this photo" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retake photo" }));
     fireEvent.canPlay(await screen.findByLabelText("Live photo ID camera preview"));
 
@@ -123,7 +110,7 @@ describe("PhotoIdCapture", () => {
     getImageData.mockReturnValue({ data: detailedPixels } as unknown as ImageData);
     fireEvent.click(screen.getByRole("button", { name: "Capture front" }));
     expect(within(await screen.findByRole("dialog", { name: "Review your photo" })).getByRole("status")).toHaveTextContent(
-      "Please make sure the details on the card are clear before proceeding.",
+      "Make sure this is a photo of your ID and that its details are readable.",
     );
     fireEvent.click(screen.getByRole("button", { name: "Use this photo" }));
     await waitFor(() => expect(onCapture).toHaveBeenCalledWith(
@@ -134,7 +121,7 @@ describe("PhotoIdCapture", () => {
     await waitFor(() => expect(stop).toHaveBeenCalled());
   });
 
-  it("blocks a sharp, well-lit photo when OCR cannot find ID details", async () => {
+  it("allows a reviewed capture without OCR text recognition", async () => {
     const stream = { getTracks: () => [{ stop: vi.fn() }] } as unknown as MediaStream;
     Object.defineProperty(navigator, "mediaDevices", {
       configurable: true,
@@ -144,50 +131,41 @@ describe("PhotoIdCapture", () => {
     vi.spyOn(HTMLVideoElement.prototype, "videoWidth", "get").mockReturnValue(1600);
     vi.spyOn(HTMLVideoElement.prototype, "videoHeight", "get").mockReturnValue(900);
     vi.spyOn(HTMLVideoElement.prototype, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, 390, 844));
-    const getImageData = vi.fn(() => ({
-      data: new Uint8ClampedArray(160 * 101 * 4),
-    } as unknown as ImageData));
+    const pixels = new Uint8ClampedArray(160 * 101 * 4);
+    for (let index = 0; index < pixels.length; index += 4) {
+      const brightness = index % 8 === 0 ? 50 : 205;
+      pixels[index] = brightness;
+      pixels[index + 1] = brightness;
+      pixels[index + 2] = brightness;
+      pixels[index + 3] = 255;
+    }
+    const getImageData = vi.fn(() => ({ data: pixels } as unknown as ImageData));
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
       drawImage: vi.fn(),
       getImageData,
-      translate: vi.fn(),
-      rotate: vi.fn(),
     } as unknown as CanvasRenderingContext2D);
     vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) => {
       callback(new Blob(["captured image"], { type: "image/jpeg" }));
     });
-    const detailedPixels = new Uint8ClampedArray(160 * 101 * 4);
-    for (let index = 0; index < detailedPixels.length; index += 4) {
-      const brightness = index % 8 === 0 ? 50 : 205;
-      detailedPixels[index] = brightness;
-      detailedPixels[index + 1] = brightness;
-      detailedPixels[index + 2] = brightness;
-      detailedPixels[index + 3] = 255;
-    }
-    getImageData.mockReturnValue({ data: detailedPixels } as unknown as ImageData);
-    mockRecognize.mockResolvedValue({ data: { text: "A landscape with trees and clouds" } });
+    const onCapture = vi.fn();
 
-    render(<PhotoIdCapture capturedCount={0} onCapture={vi.fn()} />);
+    render(<PhotoIdCapture capturedCount={0} onCapture={onCapture} />);
     fireEvent.click(screen.getByRole("button", { name: "Scan photo ID" }));
     fireEvent.canPlay(await screen.findByLabelText("Live photo ID camera preview"));
     fireEvent.click(screen.getByRole("button", { name: "Capture front" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/couldn’t recognize this as an ID/i);
-    expect(screen.queryByRole("button", { name: "Use this photo" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Retake photo" })).toBeInTheDocument();
-    expect(mockRecognize).toHaveBeenCalledTimes(4);
-
-    mockRecognize.mockReset()
-      .mockResolvedValueOnce({ data: { text: "trees and sky" } })
-      .mockResolvedValueOnce({ data: { text: "DRIVER LICENCE DOB 09/24/1996" } });
-    fireEvent.click(screen.getByRole("button", { name: "Retake photo" }));
-    fireEvent.canPlay(await screen.findByLabelText("Live photo ID camera preview"));
-    fireEvent.click(screen.getByRole("button", { name: "Capture front" }));
-    expect(within(await screen.findByRole("dialog", { name: "Review your photo" })).getByRole("status")).toHaveTextContent(
-      /Please make sure the details/,
+    const review = await screen.findByRole("dialog", { name: "Review your photo" });
+    expect(within(review).getByRole("status")).toHaveTextContent(
+      /Make sure this is a photo of your ID/,
     );
-    expect(mockRecognize).toHaveBeenCalledTimes(2);
+    expect(within(review).queryByText(/recognize this as an ID/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Use this photo" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Use this photo" }));
+    await waitFor(() => expect(onCapture).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "photo-id-front.jpg", type: "image/jpeg" }),
+    ));
+    await screen.findByLabelText("Live photo ID camera preview");
+    fireEvent.click(screen.getByRole("button", { name: "Close camera" }));
   });
 
   it("returns to the existing upload flow when camera permission is blocked", async () => {

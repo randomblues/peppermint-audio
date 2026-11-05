@@ -4,13 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Camera, Check, ScanLine, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { hasPhotoIdText, unrecognizedPhotoIdMessage } from "@/lib/photo-id-ocr";
 import { getPhotoIdLiveGuidance } from "@/lib/photo-id-live-guidance";
-
-type OcrWorker = {
-  recognize: (image: HTMLCanvasElement) => Promise<{ data: { text: string } }>;
-  terminate: () => Promise<unknown>;
-};
 
 type VideoFrameSource = { x: number; y: number; width: number; height: number };
 
@@ -54,7 +48,6 @@ export function PhotoIdCapture({
   const [reviewFile, setReviewFile] = useState<File | null>(null);
   const [reviewUrl, setReviewUrl] = useState("");
   const [qualityTip, setQualityTip] = useState("");
-  const [canUseReviewPhoto, setCanUseReviewPhoto] = useState(false);
   const [liveGuidance, setLiveGuidance] = useState("Place your ID inside the frame and keep all four edges visible.");
   const videoRef = useRef<HTMLVideoElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -62,7 +55,6 @@ export function PhotoIdCapture({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const launchButtonRef = useRef<HTMLButtonElement>(null);
   const cameraRequestId = useRef(0);
-  const ocrWorkerRef = useRef<Promise<OcrWorker> | null>(null);
 
   useEffect(() => {
     if (!stream) return;
@@ -157,15 +149,6 @@ export function PhotoIdCapture({
     };
   }, [isOpen]);
 
-  useEffect(() => () => {
-    const worker = ocrWorkerRef.current;
-    if (worker) {
-      void worker.then((instance) => instance.terminate()).catch((error: unknown) => {
-        console.error("Photo ID OCR worker cleanup failed:", error);
-      });
-    }
-  }, []);
-
   async function startCamera() {
     const requestId = ++cameraRequestId.current;
     setIsOpen(true);
@@ -210,10 +193,9 @@ export function PhotoIdCapture({
     setReviewFile(null);
     setReviewUrl("");
     setQualityTip("");
-    setCanUseReviewPhoto(false);
   }
 
-  async function getQualityTip(canvas: HTMLCanvasElement): Promise<{ message: string; canUsePhoto: boolean }> {
+  function getQualityWarning(canvas: HTMLCanvasElement): string {
     const sample = document.createElement("canvas");
     sample.width = 160;
     sample.height = 101;
@@ -276,40 +258,7 @@ export function PhotoIdCapture({
       qualityWarning = "This photo may be a little blurry. Check that the details are readable before using it.";
     }
 
-    if (!ocrWorkerRef.current) {
-      ocrWorkerRef.current = import("tesseract.js")
-        .then(({ createWorker }) => createWorker("eng"))
-        .catch((error: unknown) => {
-          ocrWorkerRef.current = null;
-          throw error;
-        });
-    }
-    const worker = await ocrWorkerRef.current;
-    let recognizedId = false;
-    for (const rotation of [0, 90, 180, 270]) {
-      const image = rotation === 0 ? canvas : rotateCanvas(canvas, rotation);
-      const { data } = await worker.recognize(image);
-      if (hasPhotoIdText(data.text)) {
-        recognizedId = true;
-        break;
-      }
-    }
-    if (!recognizedId) return { message: unrecognizedPhotoIdMessage, canUsePhoto: false };
-
-    return { message: qualityWarning, canUsePhoto: true };
-  }
-
-  function rotateCanvas(source: HTMLCanvasElement, degrees: number): HTMLCanvasElement {
-    const canvas = document.createElement("canvas");
-    const isQuarterTurn = degrees === 90 || degrees === 270;
-    canvas.width = isQuarterTurn ? source.height : source.width;
-    canvas.height = isQuarterTurn ? source.width : source.height;
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("Photo ID rotation is unavailable.");
-    context.translate(canvas.width / 2, canvas.height / 2);
-    context.rotate((degrees * Math.PI) / 180);
-    context.drawImage(source, -source.width / 2, -source.height / 2);
-    return canvas;
+    return qualityWarning;
   }
 
   async function capturePhoto() {
@@ -331,12 +280,12 @@ export function PhotoIdCapture({
       if (!context) throw new Error("Photo capture is unavailable in this browser.");
       context.drawImage(video, source.x, source.y, source.width, source.height, 0, 0, canvas.width, canvas.height);
 
-      let qualityResult: { message: string; canUsePhoto: boolean };
+      let qualityWarning: string;
       try {
-        qualityResult = await getQualityTip(canvas);
+        qualityWarning = getQualityWarning(canvas);
       } catch (error) {
-        console.error("Photo ID content check failed:", error);
-        qualityResult = { message: "We couldn’t check this photo. Please try again or choose an image file.", canUsePhoto: false };
+        console.error("Photo ID quality check failed:", error);
+        qualityWarning = "We couldn’t check the photo quality. Please review the details before using it.";
       }
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
       if (!blob) throw new Error("We could not capture that photo. Please try again or choose an image file.");
@@ -344,8 +293,7 @@ export function PhotoIdCapture({
       const file = new File([blob], `photo-id-${side}.jpg`, { type: "image/jpeg" });
       setReviewFile(file);
       setReviewUrl(URL.createObjectURL(blob));
-      setQualityTip(qualityResult.message);
-      setCanUseReviewPhoto(qualityResult.canUsePhoto);
+      setQualityTip(qualityWarning);
       setIsReady(false);
       setStream(null);
     } catch (error) {
@@ -360,17 +308,15 @@ export function PhotoIdCapture({
     setReviewFile(null);
     setReviewUrl("");
     setQualityTip("");
-    setCanUseReviewPhoto(false);
     void startCamera();
   }
 
   function usePhoto() {
-    if (!reviewFile || !canUseReviewPhoto) return;
+    if (!reviewFile) return;
     onCapture(reviewFile);
     setReviewFile(null);
     setReviewUrl("");
     setQualityTip("");
-    setCanUseReviewPhoto(false);
     if (capturedCount === 1) {
       closeCamera();
     } else {
@@ -464,22 +410,16 @@ export function PhotoIdCapture({
               ) : (
                 <p role="status" className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-4 py-2 text-sm text-white shadow-lg backdrop-blur-md">
                   <Check className="size-4 text-primary" aria-hidden="true" />
-                Please make sure the details on the card are clear before proceeding.
+                Make sure this is a photo of your ID and that its details are readable.
                 </p>
               )}
               <div className="flex w-full max-w-md flex-col gap-3 sm:flex-row">
                 <Button type="button" variant="outline" onClick={retakePhoto} className="w-full border-white/30 bg-black/40 text-white hover:bg-black/70 sm:flex-1">
                   Retake photo
                 </Button>
-                {!qualityTip ? (
-                  <Button type="button" onClick={usePhoto} className="w-full sm:flex-1">
-                    Use this photo
-                  </Button>
-                ) : canUseReviewPhoto ? (
-                  <Button type="button" onClick={usePhoto} className="w-full sm:flex-1">
-                    Use photo anyway
-                  </Button>
-                ) : null}
+                <Button type="button" onClick={usePhoto} className="w-full sm:flex-1">
+                  Use this photo
+                </Button>
               </div>
             </div>
           ) : stream ? (

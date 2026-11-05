@@ -213,15 +213,13 @@ limited to 1.5 MB each. The API retains the 1.5 MB per-file cap so two IDs and t
 booking fields fit within Vercel's request-body limit. If conversion or compression
 fails, the form explains how to retry rather than submitting an oversized file.
 On phones, **Scan photo ID** opens a full-screen camera guide with a card
-outline, live framing guidance for distance, lighting, glare, and focus, and
-browser-local OCR that looks for photo-ID labels and identity fields. Customers
-can review and retake each side. Lighting, glare, and focus checks give
-suggestions rather than blocking a photo when OCR recognizes ID text; photos
-without recognizable ID text cannot be used from the scanner. This is a
-content/quality check, not identity or authenticity verification. Tesseract's
-worker and English OCR data are downloaded by the browser; captured images and
-recognized text stay on-device and are only uploaded when the booking request is submitted.
-The existing file upload remains available as a fallback.
+outline, live framing guidance for distance, and advisory lighting, glare, and
+focus checks. Customers can review and retake each side, then decide whether to
+use the photo; the scanner does not use OCR to decide whether an image is an ID.
+Customers should review the details before continuing, and admins can review
+the submitted files through the booking workflow. This is not an identity or
+authenticity check. Captured images remain in the browser until the booking
+request is submitted; the existing file upload remains available as a fallback.
 The browser regression test uses `tests/fixtures/synthetic-photo.heic`, an
 800x500 generated colour gradient encoded with macOS `sips`; it contains no ID
 or customer data and exercises the real decoder rather than a mocked conversion.
