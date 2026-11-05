@@ -49,20 +49,20 @@ const bookingSteps = [
     description: "Tell us where and when your hire is happening.",
   },
   {
-    title: "Review your hire",
-    description: "Review your selected items and add any additional details or special requests.",
+    title: "Photo ID",
+    description: "Scan or upload clear photos of the front and back of your ID.",
   },
   {
-    title: "Photo ID and terms",
-    description: "Upload your ID and accept the hire terms to submit your request.",
+    title: "Review your hire and terms",
+    description: "Check your selected items, add any details, and accept the hire terms to submit your request.",
   },
 ] as const;
 
 const stepFields: Array<Array<keyof BookingInputValues | "idFiles">> = [
   ["firstName", "lastName", "email", "mobile"],
   ["eventType", "eventAddress", "pickupDate", "dropoffDate", "pickupTime", "dropoffTime"],
-  ["hireLineItems", "additionalDetails"],
-  ["idFiles", "termsAccepted"],
+  ["idFiles"],
+  ["hireLineItems", "additionalDetails", "termsAccepted"],
 ];
 
 type FormState = typeof initialValues & { idFiles: File[] };
@@ -103,7 +103,7 @@ export function BookingForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
-  const [step4SubmitAttempted, setStep4SubmitAttempted] = useState(false);
+  const [finalStepSubmitAttempted, setFinalStepSubmitAttempted] = useState(false);
   const [idFilesTouched, setIdFilesTouched] = useState(false);
   const [termsTouched, setTermsTouched] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -171,6 +171,7 @@ export function BookingForm() {
     for (const field of activeStepFields) {
       if (allErrors[field]) stepErrors[field] = allErrors[field];
     }
+    if (currentStep === 2 && stepErrors.idFiles) setIdFilesTouched(true);
     setErrors(stepErrors);
     return Object.keys(stepErrors).length === 0;
   }
@@ -200,12 +201,10 @@ export function BookingForm() {
     setCurrentStep((step) => {
       const nextStep = Math.min(step + 1, bookingSteps.length - 1);
       if (nextStep === 3) {
-        setStep4SubmitAttempted(false);
-        setIdFilesTouched(false);
+        setFinalStepSubmitAttempted(false);
         setTermsTouched(false);
         setErrors((current) => {
           const next = { ...current };
-          delete next.idFiles;
           delete next.termsAccepted;
           return next;
         });
@@ -217,7 +216,7 @@ export function BookingForm() {
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (currentStep !== bookingSteps.length - 1) return;
-    setStep4SubmitAttempted(true);
+    setFinalStepSubmitAttempted(true);
     const requestValues = { ...values, hireLineItems: JSON.stringify(lineItems) };
     if (!validate(requestValues)) return;
     setIsSubmitting(true);
@@ -354,7 +353,14 @@ export function BookingForm() {
               </div>
             ) : null}
 
-            {currentStep === 2 ? (
+            {lineItems.length && (currentStep === 1 || currentStep === 3) ? (
+              <div className="space-y-2 rounded-lg border bg-muted/30 p-4" aria-live="polite">
+                <HirePriceSummary items={lineItems} nights={nights} label={`Hire total · ${nights} ${nights === 1 ? "night" : "nights"}`} />
+                <p className="text-xs text-muted-foreground">Availability, final pricing and any security deposit are confirmed separately.</p>
+              </div>
+            ) : null}
+
+            {currentStep === 3 ? (
               <div className="space-y-4">
                 <div className="space-y-3">
                   <h3 className="text-base font-semibold">Selected hire items</h3>
@@ -374,17 +380,19 @@ export function BookingForm() {
                   <Textarea id="additionalDetails" value={values.additionalDetails} onChange={(event) => update("additionalDetails", event.target.value)} placeholder="Share any additional details or special requests for your booking..." className="min-h-28" />
                   {errors.additionalDetails ? <p className="text-xs text-destructive">{errors.additionalDetails}</p> : null}
                 </div>
+                <details className="rounded-lg border px-4 py-3">
+                  <summary className="cursor-pointer font-medium">Read the PA Equipment Hire Terms & Conditions</summary>
+                  <div className="space-y-3 pt-4 text-sm text-muted-foreground">{hireTerms.map((term) => <div key={term.title}><p className="font-medium text-foreground">{term.title}</p><p>{term.body}</p></div>)}</div>
+                </details>
+                <label className="flex items-start gap-3 text-sm">
+                  <input type="checkbox" className="mt-1 size-4 accent-primary" checked={values.termsAccepted === "accepted"} onChange={(event) => update("termsAccepted", event.target.checked ? "accepted" : "")} />
+                  <span>I have read and agree to the PA Equipment Hire Terms & Conditions.</span>
+                </label>
+                {(finalStepSubmitAttempted || termsTouched) && errors.termsAccepted ? <p className="text-xs text-destructive">{errors.termsAccepted}</p> : null}
               </div>
             ) : null}
 
-            {lineItems.length && currentStep > 0 ? (
-              <div className="space-y-2 rounded-lg border bg-muted/30 p-4" aria-live="polite">
-                <HirePriceSummary items={lineItems} nights={nights} label={`Hire total · ${nights} ${nights === 1 ? "night" : "nights"}`} />
-                <p className="text-xs text-muted-foreground">Availability, final pricing and any security deposit are confirmed separately.</p>
-              </div>
-            ) : null}
-
-            {currentStep === 3 ? (
+            {currentStep === 2 ? (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">Upload clear photos of the front and back of your valid photo ID.</p>
                 <PhotoIdCapture capturedCount={values.idFiles.length} onCapture={(file) => updateIdFiles([file])} />
@@ -452,16 +460,7 @@ export function BookingForm() {
                 ) : (
                   <p className="text-sm text-muted-foreground">No files selected yet.</p>
                 )}
-                {(step4SubmitAttempted || idFilesTouched) && errors.idFiles ? <p className="text-xs text-destructive">{errors.idFiles}</p> : null}
-                <details className="rounded-lg border px-4 py-3">
-                  <summary className="cursor-pointer font-medium">Read the PA Equipment Hire Terms & Conditions</summary>
-                  <div className="space-y-3 pt-4 text-sm text-muted-foreground">{hireTerms.map((term) => <div key={term.title}><p className="font-medium text-foreground">{term.title}</p><p>{term.body}</p></div>)}</div>
-                </details>
-                <label className="flex items-start gap-3 text-sm">
-                  <input type="checkbox" className="mt-1 size-4 accent-primary" checked={values.termsAccepted === "accepted"} onChange={(event) => update("termsAccepted", event.target.checked ? "accepted" : "")} />
-                  <span>I have read and agree to the PA Equipment Hire Terms & Conditions.</span>
-                </label>
-                {(step4SubmitAttempted || termsTouched) && errors.termsAccepted ? <p className="text-xs text-destructive">{errors.termsAccepted}</p> : null}
+                {idFilesTouched && errors.idFiles ? <p className="text-xs text-destructive">{errors.idFiles}</p> : null}
               </div>
             ) : null}
           </section>

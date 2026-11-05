@@ -65,6 +65,13 @@ describe("BookingForm", () => {
     expect(screen.getByText("$55.00")).toBeInTheDocument();
     expect(screen.queryByText(/You save/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.change(screen.getByLabelText("Choose files"), {
+      target: { files: [
+        new File(["front"], "front-id.png", { type: "image/png" }),
+        new File(["back"], "back-id.png", { type: "image/png" }),
+      ] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByText("$55.00 each / night")).toBeInTheDocument();
   });
 
@@ -77,8 +84,18 @@ describe("BookingForm", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.change(screen.getByLabelText("Choose files"), {
+      target: { files: [
+        new File(["front"], "front-id.png", { type: "image/png" }),
+        new File(["back"], "back-id.png", { type: "image/png" }),
+      ] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
-    expect(screen.getByText("Review your selected items and add any additional details or special requests.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Review your hire and terms" })).toBeInTheDocument();
+    expect(screen.getByText("Check your selected items, add any details, and accept the hire terms to submit your request.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Selected hire items" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Anything else?" })).toBeInTheDocument();
     expect(screen.getByLabelText("Additional details or special requests (optional)")).toHaveAttribute(
       "placeholder",
       "Share any additional details or special requests for your booking...",
@@ -101,7 +118,7 @@ describe("BookingForm", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     render(<BookingForm />);
-    for (let step = 0; step < 3; step++) fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    for (let step = 0; step < 2; step++) fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.change(screen.getByLabelText("Choose files"), {
       target: { files: [
         new File(["front"], "front.png", { type: "image/png" }),
@@ -112,6 +129,7 @@ describe("BookingForm", () => {
         new File(["back"], "back.png", { type: "image/png" }),
       ] },
     });
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: "Submit a Booking Request" }));
 
@@ -142,7 +160,7 @@ describe("BookingForm", () => {
     expect(screen.getByRole("heading", { name: "Your details" })).toBeInTheDocument();
     expect(screen.getByLabelText("First name")).toBeInTheDocument();
     expect(screen.queryByLabelText("Event address")).not.toBeInTheDocument();
-    expect(screen.queryByText("Photo ID and terms")).not.toBeInTheDocument();
+    expect(screen.queryByText("Photo ID")).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Alex" } });
     fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Smith" } });
@@ -164,7 +182,7 @@ describe("BookingForm", () => {
     expect(screen.queryByLabelText("First name")).not.toBeInTheDocument();
   });
 
-  it("does not show step 4 red validation messages before submit", () => {
+  it("puts photo ID before review and only shows final-step errors after submit", () => {
     window.localStorage.setItem(
       "peppermint-audio-booking-draft",
       JSON.stringify({
@@ -185,10 +203,22 @@ describe("BookingForm", () => {
     render(<BookingForm />);
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+    expect(screen.getByText("Step 3 of 4")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Photo ID" })).toBeInTheDocument();
+    expect(screen.queryByText("Hire total · 3 nights")).not.toBeInTheDocument();
+    expect(screen.queryByText("Please upload the front and back of your photo ID.")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Choose files"), {
+      target: { files: [
+        new File(["front"], "front-id.png", { type: "image/png" }),
+        new File(["back"], "back-id.png", { type: "image/png" }),
+      ] },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
-    expect(screen.getByRole("heading", { name: "Photo ID and terms" })).toBeInTheDocument();
-    expect(screen.queryByText("Please upload the front and back of your photo ID.")).not.toBeInTheDocument();
+    expect(screen.getByText("Step 4 of 4")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Review your hire and terms" })).toBeInTheDocument();
+    expect(screen.getByText("Hire total · 3 nights")).toBeInTheDocument();
     expect(screen.queryByText("Please confirm that you have read and agree to the terms")).not.toBeInTheDocument();
   });
 
@@ -210,7 +240,6 @@ describe("BookingForm", () => {
     );
 
     render(<BookingForm />);
-    fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
 

@@ -4,6 +4,39 @@ import { useEffect, useRef, useState } from "react";
 import { Camera, Check, ScanLine, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { hasPhotoIdText, unrecognizedPhotoIdMessage } from "@/lib/photo-id-ocr";
+import { getPhotoIdLiveGuidance } from "@/lib/photo-id-live-guidance";
+
+type OcrWorker = {
+  recognize: (image: HTMLCanvasElement) => Promise<{ data: { text: string } }>;
+  terminate: () => Promise<unknown>;
+};
+
+type VideoFrameSource = { x: number; y: number; width: number; height: number };
+
+function getVideoFrameSource(video: HTMLVideoElement, frame: DOMRect | undefined): VideoFrameSource {
+  const videoRect = video.getBoundingClientRect();
+  const coverScale = Math.max(videoRect.width / video.videoWidth, videoRect.height / video.videoHeight);
+  const renderedWidth = video.videoWidth * coverScale;
+  const renderedHeight = video.videoHeight * coverScale;
+  const fallbackWidth = Math.min(video.videoWidth, video.videoHeight * 1.586);
+  const fallbackHeight = fallbackWidth / 1.586;
+  const sourceX = frame && videoRect.width > 0
+    ? (frame.left - videoRect.left + (renderedWidth - videoRect.width) / 2) / coverScale
+    : (video.videoWidth - fallbackWidth) / 2;
+  const sourceY = frame && videoRect.height > 0
+    ? (frame.top - videoRect.top + (renderedHeight - videoRect.height) / 2) / coverScale
+    : (video.videoHeight - fallbackHeight) / 2;
+  const x = Math.max(0, Math.min(video.videoWidth, sourceX));
+  const y = Math.max(0, Math.min(video.videoHeight, sourceY));
+
+  return {
+    x,
+    y,
+    width: Math.max(1, Math.min(video.videoWidth - x, frame && videoRect.width > 0 ? frame.width / coverScale : fallbackWidth)),
+    height: Math.max(1, Math.min(video.videoHeight - y, frame && videoRect.height > 0 ? frame.height / coverScale : fallbackHeight)),
+  };
+}
 
 export function PhotoIdCapture({
   capturedCount,
@@ -21,12 +54,14 @@ export function PhotoIdCapture({
   const [reviewFile, setReviewFile] = useState<File | null>(null);
   const [reviewUrl, setReviewUrl] = useState("");
   const [qualityTip, setQualityTip] = useState("");
+  const [liveGuidance, setLiveGuidance] = useState("Place your ID inside the frame and keep all four edges visible.");
   const videoRef = useRef<HTMLVideoElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const launchButtonRef = useRef<HTMLButtonElement>(null);
   const cameraRequestId = useRef(0);
+  const ocrWorkerRef = useRef<Promise<OcrWorker> | null>(null);
 
   useEffect(() => {
     if (!stream) return;
@@ -41,6 +76,42 @@ export function PhotoIdCapture({
       video.srcObject = null;
     };
   }, [stream]);
+
+  useEffect(() => {
+    if (!stream || !isReady) return;
+    const sample = document.createElement("canvas");
+    sample.width = 160;
+    sample.height = 101;
+    const context = sample.getContext("2d", { willReadFrequently: true });
+    if (!context) {
+      const errorTimer = window.setTimeout(() => {
+        setCameraError("Live camera guidance is unavailable. Please retake the photo or choose an image file.");
+      }, 0);
+      return () => window.clearTimeout(errorTimer);
+    }
+
+    let timer: number | undefined;
+    let active = true;
+    const inspectFrame = () => {
+      const video = videoRef.current;
+      if (!active || !video?.videoWidth || !video.videoHeight) return;
+      try {
+        const source = getVideoFrameSource(video, frameRef.current?.getBoundingClientRect());
+        context.drawImage(video, source.x, source.y, source.width, source.height, 0, 0, sample.width, sample.height);
+        setLiveGuidance(getPhotoIdLiveGuidance(context.getImageData(0, 0, sample.width, sample.height)));
+      } catch (error) {
+        console.error("Photo ID live camera guidance failed:", error);
+        setCameraError("We couldn’t assess the camera view. Please retake the photo or choose an image file.");
+        return;
+      }
+      timer = window.setTimeout(inspectFrame, 450);
+    };
+    inspectFrame();
+    return () => {
+      active = false;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [isReady, stream]);
 
   useEffect(() => {
     if (!reviewUrl) return;
@@ -84,6 +155,15 @@ export function PhotoIdCapture({
       launchButton?.focus();
     };
   }, [isOpen]);
+
+  useEffect(() => () => {
+    const worker = ocrWorkerRef.current;
+    if (worker) {
+      void worker.then((instance) => instance.terminate()).catch((error: unknown) => {
+        console.error("Photo ID OCR worker cleanup failed:", error);
+      });
+    }
+  }, []);
 
   async function startCamera() {
     const requestId = ++cameraRequestId.current;
@@ -131,7 +211,7 @@ export function PhotoIdCapture({
     setQualityTip("");
   }
 
-  function getQualityTip(canvas: HTMLCanvasElement): string {
+  async function getQualityTip(canvas: HTMLCanvasElement): Promise<string> {
     const sample = document.createElement("canvas");
     sample.width = 160;
     sample.height = 101;
@@ -191,7 +271,41 @@ export function PhotoIdCapture({
     }
     const laplacianVariance = laplacianSquaredTotal / sampleCount - (laplacianTotal / sampleCount) ** 2;
     if (laplacianVariance < 18) return "This photo may be blurry. Hold steady and try again.";
+
+    if (!ocrWorkerRef.current) {
+      ocrWorkerRef.current = import("tesseract.js")
+        .then(({ createWorker }) => createWorker("eng"))
+        .catch((error: unknown) => {
+          ocrWorkerRef.current = null;
+          throw error;
+        });
+    }
+    const worker = await ocrWorkerRef.current;
+    let recognizedId = false;
+    for (const rotation of [0, 90, 180, 270]) {
+      const image = rotation === 0 ? canvas : rotateCanvas(canvas, rotation);
+      const { data } = await worker.recognize(image);
+      if (hasPhotoIdText(data.text)) {
+        recognizedId = true;
+        break;
+      }
+    }
+    if (!recognizedId) return unrecognizedPhotoIdMessage;
+
     return "";
+  }
+
+  function rotateCanvas(source: HTMLCanvasElement, degrees: number): HTMLCanvasElement {
+    const canvas = document.createElement("canvas");
+    const isQuarterTurn = degrees === 90 || degrees === 270;
+    canvas.width = isQuarterTurn ? source.height : source.width;
+    canvas.height = isQuarterTurn ? source.width : source.height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Photo ID rotation is unavailable.");
+    context.translate(canvas.width / 2, canvas.height / 2);
+    context.rotate((degrees * Math.PI) / 180);
+    context.drawImage(source, -source.width / 2, -source.height / 2);
+    return canvas;
   }
 
   async function capturePhoto() {
@@ -204,37 +318,21 @@ export function PhotoIdCapture({
     setCameraError("");
     setIsCapturing(true);
     try {
-      const videoRect = video.getBoundingClientRect();
-      const frameRect = frameRef.current?.getBoundingClientRect();
-      const coverScale = Math.max(videoRect.width / video.videoWidth, videoRect.height / video.videoHeight);
-      const renderedWidth = video.videoWidth * coverScale;
-      const renderedHeight = video.videoHeight * coverScale;
-      const fallbackWidth = Math.min(video.videoWidth, video.videoHeight * 1.586);
-      const fallbackHeight = fallbackWidth / 1.586;
-      const sourceX = frameRect && videoRect.width > 0
-        ? (frameRect.left - videoRect.left + (renderedWidth - videoRect.width) / 2) / coverScale
-        : (video.videoWidth - fallbackWidth) / 2;
-      const sourceY = frameRect && videoRect.height > 0
-        ? (frameRect.top - videoRect.top + (renderedHeight - videoRect.height) / 2) / coverScale
-        : (video.videoHeight - fallbackHeight) / 2;
-      const cropX = Math.max(0, Math.min(video.videoWidth, sourceX));
-      const cropY = Math.max(0, Math.min(video.videoHeight, sourceY));
-      const cropWidth = Math.max(1, Math.min(video.videoWidth - cropX, frameRect && videoRect.width > 0 ? frameRect.width / coverScale : fallbackWidth));
-      const cropHeight = Math.max(1, Math.min(video.videoHeight - cropY, frameRect && videoRect.height > 0 ? frameRect.height / coverScale : fallbackHeight));
-      const scale = Math.min(1, 2400 / Math.max(cropWidth, cropHeight));
+      const source = getVideoFrameSource(video, frameRef.current?.getBoundingClientRect());
+      const scale = Math.min(1, 2400 / Math.max(source.width, source.height));
       const canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.round(cropWidth * scale));
-      canvas.height = Math.max(1, Math.round(cropHeight * scale));
+      canvas.width = Math.max(1, Math.round(source.width * scale));
+      canvas.height = Math.max(1, Math.round(source.height * scale));
       const context = canvas.getContext("2d");
       if (!context) throw new Error("Photo capture is unavailable in this browser.");
-      context.drawImage(video, cropX, cropY, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
+      context.drawImage(video, source.x, source.y, source.width, source.height, 0, 0, canvas.width, canvas.height);
 
       let nextQualityTip: string;
       try {
-        nextQualityTip = getQualityTip(canvas);
+        nextQualityTip = await getQualityTip(canvas);
       } catch (error) {
-        console.error("Photo ID quality check failed:", error);
-        nextQualityTip = "We could not check this photo automatically. Please review it closely.";
+        console.error("Photo ID content check failed:", error);
+        nextQualityTip = "We couldn’t check this photo. Please try again or choose an image file.";
       }
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
       if (!blob) throw new Error("We could not capture that photo. Please try again or choose an image file.");
@@ -277,7 +375,7 @@ export function PhotoIdCapture({
     <div className="space-y-3" data-testid="photo-id-camera">
       <div data-testid="photo-id-camera-launch" className="space-y-3 rounded-xl border bg-muted/30 p-4 sm:hidden">
         <div className="space-y-1">
-          <p className="text-sm font-semibold">Scan your photo ID</p>
+          <p className="text-sm font-semibold">Scan photo ID</p>
           <p className="text-sm text-muted-foreground">Use the camera guide to capture the front and back clearly.</p>
         </div>
         <Button
@@ -288,7 +386,7 @@ export function PhotoIdCapture({
           className="w-full"
         >
           <Camera aria-hidden="true" />
-          {isStarting ? "Opening camera..." : capturedCount === 0 ? "Scan front of ID" : capturedCount === 1 ? "Scan back of ID" : "Both sides captured"}
+          {isStarting ? "Opening camera..." : capturedCount === 0 ? "Scan photo ID" : capturedCount === 1 ? "Scan back of ID" : "Both sides captured"}
         </Button>
       </div>
 
@@ -363,7 +461,7 @@ export function PhotoIdCapture({
               ) : (
                 <p role="status" className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-4 py-2 text-sm text-white shadow-lg backdrop-blur-md">
                   <Check className="size-4 text-primary" aria-hidden="true" />
-                  Photo looks clear. Check that the details are readable.
+                Please make sure the details on the card are clear before proceeding.
                 </p>
               )}
               <div className="flex w-full max-w-md flex-col gap-3 sm:flex-row">
@@ -380,7 +478,7 @@ export function PhotoIdCapture({
           ) : stream ? (
             <>
               <div className="absolute inset-x-4 top-[18%] bottom-[25%] z-10 flex items-center justify-center">
-                <div ref={frameRef} className="relative flex aspect-[1.586/1] w-full max-w-[38rem] items-start justify-center rounded-2xl border border-white/30 bg-white/[0.03] shadow-[0_0_0_999px_rgb(0_0_0/0.48),0_0_40px_rgb(0_0_0/0.25)]">
+                <div ref={frameRef} className="relative flex aspect-[1.586/1] w-full max-w-[38rem] items-start justify-center overflow-hidden rounded-2xl border border-white/30 bg-white/[0.03] shadow-[0_0_0_999px_rgb(0_0_0/0.48),0_0_40px_rgb(0_0_0/0.25)]">
                   <span className="absolute left-1/2 top-3 inline-flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full border border-white/15 bg-black/65 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-md">
                     <ScanLine className="size-3.5 text-primary" aria-hidden="true" />
                     Fit all four corners inside
@@ -389,16 +487,16 @@ export function PhotoIdCapture({
                   <span className="pointer-events-none absolute right-[-1px] top-[-1px] size-8 rounded-tr-2xl border-r-[3px] border-t-[3px] border-primary shadow-[2px_-2px_12px_color-mix(in_oklab,var(--primary)_35%,transparent)]" />
                   <span className="pointer-events-none absolute bottom-[-1px] left-[-1px] size-8 rounded-bl-2xl border-b-[3px] border-l-[3px] border-primary shadow-[-2px_2px_12px_color-mix(in_oklab,var(--primary)_35%,transparent)]" />
                   <span className="pointer-events-none absolute bottom-[-1px] right-[-1px] size-8 rounded-br-2xl border-b-[3px] border-r-[3px] border-primary shadow-[2px_2px_12px_color-mix(in_oklab,var(--primary)_35%,transparent)]" />
-                  <span className="photo-id-scanline pointer-events-none absolute inset-x-3 top-1/2 h-px bg-gradient-to-r from-transparent via-primary to-transparent shadow-[0_0_12px_color-mix(in_oklab,var(--primary)_85%,transparent)]" />
+                  <span className="photo-id-scanline pointer-events-none absolute inset-x-3 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent shadow-[0_0_12px_color-mix(in_oklab,var(--primary)_85%,transparent)]" />
                 </div>
               </div>
               <div className="absolute inset-x-0 bottom-0 z-10 space-y-3 px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] text-center sm:space-y-4">
-                <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/45 px-3.5 py-2 text-xs text-white/90 shadow-lg backdrop-blur-md">
+                <div role="status" aria-live="polite" className={`mx-auto inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-xs text-white/90 shadow-lg backdrop-blur-md ${liveGuidance.startsWith("Looks good") ? "border-primary/25 bg-black/45" : "border-amber-300/25 bg-amber-950/45"}`}>
                   <span className="relative flex size-2">
-                    <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60 motion-reduce:animate-none" />
-                    <span className="relative inline-flex size-2 rounded-full bg-primary" />
+                    <span className={`absolute inline-flex size-full animate-ping rounded-full opacity-60 motion-reduce:animate-none ${liveGuidance.startsWith("Looks good") ? "bg-primary" : "bg-amber-300"}`} />
+                    <span className={`relative inline-flex size-2 rounded-full ${liveGuidance.startsWith("Looks good") ? "bg-primary" : "bg-amber-300"}`} />
                   </span>
-                  Hold steady · avoid glare
+                  {liveGuidance}
                 </div>
                 {cameraError ? <p role="alert" className="text-sm text-red-200">{cameraError}</p> : null}
                 <Button

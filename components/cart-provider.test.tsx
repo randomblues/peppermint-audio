@@ -99,11 +99,11 @@ describe("CartProvider hire dates", () => {
     expect(screen.getByRole("combobox", { name: "Pickup time" })).toHaveValue("10:00");
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
-    fireEvent.click(screen.getByRole("button", { name: "Next" }));
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ bookingReference: "PA-QA" }), { status: 200 }));
     fireEvent.drop(screen.getByTestId("photo-id-dropzone"), {
       dataTransfer: { files: [new File(["front"], "front.png", { type: "image/png" }), new File(["back"], "back.png", { type: "image/png" })] },
     });
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: "Submit a Booking Request" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));

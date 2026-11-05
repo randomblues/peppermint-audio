@@ -195,6 +195,11 @@ keys in local tests. Use Stripe test-mode keys and keep calendar disabled.
 
 ## Booking and payment management
 
+The four booking-form steps are **Your details**, **Event details**, **Photo ID**,
+and **Review your hire and terms**. Customers provide both ID sides before the
+final review, where selected items, additional details, and hire-term acceptance
+are shown together.
+
 The booking form accepts the front and back of a photo ID together or in separate
 file-picker selections or drops. New selections add to the existing files, up to
 two total; customers must remove a selected file before replacing it. Selections
@@ -207,12 +212,15 @@ no third-party upload service receives the ID. PDFs are not compressed and remai
 limited to 1.5 MB each. The API retains the 1.5 MB per-file cap so two IDs and the
 booking fields fit within Vercel's request-body limit. If conversion or compression
 fails, the form explains how to retry rather than submitting an oversized file.
-On phones, **Take front photo** opens a full-screen camera guide with a card
-outline and local lighting, glare, and focus checks. Customers can review and
-retake each side; photos that fail a check cannot be used from the scanner.
-These basic checks do not verify ID identity. The existing file upload remains
-available as a fallback. Camera access and image checks run in the browser, and
-the images are only uploaded when the booking request is submitted.
+On phones, **Scan photo ID** opens a full-screen camera guide with a card
+outline, live framing guidance for distance, lighting, glare, and focus, and
+browser-local OCR that looks for photo-ID labels and identity fields. Customers
+can review and retake each side; photos without recognizable ID text or that
+fail a quality check cannot be used from the scanner. This is a content/quality
+check, not identity or authenticity verification. Tesseract's worker and
+English OCR data are downloaded by the browser; captured images and recognized
+text stay on-device and are only uploaded when the booking request is submitted.
+The existing file upload remains available as a fallback.
 The browser regression test uses `tests/fixtures/synthetic-photo.heic`, an
 800x500 generated colour gradient encoded with macOS `sips`; it contains no ID
 or customer data and exercises the real decoder rather than a mocked conversion.

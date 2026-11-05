@@ -1,10 +1,22 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PhotoIdCapture } from "./photo-id-capture";
 
+const mockRecognize = vi.hoisted(() => vi.fn());
+
+vi.mock("tesseract.js", () => ({
+  createWorker: vi.fn(async () => ({
+    recognize: mockRecognize,
+    terminate: vi.fn(),
+  })),
+}));
+
 describe("PhotoIdCapture", () => {
   beforeEach(() => {
+    mockRecognize.mockReset().mockResolvedValue({
+      data: { text: "DRIVER LICENCE DOB 09/24/1996 4d DLN 62821123" },
+    });
     Object.defineProperty(URL, "createObjectURL", {
       configurable: true,
       value: vi.fn(() => "blob:photo-id-preview"),
@@ -21,7 +33,7 @@ describe("PhotoIdCapture", () => {
     render(<PhotoIdCapture capturedCount={0} onCapture={vi.fn()} />);
 
     expect(screen.getByTestId("photo-id-camera-launch")).toHaveClass("sm:hidden");
-    expect(screen.getByText("Scan your photo ID")).toBeInTheDocument();
+    expect(within(screen.getByTestId("photo-id-camera-launch")).getByText("Scan photo ID", { selector: "p" })).toBeInTheDocument();
     expect(screen.queryByText(/Photos stay on your device/)).not.toBeInTheDocument();
   });
 
@@ -51,7 +63,7 @@ describe("PhotoIdCapture", () => {
     const onCapture = vi.fn();
 
     render(<PhotoIdCapture capturedCount={0} onCapture={onCapture} />);
-    fireEvent.click(screen.getByRole("button", { name: "Scan front of ID" }));
+    fireEvent.click(screen.getByRole("button", { name: "Scan photo ID" }));
 
     const dialog = await screen.findByRole("dialog", { name: "Line up your photo ID" });
     expect(dialog).toHaveAttribute("aria-modal", "true");
@@ -107,7 +119,9 @@ describe("PhotoIdCapture", () => {
     }
     getImageData.mockReturnValue({ data: detailedPixels } as unknown as ImageData);
     fireEvent.click(screen.getByRole("button", { name: "Capture front" }));
-    expect(await screen.findByRole("status")).toHaveTextContent(/Photo looks clear/);
+    expect(within(await screen.findByRole("dialog", { name: "Review your photo" })).getByRole("status")).toHaveTextContent(
+      "Please make sure the details on the card are clear before proceeding.",
+    );
     fireEvent.click(screen.getByRole("button", { name: "Use this photo" }));
     await waitFor(() => expect(onCapture).toHaveBeenCalledWith(
       expect.objectContaining({ name: "photo-id-front.jpg", type: "image/jpeg" }),
@@ -115,6 +129,62 @@ describe("PhotoIdCapture", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Close camera" }));
     await waitFor(() => expect(stop).toHaveBeenCalled());
+  });
+
+  it("blocks a sharp, well-lit photo when OCR cannot find ID details", async () => {
+    const stream = { getTracks: () => [{ stop: vi.fn() }] } as unknown as MediaStream;
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: { getUserMedia: vi.fn().mockResolvedValue(stream) },
+    });
+    vi.spyOn(HTMLVideoElement.prototype, "play").mockResolvedValue();
+    vi.spyOn(HTMLVideoElement.prototype, "videoWidth", "get").mockReturnValue(1600);
+    vi.spyOn(HTMLVideoElement.prototype, "videoHeight", "get").mockReturnValue(900);
+    vi.spyOn(HTMLVideoElement.prototype, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, 390, 844));
+    const getImageData = vi.fn(() => ({
+      data: new Uint8ClampedArray(160 * 101 * 4),
+    } as unknown as ImageData));
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      drawImage: vi.fn(),
+      getImageData,
+      translate: vi.fn(),
+      rotate: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) => {
+      callback(new Blob(["captured image"], { type: "image/jpeg" }));
+    });
+    const detailedPixels = new Uint8ClampedArray(160 * 101 * 4);
+    for (let index = 0; index < detailedPixels.length; index += 4) {
+      const brightness = index % 8 === 0 ? 50 : 205;
+      detailedPixels[index] = brightness;
+      detailedPixels[index + 1] = brightness;
+      detailedPixels[index + 2] = brightness;
+      detailedPixels[index + 3] = 255;
+    }
+    getImageData.mockReturnValue({ data: detailedPixels } as unknown as ImageData);
+    mockRecognize.mockResolvedValue({ data: { text: "A landscape with trees and clouds" } });
+
+    render(<PhotoIdCapture capturedCount={0} onCapture={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Scan photo ID" }));
+    fireEvent.canPlay(await screen.findByLabelText("Live photo ID camera preview"));
+    fireEvent.click(screen.getByRole("button", { name: "Capture front" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/couldn’t recognize this as an ID/i);
+    expect(screen.queryByRole("button", { name: "Use this photo" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retake photo" })).toBeInTheDocument();
+    expect(mockRecognize).toHaveBeenCalledTimes(4);
+
+    mockRecognize.mockReset()
+      .mockResolvedValueOnce({ data: { text: "trees and sky" } })
+      .mockResolvedValueOnce({ data: { text: "DRIVER LICENCE DOB 09/24/1996" } });
+    fireEvent.click(screen.getByRole("button", { name: "Retake photo" }));
+    fireEvent.canPlay(await screen.findByLabelText("Live photo ID camera preview"));
+    fireEvent.click(screen.getByRole("button", { name: "Capture front" }));
+    expect(within(await screen.findByRole("dialog", { name: "Review your photo" })).getByRole("status")).toHaveTextContent(
+      /Please make sure the details/,
+    );
+    expect(mockRecognize).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("button", { name: "Use this photo" })).toBeInTheDocument();
   });
 
   it("returns to the existing upload flow when camera permission is blocked", async () => {
@@ -126,12 +196,12 @@ describe("PhotoIdCapture", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     render(<PhotoIdCapture capturedCount={0} onCapture={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Scan front of ID" }));
+    fireEvent.click(screen.getByRole("button", { name: "Scan photo ID" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/Camera access was blocked/);
     fireEvent.click(screen.getByRole("button", { name: "Back to uploads" }));
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Scan front of ID" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Scan photo ID" })).toBeInTheDocument();
   });
 
   it("stops a late camera stream if the customer closes while permission is pending", async () => {
@@ -147,7 +217,7 @@ describe("PhotoIdCapture", () => {
     });
     render(<PhotoIdCapture capturedCount={0} onCapture={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Scan front of ID" }));
+    fireEvent.click(screen.getByRole("button", { name: "Scan photo ID" }));
     fireEvent.click(await screen.findByRole("button", { name: "Close camera" }));
     provideStream?.(stream);
 

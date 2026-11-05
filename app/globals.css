@@ -133,12 +133,12 @@ body {
   0%,
   100% {
     opacity: 0.3;
-    transform: translateY(-45%);
+    top: 10%;
   }
 
   50% {
     opacity: 1;
-    transform: translateY(45%);
+    top: 90%;
   }
 }
 
@@ -146,7 +146,7 @@ body {
   .photo-id-scanline {
     animation: none;
     opacity: 0.65;
-    transform: translateY(0);
+    top: 50%;
   }
 }
 
