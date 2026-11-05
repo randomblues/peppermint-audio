@@ -56,6 +56,60 @@ beforeEach(async () => {
 });
 
 describe("AdminConsole", () => {
+  it("asks for payment receipt before confirming a bank transfer and allows cancelling", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ bookings: [{
+      ...booking, payment_method: "bank_transfer", hire_payment_status: "bank_transfer_pending",
+    }] })).mockResolvedValue(jsonResponse({ ok: true, payment: { hire_payment_status: "bank_transfer_received", deposit_payment_status: "bank_transfer_received" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AdminConsole />);
+    fireEvent.click(await screen.findByText("Alex Smith"));
+    fireEvent.change(screen.getByLabelText("Update booking status"), { target: { value: "confirmed" } });
+    expect(screen.getByRole("dialog", { name: "Has payment been received?" })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "No, not yet" }));
+    expect(screen.getByLabelText("Update booking status")).toHaveValue("submitted");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    fireEvent.change(screen.getByLabelText("Update booking status"), { target: { value: "confirmed" } });
+    fireEvent.click(screen.getByRole("button", { name: "Yes, confirm booking" }));
+    await waitFor(() => expect(screen.getByLabelText("Update booking status")).toHaveValue("confirmed"));
+    expect(fetchMock).toHaveBeenCalledWith("/api/admin/bookings", expect.objectContaining({
+      body: JSON.stringify({ id: "one", status: "confirmed", payment_received: true }),
+    }));
+    expect(screen.queryByRole("dialog", { name: "Has payment been received?" })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    { payment_method: "stripe_card_hold", hire_payment_status: "paid" },
+    { payment_method: "bank_transfer", hire_payment_status: "bank_transfer_received" },
+    { payment_method: "cash_on_pickup", hire_payment_status: "cash_due" },
+  ])("confirms without asking for payment when already settled or cash is due: %j", async (payment) => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ bookings: [{ ...booking, ...payment }] }))
+      .mockResolvedValue(jsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AdminConsole />);
+    fireEvent.click(await screen.findByText("Alex Smith"));
+    fireEvent.change(screen.getByLabelText("Update booking status"), { target: { value: "confirmed" } });
+    await waitFor(() => expect(screen.getByLabelText("Update booking status")).toHaveValue("confirmed"));
+    expect(screen.queryByRole("dialog", { name: "Has payment been received?" })).not.toBeInTheDocument();
+  });
+
+  it("reflects a saved confirmation even when its email fails", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ bookings: [{
+      ...booking, payment_method: "bank_transfer", hire_payment_status: "bank_transfer_pending",
+    }] })).mockResolvedValue(jsonResponse({
+      error: "Booking confirmed, but the confirmation email failed.",
+      booking: { status: "confirmed", hire_payment_status: "bank_transfer_received" },
+    }, false));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AdminConsole />);
+    fireEvent.click(await screen.findByText("Alex Smith"));
+    fireEvent.change(screen.getByLabelText("Update booking status"), { target: { value: "confirmed" } });
+    fireEvent.click(screen.getByRole("button", { name: "Yes, confirm booking" }));
+    expect(await screen.findByRole("alertdialog")).toHaveTextContent("Booking confirmed, but the confirmation email failed.");
+    expect(screen.queryByRole("dialog", { name: "Has payment been received?" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Update booking status")).toHaveValue("confirmed");
+  });
+
   it("shows full multi-night catalogue totals in saved hire details", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ bookings: [{
       ...booking, dropoff_date: "2026-10-04",

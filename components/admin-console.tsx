@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Dialog } from "@base-ui/react/dialog";
 import {
   Archive, BarChart3, ChevronDown, ChevronRight, CreditCard, Download, FileSpreadsheet,
   ExternalLink, LayoutDashboard, LogOut, Mail, Menu, RefreshCw,
@@ -144,6 +145,8 @@ export function AdminConsole() {
   const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [selected, setSelected] = useState<Booking | null>(null);
+  const [paymentConfirmation, setPaymentConfirmation] = useState<Booking | null>(null);
+  const [confirmingPayment, setConfirmingPayment] = useState(false);
   const [emailHistorySearch, setEmailHistorySearch] = useState("");
   const [range, setRange] = useState({ from: "", to: "" });
   const [loading, setLoading] = useState(true);
@@ -206,14 +209,40 @@ export function AdminConsole() {
     ].some((value) => String(value ?? "").toLowerCase().includes(query)));
   }, [bookings, emailHistorySearch]);
 
-  async function update(id: string, values: { status?: string; internal_notes?: string }) {
+  async function update(id: string, values: { status?: string; internal_notes?: string; payment_received?: boolean }) {
+    const booking = bookings.find((item) => item.id === id);
+    if (values.status === "confirmed" && booking?.payment_method === "bank_transfer"
+      && !["paid", "succeeded", "bank_transfer_received"].includes(booking.hire_payment_status ?? "")
+      && values.payment_received !== true) {
+      setPaymentConfirmation(booking);
+      return;
+    }
+    if (values.payment_received) setConfirmingPayment(true);
     try {
       const response = await fetch("/api/admin/bookings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...values }) });
-      if (!response.ok) { showMessage(await responseError(response, "Update failed."), "error"); return; }
-      setBookings((current) => current.map((booking) => booking.id === id ? { ...booking, ...values } : booking));
-      setSelected((current) => current?.id === id ? { ...current, ...values } : current);
+      const data = await response.json() as {
+        error?: string;
+        payment?: Pick<Booking, "hire_payment_status" | "deposit_payment_status">;
+        booking?: Partial<Booking>;
+      };
+      if (!response.ok) {
+        if (data.booking) {
+          setBookings((current) => current.map((booking) => booking.id === id ? { ...booking, ...data.booking } : booking));
+          setSelected((current) => current?.id === id ? { ...current, ...data.booking } : current);
+          setPaymentConfirmation(null);
+        }
+        showMessage(data.error ?? "Update failed.", "error");
+        return;
+      }
+      const { payment } = data;
+      const { payment_received: paymentReceived, ...bookingValues } = values;
+      const updatedValues = { ...bookingValues, ...payment };
+      setBookings((current) => current.map((booking) => booking.id === id ? { ...booking, ...updatedValues } : booking));
+      setSelected((current) => current?.id === id ? { ...current, ...updatedValues } : current);
+      if (paymentReceived) setPaymentConfirmation(null);
       showMessage("Booking updated.", "success");
     } catch { showMessage("Update failed. Check your connection and try again.", "error"); }
+    finally { setConfirmingPayment(false); }
   }
   async function signedLink(path: string) {
     try {
@@ -270,6 +299,21 @@ export function AdminConsole() {
   return (
     <div className="admin-console-shell min-h-screen bg-muted/30">
       <AdminErrorDialog message={messageType === "error" ? message : ""} onClose={() => setMessage("")} />
+      <Dialog.Root open={Boolean(paymentConfirmation)} onOpenChange={(open) => { if (!open && !confirmingPayment) setPaymentConfirmation(null); }}>
+        <Dialog.Portal>
+          <Dialog.Backdrop className="fixed inset-0 z-[80] bg-black/40 backdrop-blur-md" />
+          <Dialog.Popup className="fixed top-1/2 left-1/2 z-[81] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border bg-popover p-6 text-popover-foreground shadow-2xl">
+            <Dialog.Title className="text-xl font-semibold">Has payment been received?</Dialog.Title>
+            <Dialog.Description className="mt-3 text-sm leading-6 text-muted-foreground">
+              Confirm that the hire payment and any security deposit have been received for {paymentConfirmation?.first_name} {paymentConfirmation?.last_name}. This will confirm the booking and email the customer.
+            </Dialog.Description>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <Button variant="outline" disabled={confirmingPayment} onClick={() => setPaymentConfirmation(null)}>No, not yet</Button>
+              <Button disabled={confirmingPayment} onClick={() => { if (paymentConfirmation) void update(paymentConfirmation.id, { status: "confirmed", payment_received: true }); }}>{confirmingPayment ? "Confirming…" : "Yes, confirm booking"}</Button>
+            </div>
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
       <aside className={`admin-console-sidebar fixed inset-y-0 left-0 z-30 w-64 border-r bg-card p-5 transition-transform md:translate-x-0 ${mobileNav ? "translate-x-0" : "-translate-x-full"}`}>
         <Link href="/" aria-label="Go to Peppermint Audio home" className="flex items-center gap-3 border-b pb-6"><div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground"><ShieldCheck className="size-5" /></div><div><p className="font-semibold">Peppermint Audio</p><p className="text-xs text-muted-foreground">Operations console</p></div></Link>
         <nav className="mt-6 space-y-1" aria-label="Admin sections">

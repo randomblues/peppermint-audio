@@ -262,7 +262,15 @@ deposits cannot be reset through bank-transfer setup; resend the existing invoic
 Invalid deposit amounts are rejected rather than retaining an earlier amount.
 
 Booking confirmation saves the confirmed status before sending the customer
-email. If delivery fails, the booking remains confirmed and the admin can retry
+email. A successful Stripe hire payment automatically confirms submitted bookings;
+deposit-only events do not confirm bookings, and cancelled/completed bookings are
+never reopened. Review availability before sending a Stripe payment link.
+For bank transfers, choose **Confirmed** in the booking status control and answer
+the payment-received dialog. **Yes, confirm booking** records hire and deposit
+receipt, confirms the booking, and sends the confirmation and payment receipt.
+The separate **Confirm payment** checkbox is no longer needed. Cash-on-pickup
+bookings can still be confirmed while payment is due.
+If delivery fails, the booking remains confirmed and the admin can retry
 using **Send confirmation email**. Automated pickup reminders exclude cancelled
 and completed bookings. Manual reminders use the actual pickup date without
 assuming tomorrow. Calendar-outcome recording failures are logged independently

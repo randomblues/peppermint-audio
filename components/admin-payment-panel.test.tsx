@@ -202,6 +202,7 @@ describe("AdminPaymentPanel", () => {
     expect(stripeOption).toBeEnabled();
     fireEvent.click(stripeOption);
     expect(stripeOption).toBeChecked();
+    expect(screen.queryByRole("checkbox", { name: "Confirm payment" })).not.toBeInTheDocument();
   });
 
   it("updates a pending invoice on the same booking and reference", async () => {

@@ -59,6 +59,14 @@ describe("sendBookingConfirmationEmail", () => {
     }));
   });
 
+  it("passes the automatic confirmation idempotency key to the provider", async () => {
+    send.mockResolvedValue({ data: { id: "email-1" }, error: null });
+    await sendBookingConfirmationEmail(booking, { idempotencyKey: "booking-confirmation-test" });
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ to: ["customer@example.com"] }), {
+      idempotencyKey: "booking-confirmation-test",
+    });
+  });
+
   it("surfaces missing configuration and provider failures", async () => {
     vi.stubEnv("RESEND_API_KEY", "");
     await expect(sendBookingConfirmationEmail(booking)).rejects.toThrow("Email service is not configured.");

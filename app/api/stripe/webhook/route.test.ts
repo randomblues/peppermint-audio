@@ -9,10 +9,12 @@ const mocks = vi.hoisted(() => ({
   syncDeferredDeposit: vi.fn(),
   attemptDeferredDeposit: vi.fn(),
   notifyDepositAttention: vi.fn(),
+  confirmPaidStripeBooking: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase", () => ({ createAdminClient: mocks.createAdminClient }));
 vi.mock("@/lib/stripe", () => ({ getStripe: mocks.getStripe }));
+vi.mock("@/lib/booking-confirmation", () => ({ confirmPaidStripeBooking: mocks.confirmPaidStripeBooking }));
 vi.mock("@/lib/invoice-service", () => ({ markInvoiceStatus: mocks.markInvoiceStatus, sendBillingDocument: mocks.sendBillingDocument }));
 vi.mock("@/lib/deferred-deposits", () => ({
   readDepositBooking: mocks.readDepositBooking, syncDeferredDeposit: mocks.syncDeferredDeposit,
@@ -46,6 +48,7 @@ describe("Stripe webhook", () => {
     });
     mocks.markInvoiceStatus.mockResolvedValue(undefined);
     mocks.sendBillingDocument.mockResolvedValue("document-1");
+    mocks.confirmPaidStripeBooking.mockResolvedValue(undefined);
     mocks.readDepositBooking.mockResolvedValue({
       id: "booking-1", stripe_hire_payment_intent_id: "pi_hire", hire_payment_status: "pending",
     });
@@ -76,6 +79,7 @@ describe("Stripe webhook", () => {
     expect(response.status).toBe(200);
     expect(admin.update).toHaveBeenCalledWith(expect.objectContaining(updates));
     expect(admin.eq).toHaveBeenCalledWith("id", "booking-1");
+    expect(mocks.confirmPaidStripeBooking).not.toHaveBeenCalled();
   });
 
   it("ignores stale deferred-deposit events from a replaced intent", async () => {
@@ -115,6 +119,7 @@ describe("Stripe webhook", () => {
     expect((await POST(request())).status).toBe(200);
     expect(admin.update).not.toHaveBeenCalled();
     expect(mocks.sendBillingDocument).not.toHaveBeenCalled();
+    expect(mocks.confirmPaidStripeBooking).not.toHaveBeenCalled();
   });
 
   it("retrieves current deferred-deposit state for out-of-order events", async () => {
@@ -141,6 +146,46 @@ describe("Stripe webhook", () => {
     }) } });
     expect((await POST(request())).status).toBe(200);
     expect(mocks.attemptDeferredDeposit).toHaveBeenCalledWith(expect.anything(), "booking-1");
+    expect(mocks.confirmPaidStripeBooking).toHaveBeenCalledWith(expect.anything(), "booking-1");
     expect(mocks.attemptDeferredDeposit.mock.invocationCallOrder[0]).toBeLessThan(mocks.sendBillingDocument.mock.invocationCallOrder[0]);
+  });
+
+  it.each(["checkout.session.completed", "checkout.session.async_payment_succeeded"])("confirms a paid hire from %s", async (type) => {
+    mocks.getStripe.mockReturnValue({ webhooks: { constructEvent: vi.fn().mockReturnValue({
+      type, data: { object: { payment_status: "paid", payment_intent: "pi_hire", metadata: { bookingId: "booking-1", paymentType: "hire" } } },
+    }) } });
+    expect((await POST(request())).status).toBe(200);
+    expect(mocks.confirmPaidStripeBooking).toHaveBeenCalledWith(expect.anything(), "booking-1");
+  });
+
+  it.each([
+    ["hire", "unpaid", "pi_hire"],
+    ["hire", "paid", "pi_old"],
+    ["deposit", "paid", "pi_deposit"],
+  ])("does not confirm %s checkout with status %s and intent %s", async (paymentType, payment_status, payment_intent) => {
+    mocks.getStripe.mockReturnValue({ webhooks: { constructEvent: vi.fn().mockReturnValue({
+      type: "checkout.session.completed", data: { object: { payment_status, payment_intent, metadata: { bookingId: "booking-1", paymentType } } },
+    }) } });
+    expect((await POST(request())).status).toBe(200);
+    expect(mocks.confirmPaidStripeBooking).not.toHaveBeenCalled();
+  });
+
+  it("returns a retryable failure if automatic confirmation fails", async () => {
+    mocks.confirmPaidStripeBooking.mockRejectedValueOnce(new Error("email failed"));
+    mocks.getStripe.mockReturnValue({ webhooks: { constructEvent: vi.fn().mockReturnValue({
+      type: "payment_intent.succeeded", data: { object: { id: "pi_hire", metadata: { bookingId: "booking-1", paymentType: "hire" } } },
+    }) } });
+    expect((await POST(request())).status).toBe(500);
+    expect(mocks.attemptDeferredDeposit).toHaveBeenCalledWith(expect.anything(), "booking-1");
+    expect(mocks.sendBillingDocument).toHaveBeenCalledWith(expect.anything(), "booking-1", "payment_receipt");
+  });
+
+  it("still confirms the paid hire if deposit processing fails", async () => {
+    mocks.attemptDeferredDeposit.mockRejectedValueOnce(new Error("deposit failed"));
+    mocks.getStripe.mockReturnValue({ webhooks: { constructEvent: vi.fn().mockReturnValue({
+      type: "payment_intent.succeeded", data: { object: { id: "pi_hire", metadata: { bookingId: "booking-1", paymentType: "hire" } } },
+    }) } });
+    expect((await POST(request())).status).toBe(500);
+    expect(mocks.confirmPaidStripeBooking).toHaveBeenCalledWith(expect.anything(), "booking-1");
   });
 });

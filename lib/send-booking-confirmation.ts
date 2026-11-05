@@ -19,7 +19,7 @@ export type BookingConfirmationRecord = {
   additional_details?: string | null;
 };
 
-export async function sendBookingConfirmationEmail(booking: BookingConfirmationRecord) {
+export async function sendBookingConfirmationEmail(booking: BookingConfirmationRecord, options?: { idempotencyKey: string }) {
   const { apiKey, from } = emailConfiguration();
   if (!apiKey || !from) throw new Error("Email service is not configured.");
 
@@ -52,7 +52,7 @@ export async function sendBookingConfirmationEmail(booking: BookingConfirmationR
     subject: email.subject,
     text: email.text,
     html: email.html,
-  });
+  }, options);
   if (response.error) {
     const providerMessage = typeof response.error.message === "string" ? response.error.message.trim() : "";
     throw new Error(providerMessage

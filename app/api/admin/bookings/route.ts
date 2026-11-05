@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { requireAdminJson } from "@/lib/admin-request";
 import { PHOTO_ID_BUCKET } from "@/lib/supabase";
-import { sendBookingConfirmationEmail } from "@/lib/send-booking-confirmation";
-import { recordCustomerEmail } from "@/lib/email-log";
+import { ConfirmationError, sendTrackedBookingConfirmation } from "@/lib/booking-confirmation";
+import { markInvoiceStatus, sendBillingDocument } from "@/lib/invoice-service";
 import { lineItemsTotalCents, parseBookingLineItems, type BookingLineItem } from "@/lib/booking-line-items";
 import { rentalDays } from "@/lib/payment-flow";
 import { releaseCancelledDeferredDeposit } from "@/lib/deferred-deposits";
@@ -72,7 +72,7 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const auth = await requireAdminJson<{ id?: string; status?: string; internal_notes?: string; hire_line_items?: unknown }>(request);
+  const auth = await requireAdminJson<{ id?: string; status?: string; payment_received?: boolean; internal_notes?: string; hire_line_items?: unknown }>(request);
   if ("response" in auth) return auth.response;
   const { session, body } = auth;
   if (!body.id || (body.status && !["submitted", "confirmed", "completed", "cancelled"].includes(body.status))) return NextResponse.json({ error: "Invalid update." }, { status: 400 });
@@ -107,9 +107,10 @@ export async function PATCH(request: Request) {
     additional_details?: string | null;
     confirmation_email_sent: boolean;
   } | null = null;
+  let paymentUpdate: { hire_payment_status: string; deposit_payment_status: string; payment_received_at: string } | null = null;
   if (body.status === "confirmed") {
     const result = await session.admin.from("bookings")
-      .select("id,email,first_name,event_type,pickup_date,dropoff_date,pickup_time,dropoff_time,created_at,hire_line_items,additional_details,confirmation_email_sent,hire_payment_status,payment_method")
+      .select("id,email,first_name,event_type,pickup_date,dropoff_date,pickup_time,dropoff_time,created_at,hire_line_items,additional_details,confirmation_email_sent,hire_payment_status,payment_method,security_deposit_cents")
       .eq("id", body.id)
       .single();
     if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 });
@@ -117,7 +118,16 @@ export async function PATCH(request: Request) {
     const paymentReady = ["paid", "succeeded", "bank_transfer_received"].includes(result.data.hire_payment_status ?? "")
       || (result.data.payment_method === "cash_on_pickup" && result.data.hire_payment_status === "cash_due");
     if (!paymentReady) {
-      return NextResponse.json({ error: "Mark the hire payment as paid before confirming this booking." }, { status: 409 });
+      if (result.data.payment_method !== "bank_transfer" || body.payment_received !== true) {
+        return NextResponse.json({ error: result.data.payment_method === "bank_transfer"
+          ? "Confirm that payment has been received before confirming this booking."
+          : "A paid Stripe payment or a bank-transfer or cash-on-pickup invoice is required before confirming this booking." }, { status: 409 });
+      }
+      paymentUpdate = {
+        hire_payment_status: "bank_transfer_received",
+        deposit_payment_status: result.data.security_deposit_cents > 0 ? "bank_transfer_received" : "not_required",
+        payment_received_at: new Date().toISOString(),
+      };
     }
     confirmation = result.data;
   }
@@ -125,32 +135,35 @@ export async function PATCH(request: Request) {
     ...(body.status ? { status: body.status } : {}),
     ...(body.internal_notes !== undefined ? { internal_notes: body.internal_notes } : {}),
     ...(lineItemUpdate ?? {}),
+    ...(paymentUpdate ?? {}),
     updated_at: new Date().toISOString(),
   };
   const { error } = await session.admin.from("bookings").update(update).eq("id", body.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (confirmation) {
-    if (!confirmation.confirmation_email_sent) {
-      try {
-        const providerMessageId = await sendBookingConfirmationEmail(confirmation);
-        try {
-          await recordCustomerEmail(session.admin, {
-            bookingId: body.id,
-            recipientEmail: confirmation.email,
-            emailType: "confirmation",
-            providerMessageId,
-          });
-        } catch (error) {
-          console.error("Confirmation email log failed:", error);
-        }
-      } catch (error) {
-        console.error("Booking confirmation email failed:", error);
-        const message = error instanceof Error ? error.message : "Booking confirmation email could not be sent.";
-        return NextResponse.json({ error: `Booking confirmed, but the confirmation email failed. Use Send confirmation email to retry. ${message}` }, { status: 502 });
+    const bookingId = body.id;
+    try {
+      const outcomes = await Promise.allSettled([
+        sendTrackedBookingConfirmation(session.admin, body.id, confirmation),
+        ...(paymentUpdate ? [(async () => {
+          await markInvoiceStatus(session.admin, bookingId, "paid", paymentUpdate.payment_received_at);
+          await sendBillingDocument(session.admin, bookingId, "payment_receipt");
+        })()] : []),
+      ]);
+      const failures = outcomes.filter((outcome) => outcome.status === "rejected");
+      if (failures.length) {
+        const messages = failures.map(({ reason }) => reason instanceof ConfirmationError ? reason.message
+          : `Booking confirmed, but payment receipt delivery failed. ${reason instanceof Error ? reason.message : "Please retry from payment collection."}`);
+        const status = failures[0].reason instanceof ConfirmationError ? failures[0].reason.status : 502;
+        throw new ConfirmationError(messages.join(" "), status);
       }
-      const tracking = await session.admin.from("bookings")
-        .update({ confirmation_email_sent: true, updated_at: new Date().toISOString() }).eq("id", body.id);
-      if (tracking.error) return NextResponse.json({ error: "Booking confirmed and email sent, but email tracking could not be saved. Refresh before retrying to avoid sending a duplicate." }, { status: 500 });
+    } catch (error) {
+      console.error("Booking confirmation failed:", error);
+      return NextResponse.json({
+        error: error instanceof ConfirmationError ? error.message : `Booking confirmed, but payment receipt delivery failed. ${error instanceof Error ? error.message : "Please retry from payment collection."}`,
+        booking: update,
+      },
+        { status: error instanceof ConfirmationError ? error.status : 502 });
     }
   }
   if (body.status === "cancelled") {
@@ -161,7 +174,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Booking cancelled, but the deposit hold could not be released. Please review the deposit before retrying." }, { status: 502 });
     }
   }
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, ...(paymentUpdate ? { payment: paymentUpdate } : {}) });
 }
 
 export async function DELETE(request: Request) {

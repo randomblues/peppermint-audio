@@ -249,14 +249,13 @@ export function AdminPaymentPanel({ booking, onChanged, collapsible = true }: { 
     showMessage(action === "release" ? "Security-deposit authorisation released." : "Security-deposit amount captured.");
   }
 
-  async function markBankTransfer(action: "bank_transfer_received" | "bank_transfer_deposit_refunded") {
-    const data = await submit("/api/admin/payments/manage-deposit", { bookingId: booking.id, action });
+  async function markBankTransferRefunded() {
+    const data = await submit("/api/admin/payments/manage-deposit", { bookingId: booking.id, action: "bank_transfer_deposit_refunded" });
     if (!data) return;
     onChanged({
-      hire_payment_status: action === "bank_transfer_received" ? "bank_transfer_received" : booking.hire_payment_status,
-      deposit_payment_status: action === "bank_transfer_received" ? (Number(depositAmount || "0") > 0 ? "bank_transfer_received" : "not_required") : "bank_transfer_refunded",
+      deposit_payment_status: "bank_transfer_refunded",
     });
-    showMessage(action === "bank_transfer_received" ? "Bank transfer marked received and receipt emailed." : "Bank-transfer deposit marked refunded.");
+    showMessage("Bank-transfer deposit marked refunded.");
   }
 
   async function sendExistingInvoice() {
@@ -431,21 +430,12 @@ export function AdminPaymentPanel({ booking, onChanged, collapsible = true }: { 
         {booking.deposit_payment_status === "scheduled" ? <p className="rounded-lg border bg-muted/30 p-3 text-sm">Deposit hold scheduled one day before pickup. A paid hire does not yet mean the deposit is secured.</p> : null}
         {booking.deposit_capture_before ? <p className="text-sm text-muted-foreground">Card hold expires: {new Date(booking.deposit_capture_before).toLocaleString("en-AU", { timeZone: "Australia/Melbourne" })} Melbourne time.</p> : null}
         {booking.deposit_error ? <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">{booking.deposit_error}</p> : null}
-        {booking.payment_method === "bank_transfer" && (booking.hire_payment_status === "bank_transfer_pending" || booking.deposit_payment_status === "bank_transfer_received") ? (
+        {booking.payment_method === "bank_transfer" && booking.deposit_payment_status === "bank_transfer_received" ? (
           <section className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
             <div className="grid gap-2 sm:grid-cols-2">
-              {booking.hire_payment_status === "bank_transfer_pending" ? (
-                <label className="group flex cursor-pointer items-center gap-3 rounded-xl border border-primary/20 bg-background/70 p-3 text-sm shadow-sm transition-colors hover:border-primary/45 hover:bg-background has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
-                  <input type="checkbox" aria-label="Confirm payment" disabled={processing} onChange={() => void markBankTransfer("bank_transfer_received")} className="peer sr-only" />
-                  <span className="flex size-5 shrink-0 items-center justify-center rounded-md border-2 border-primary/35 text-transparent transition-all peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground peer-focus-visible:ring-3 peer-focus-visible:ring-primary/25">
-                    <CheckCircle2 className="size-3.5" aria-hidden="true" />
-                  </span>
-                  <span className="font-medium group-hover:text-primary">Confirm payment</span>
-                </label>
-              ) : null}
               {booking.deposit_payment_status === "bank_transfer_received" ? (
                 <label className="group flex cursor-pointer items-center gap-3 rounded-xl border border-primary/20 bg-background/70 p-3 text-sm shadow-sm transition-colors hover:border-primary/45 hover:bg-background has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
-                  <input type="checkbox" aria-label="Mark deposit refunded" disabled={processing} onChange={() => void markBankTransfer("bank_transfer_deposit_refunded")} className="peer sr-only" />
+                  <input type="checkbox" aria-label="Mark deposit refunded" disabled={processing} onChange={() => void markBankTransferRefunded()} className="peer sr-only" />
                   <span className="flex size-5 shrink-0 items-center justify-center rounded-md border-2 border-primary/35 text-transparent transition-all peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground peer-focus-visible:ring-3 peer-focus-visible:ring-primary/25">
                     <CheckCircle2 className="size-3.5" aria-hidden="true" />
                   </span>

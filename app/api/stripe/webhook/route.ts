@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase";
 import { markInvoiceStatus, sendBillingDocument } from "@/lib/invoice-service";
 import { getStripe } from "@/lib/stripe";
 import { attemptDeferredDeposit, notifyDepositAttention, readDepositBooking, syncDeferredDeposit } from "@/lib/deferred-deposits";
+import { confirmPaidStripeBooking } from "@/lib/booking-confirmation";
 
 async function updatePayment(bookingId: string, updates: Record<string, unknown>) {
   const admin = createAdminClient();
@@ -56,10 +57,17 @@ export async function POST(request: Request) {
       const bookingId = session.metadata?.bookingId;
       const paymentType = session.metadata?.paymentType;
       if (bookingId && paymentType === "hire") {
+        const intentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id;
+        const booking = await readDepositBooking(createAdminClient(), bookingId);
+        if (!booking || !intentId || booking.stripe_hire_payment_intent_id !== intentId
+          || (booking.hire_payment_status === "paid" && session.payment_status !== "paid")) {
+          return Response.json({ received: true });
+        }
         await updatePayment(bookingId, {
           hire_payment_status: session.payment_status === "paid" ? "paid" : "processing",
-          stripe_hire_payment_intent_id: typeof session.payment_intent === "string" ? session.payment_intent : null,
+          stripe_hire_payment_intent_id: intentId,
         });
+        if (session.payment_status === "paid") await confirmPaidStripeBooking(createAdminClient(), bookingId);
       } else if (bookingId && paymentType === "deposit") {
         await updatePayment(bookingId, {
           deposit_payment_status: "authorized",
@@ -82,11 +90,18 @@ export async function POST(request: Request) {
       if (bookingId && paymentIntent.metadata.paymentType === "hire") {
         const paidAt = new Date().toISOString();
         await updatePayment(bookingId, { hire_payment_status: "paid", stripe_hire_payment_intent_id: paymentIntent.id, payment_received_at: paidAt });
-        await attemptDeferredDeposit(createAdminClient(), bookingId);
-        const depositBooking = await readDepositBooking(createAdminClient(), bookingId);
-        if (depositBooking) await notifyDepositAttention(createAdminClient(), depositBooking);
-        await sendBillingDocument(createAdminClient(), bookingId, "payment_receipt");
-        await markInvoiceStatus(createAdminClient(), bookingId, "paid", paidAt);
+        const outcomes = await Promise.allSettled([
+          confirmPaidStripeBooking(createAdminClient(), bookingId),
+          (async () => {
+            await attemptDeferredDeposit(createAdminClient(), bookingId);
+            const depositBooking = await readDepositBooking(createAdminClient(), bookingId);
+            if (depositBooking) await notifyDepositAttention(createAdminClient(), depositBooking);
+            await sendBillingDocument(createAdminClient(), bookingId, "payment_receipt");
+            await markInvoiceStatus(createAdminClient(), bookingId, "paid", paidAt);
+          })(),
+        ]);
+        const failures = outcomes.filter((outcome) => outcome.status === "rejected");
+        if (failures.length) throw new AggregateError(failures.map((failure) => failure.reason), "Paid hire follow-up failed.");
       } else if (bookingId && paymentIntent.metadata.paymentType === "deposit") {
         await updatePayment(bookingId, {
           deposit_payment_status: "captured",

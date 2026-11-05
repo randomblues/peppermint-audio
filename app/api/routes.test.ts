@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => {
     sendBookingConfirmationEmail: vi.fn(),
     recordCustomerEmail: vi.fn(),
     releaseCancelledDeferredDeposit: vi.fn(),
+    markInvoiceStatus: vi.fn(),
+    sendBillingDocument: vi.fn(),
     Resend: vi.fn(() => ({ emails: { send } })),
   };
 });
@@ -40,6 +42,7 @@ vi.mock("@/lib/email-log", () => ({
   recordCustomerEmail: mocks.recordCustomerEmail,
 }));
 vi.mock("@/lib/deferred-deposits", () => ({ releaseCancelledDeferredDeposit: mocks.releaseCancelledDeferredDeposit }));
+vi.mock("@/lib/invoice-service", () => ({ markInvoiceStatus: mocks.markInvoiceStatus, sendBillingDocument: mocks.sendBillingDocument }));
 
 import { GET as getBookings, PATCH as patchBooking, DELETE as deleteBooking } from "./admin/bookings/route";
 import { POST as exportBookings } from "./admin/export/route";
@@ -222,7 +225,7 @@ describe("admin booking routes", () => {
     expect(mocks.sendBookingConfirmationEmail).toHaveBeenCalledWith(expect.objectContaining({
       email: "customer@example.com",
       first_name: "Alex",
-    }));
+    }), { idempotencyKey: "booking-confirmation-b1" });
     expect(update.update).toHaveBeenCalledWith(expect.objectContaining({
       status: "confirmed",
     }));
@@ -267,6 +270,7 @@ describe("admin booking routes", () => {
           first_name: "Alex",
           confirmation_email_sent: false,
           hire_payment_status: "bank_transfer_pending",
+          payment_method: "bank_transfer",
         },
         error: null,
       }),
@@ -276,8 +280,64 @@ describe("admin booking routes", () => {
     const response = await patchBooking(jsonRequest("/api/admin/bookings", { id: "b1", status: "confirmed" }));
 
     expect(response.status).toBe(409);
-    expect(await responseJson(response)).toEqual({ error: "Mark the hire payment as paid before confirming this booking." });
+    expect(await responseJson(response)).toEqual({ error: "Confirm that payment has been received before confirming this booking." });
     expect(mocks.sendBookingConfirmationEmail).not.toHaveBeenCalled();
+  });
+
+  it.each([0, 10000])("records manual payment and confirms together with a %s-cent deposit", async (security_deposit_cents) => {
+    const read = {
+      select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: {
+        email: "customer@example.com", first_name: "Alex", confirmation_email_sent: false,
+        payment_method: "bank_transfer", hire_payment_status: "bank_transfer_pending", security_deposit_cents,
+      }, error: null }),
+    };
+    const update = { update: vi.fn().mockReturnThis(), eq: vi.fn().mockResolvedValue({ error: null }) };
+    mocks.requireAdmin.mockResolvedValue(adminSession({ from: vi.fn().mockReturnValueOnce(read).mockReturnValue(update) }));
+    const response = await patchBooking(jsonRequest("/api/admin/bookings", { id: "b1", status: "confirmed", payment_received: true }));
+    expect(response.status).toBe(200);
+    expect(update.update).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      status: "confirmed", hire_payment_status: "bank_transfer_received",
+      deposit_payment_status: security_deposit_cents ? "bank_transfer_received" : "not_required",
+      payment_received_at: expect.any(String),
+    }));
+    expect(mocks.markInvoiceStatus).toHaveBeenCalledWith(expect.anything(), "b1", "paid", expect.any(String));
+    expect(mocks.sendBillingDocument).toHaveBeenCalledWith(expect.anything(), "b1", "payment_receipt");
+    expect(mocks.sendBookingConfirmationEmail).toHaveBeenCalledOnce();
+    expect(await response.json()).toMatchObject({ payment: { hire_payment_status: "bank_transfer_received" } });
+  });
+
+  it.each(["stripe_card_hold", null])("does not let a manual payment flag bypass payment setup for %s", async (payment_method) => {
+    const query = {
+      select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: { payment_method, hire_payment_status: "pending" }, error: null }),
+      update: vi.fn(),
+    };
+    mocks.requireAdmin.mockResolvedValue(adminSession({ from: vi.fn().mockReturnValue(query) }));
+    expect((await patchBooking(jsonRequest("/api/admin/bookings", { id: "b1", status: "confirmed", payment_received: true }))).status).toBe(409);
+    expect(query.update).not.toHaveBeenCalled();
+  });
+
+  it.each(["confirmation", "receipt"])("keeps payment and confirmed state when the %s email fails", async (failure) => {
+    const read = {
+      select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: {
+        email: "customer@example.com", first_name: "Alex", confirmation_email_sent: false,
+        payment_method: "bank_transfer", hire_payment_status: "bank_transfer_pending", security_deposit_cents: 10000,
+      }, error: null }),
+    };
+    const update = { update: vi.fn().mockReturnThis(), eq: vi.fn().mockResolvedValue({ error: null }) };
+    mocks.requireAdmin.mockResolvedValue(adminSession({ from: vi.fn().mockReturnValueOnce(read).mockReturnValue(update) }));
+    if (failure === "confirmation") mocks.sendBookingConfirmationEmail.mockRejectedValueOnce(new Error("provider down"));
+    else mocks.sendBillingDocument.mockRejectedValueOnce(new Error("receipt provider down"));
+    const response = await patchBooking(jsonRequest("/api/admin/bookings", { id: "b1", status: "confirmed", payment_received: true }));
+    expect(response.status).toBe(502);
+    expect(await response.json()).toMatchObject({
+      booking: { status: "confirmed", hire_payment_status: "bank_transfer_received" },
+      error: expect.stringContaining(failure === "confirmation" ? "confirmation email failed" : "payment receipt delivery failed"),
+    });
+    expect(mocks.sendBookingConfirmationEmail).toHaveBeenCalledOnce();
+    expect(mocks.sendBillingDocument).toHaveBeenCalledWith(expect.anything(), "b1", "payment_receipt");
   });
 
   it("allows confirmation for cash-on-pickup bookings with payment still due", async () => {
