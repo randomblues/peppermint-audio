@@ -1,10 +1,18 @@
 # Isolated agent worktrees
 
-Use one Git worktree, branch, development server, and browser context per agent. Chats that share a checkout or browser page can overwrite code, navigate each other's tabs, change viewport state, or steal focus.
+Use one Git worktree, branch, development server, and Playwright run per agent. Separate worktrees and ports isolate code and servers; Playwright gives each test an isolated browser context without sharing tabs or desktop focus.
 
-## Create an agent worktree
+## Start parallel chats without shell commands
 
-From any checkout of this repository, run:
+When starting each chat in VS Code, choose **New Worktree** instead of sharing the current folder or branch. This gives each chat its own checkout and branch without running a setup command. If the chat is already open in a shared checkout, use the host's managed worktree/isolation action before editing when available.
+
+A new worktree starts from the current commit; uncommitted changes are not copied. Save any changes that the new chat needs before creating it.
+
+Playwright automatically chooses a stable port based on a worktree's path. Run `npm run test:e2e` from that worktree; it starts its own server and does not reuse an existing one. Each agent can run these checks independently.
+
+## Command-line fallback
+
+If VS Code cannot create a worktree for a chat, run this from a checkout:
 
 ```bash
 node scripts/agent-worktree.mjs <agent-name>
@@ -18,16 +26,15 @@ Each checkout/worktree already receives its own local Supabase project, data vol
 
 The helper does not stop servers, remove worktrees, or delete branches. When an agent is finished, review its branch and explicitly remove its worktree through Git only when its work is safely preserved.
 
-## Isolate browser sessions manually
+## Run isolated UI checks with Playwright
 
-Repository tooling cannot create or guarantee separate VS Code integrated-browser contexts. For each agent:
+Run UI checks with Playwright only; do not use the VS Code integrated browser or other shared interactive browser tools:
 
-- Use a separate browser profile/context or a separate VS Code window/profile configured with its own browser session.
-- Open that worktree's printed localhost URL in its own session. Do not reuse another agent's localhost tab, even if the page route is the same.
-- Do not ask a shared browser session to foreground a tab while another agent is testing. Foregrounding can steal desktop focus, and shared browser controls can navigate or interact with the wrong page.
-- If separate integrated-browser contexts are unavailable, do not run concurrent interactive browser tests in that shared context. Coordinate browser checks separately; code, worktrees, and servers can still run independently.
+```bash
+npm run test:e2e
+```
 
-Separate profiles reduce browser-cookie and local-storage collisions. They do not prevent multiple windows from competing for operating-system focus, so avoid interacting with a window owned by another active test.
+Playwright starts its own server on a stable worktree-specific port and uses isolated browser contexts. It does not reuse an existing server, so a port collision fails instead of accidentally testing another agent's checkout. `PORT=<port>` can override the automatic selection when needed.
 
 ## Boundaries
 

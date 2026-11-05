@@ -136,31 +136,21 @@ Never put secret values in source files, test fixtures committed with real crede
 
 Every behavior change requires unit tests. The suite currently covers API routes, booking/enquiry forms, admin operations, calendar helpers, validation, email templates, shared components, metadata pages, and UI primitives.
 
-**For browser testing and manual website checks, always use https://peppermint-audio.vercel.app/. Do not use https://www.peppermintaudio.com.au/ from this environment because Netskope can interfere with the custom domain.**
+**For UI checks, use Playwright against the local development app. Use https://peppermint-audio.vercel.app/ only for separate post-deployment checks. Do not use https://www.peppermintaudio.com.au/ from this environment because Netskope can interfere with the custom domain.**
 
-### STRICT BROWSER UI VALIDATION RULE
+### Playwright-only UI validation
 
-**EVERY NEW FEATURE OR UI CHANGE MUST BE OPENED AND CHECKED IN A REAL BROWSER BEFORE IT IS CONSIDERED COMPLETE. THIS IS MANDATORY, NOT OPTIONAL.**
+**Use Playwright only for UI checks. Do not use the VS Code integrated browser or other shared interactive browser tools for UI validation.**
 
-**CHECK THE FEATURE AT BOTH LAPTOP/DESKTOP WIDTH AND PHONE WIDTH. INSPECT THE ACTUAL RENDERED UI, INCLUDING SPACING, ALIGNMENT, OVERFLOW, RESPONSIVE BEHAVIOR, POP-OVERS, MENUS, FORM CONTROLS, BUTTONS, AND ERROR/SUCCESS STATES.**
+Run Playwright against the local development app so it tests the uncommitted changes. Add or update a Playwright test for the affected route and behavior, and use an isolated Playwright browser context. Playwright automatically chooses a stable port for VS Code-created worktrees; `PORT` may be set explicitly when needed:
 
-**IF ANYTHING LOOKS MISALIGNED, CLIPPED, CROWDED, HARD TO USE, OR OTHERWISE WONKY, FIX IT BEFORE COMPLETION AND RECHECK BOTH VIEWPORTS. DO NOT CLAIM A UI FEATURE IS DONE BASED ONLY ON UNIT TESTS, A BUILD, OR SOURCE INSPECTION.**
+```bash
+npm run test:e2e
+```
 
-**WHEN BUILDING OR MODIFYING A FEATURE, THE BROWSER CHECK MUST USE THE LOCALHOST DEVELOPMENT APP SO THE ACTUAL UNCOMMITTED CHANGES ARE BEING INSPECTED. CHECK BOTH LAPTOP/DESKTOP WIDTH AND PHONE WIDTH ON LOCALHOST BEFORE COMPLETION.** Use the Vercel preview URL only for a separate post-deployment verification. Record any browser-check limitation explicitly rather than silently skipping it.
+The Playwright configuration starts its own server and must not attach to an already-running server. A port conflict should fail explicitly rather than test another agent's app.
 
-**IF THE LOCALHOST BROWSER CHECK HAS NOT BEEN COMPLETED AT BOTH REQUIRED VIEWPORT WIDTHS, OR IDENTIFIED VISUAL/RESPONSIVE PROBLEMS HAVE NOT BEEN FIXED AND RECHECKED, THE TASK MUST BE MARKED AS A FAILURE — NOT COMPLETE, NOT READY, AND NOT SUCCESSFUL.**
-
-### 🔴 TOP PRIORITY — MANDATORY RESPONSIVE TESTING POLICY (VS CODE INTEGRATED BROWSER)
-
-**THIS POLICY IS TOP PRIORITY, STRICTLY ENFORCED, AND NON-NEGOTIABLE.**
-
-**NO TASK THAT AFFECTS UI/UX MAY BE MARKED COMPLETE UNLESS THIS POLICY IS FULLY SATISFIED.**
-
-**ANY CHANGE THAT AFFECTS UI, CSS, LAYOUT, PAGES, COMPONENTS, NAVIGATION, FORMS, DIALOGS, TABLES, ACCESSIBILITY, OR VISUAL BEHAVIOUR MUST BE TESTED IN THE VS CODE INTEGRATED BROWSER BEFORE THE TASK CAN BE CONSIDERED COMPLETE.**
-
-**WHEN THE VS CODE INTEGRATED BROWSER IS AVAILABLE, IT MUST BE USED FOR VALIDATION SO BROWSER-AWARE AI TOOLING CAN INSPECT AND VERIFY THE RENDERED APPLICATION.**
-
-Because the VS Code browser has a limited preset list, manual viewport checks are required at all of the following widths:
+For responsive UI changes, use Playwright to check all of these widths:
 
 - 360px (Small Mobile)
 - 390px (Modern iPhone)
@@ -171,7 +161,7 @@ Because the VS Code browser has a limited preset list, manual viewport checks ar
 - 1280px (Desktop)
 - 1920px (Large Desktop)
 
-For **every** viewport width, verify:
+At each required width, use Playwright assertions and screenshots as appropriate to verify:
 
 - No horizontal scrolling unless intentional
 - No clipped or hidden content
@@ -183,7 +173,7 @@ For **every** viewport width, verify:
 - Dialogs remain within viewport bounds
 - No browser console errors
 
-If **any** viewport fails:
+If any viewport or interaction fails:
 
 1. Fix the issue.
 2. Re-test **all** viewport widths.
@@ -194,11 +184,10 @@ The agent must **not**:
 - Assume responsiveness from code inspection
 - Assume responsiveness because a framework is being used
 - Skip browser testing
-- Mark work as complete without browser validation
+- Use or foreground the VS Code integrated browser for UI validation
+- Mark work as complete without successful Playwright validation
 
-**COMPLETION REPORTS ARE MANDATORY EVIDENCE. FOR ANY UI/UX-AFFECTING TASK, THE FINAL REPORT MUST INCLUDE A VIEWPORT-BY-VIEWPORT PASS/FAIL CHECKLIST FOR 360, 390, 412, 540, 768, 1024, 1280, AND 1920 WIDTHS. IF THIS CHECKLIST IS MISSING OR INCOMPLETE, THE TASK IS AUTOMATICALLY A FAILURE AND MUST NOT BE MARKED COMPLETE.**
-
-**ANY BREACH OF THIS POLICY MEANS THE TASK IS INCOMPLETE AND MUST BE TREATED AS A FAILURE UNTIL FULL RESPONSIVE VALIDATION PASSES.**
+For UI/UX-affecting tasks, report a Playwright pass/fail checklist for 360, 390, 412, 540, 768, 1024, 1280, and 1920 widths. If a width is not relevant or could not be tested, state why; do not imply it passed.
 
 Use:
 
@@ -217,14 +206,19 @@ The focused test command is preferred while iterating; the full suite and build 
 - Apply `supabase/001_booking_management.sql` manually in the production Supabase project after schema changes.
 - Vercel Cron invocation may be difficult to verify from the dashboard; use the authorized route and inspect logs carefully.
 - `after()` moves calendar/email work after the booking response; do not assume those side effects have completed when the HTTP response returns.
-- Use one localhost server per task. Before browser validation, check which process owns the target port, stop stale task-owned servers by PID, start one current server, and use one browser tab/URL consistently. Do not alternate between stale `localhost:3000`, `localhost:3001`, `localhost:3002`, or `localhost:3003` tabs.
+- Use a unique `PORT` per worktree for development and Playwright. Playwright starts its own server and does not reuse an existing listener; do not stop another agent's server to resolve a conflict.
 - Before starting a development server, check whether its requested port already has a listener. Use `npm run dev` as the standard launcher. For agent-run long-lived servers, use `scripts/dev-detached.sh` to run it in the background. Check startup from the launcher output or `/tmp/dev-<port>.log` for detached servers, and stop detached servers with `scripts/dev-stop.sh <port>`. Do not interrupt a server you do not own.
 - Never start a long-running process (including development servers, watchers, or `stripe listen`) in a way that keeps a shell attached. Run it detached with output redirected to a log file. For local Stripe forwarding, use `scripts/dev-stripe-detached.sh`; it starts the app and listener together so the generated signing secret is passed directly to the app.
-- **Reuse an existing browser tab when the required site or tool is already open. Do not open duplicate tabs or keep piling up browser tabs.**
-- If a browser tab does not reflect an edit, reload it and verify its URL, port, process, and rendered source before changing code again. Do not assume a stale tab proves the implementation is broken.
-- After a required browser check passes, do not repeat the same validation loop unless code or viewport behavior has changed. Report the result and move on.
+- After a Playwright check passes, do not repeat the same validation loop unless code or viewport behavior has changed. Report the result and move on.
 - Preserve unrelated working-tree changes. In particular, inspect `git status --short` before edits and never reset or checkout files as a recovery shortcut.
 - Use `git diff --check` before commits. Do not commit or push unless the user explicitly asks.
+
+## Parallel agent work
+
+- When the user wants multiple chats or agents to edit this project, use one Git worktree per editing chat. Prefer VS Code's **New Worktree** option when starting each chat; do not ask the user to run the worktree helper commands manually.
+- If a chat is already in a shared checkout and the host offers a managed worktree/isolation action, use it before editing. If it requires confirmation, request that confirmation. If no managed action is available, explain the VS Code **New Worktree** option; use `scripts/agent-worktree.mjs` only as a fallback.
+- A new worktree starts from the current commit and does not include uncommitted changes. Before isolating, warn the user if the new chat would need uncommitted work; never discard or silently omit that work.
+- Each worktree has an isolated local Supabase stack. Playwright automatically chooses a stable worktree-specific app port; use `npm run test:e2e` without a port override unless one is explicitly needed.
 
 ## Local development environment
 
@@ -248,8 +242,7 @@ customer data for local validation.
 - Local database isolation does not sandbox Stripe, Resend or Google Calendar.
   Use Stripe test keys, safe email settings and disabled calendar integration.
   Never assume a local booking cannot trigger an external side effect.
-- Follow the existing integrated-browser validation policy. Independent
-  Playwright checks do not replace mandatory integrated-browser evidence.
+- Use Playwright only for UI checks. Do not open or foreground the VS Code integrated browser for validation.
 
 ## Self-improvement and technical issue log
 
@@ -258,16 +251,16 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 ### 2026-10-03 — Conflicting localhost development servers
 
 - **Symptom:** Browser tabs showed different versions of the public site, making current changes appear stuck or missing.
-- **Root cause:** Multiple task-owned Next.js servers were left running on ports 3000–3003, and browser checks alternated between them.
-- **Prevention:** Use one canonical localhost port for the task; inspect and stop stale task-owned processes before starting it; verify the active browser URL and port before judging the UI.
-- **Next action:** Keep browser validation on `http://localhost:3000` unless that port is unavailable, and record the replacement port explicitly.
+- **Root cause:** Multiple task-owned Next.js servers were left running on ports 3000–3003, and checks alternated between them.
+- **Prevention:** Use the assigned port for each worktree; have Playwright start its own server instead of reusing another listener.
+- **Next action:** Run `npm run test:e2e` from the worktree and keep its automatically selected port consistent for the task.
 
 ### 2026-10-03 — Repeated validation after completion
 
-- **Symptom:** The same tests, builds, and browser checks were rerun after they had already passed, delaying delivery.
+- **Symptom:** The same tests, builds, and Playwright checks were rerun after they had already passed, delaying delivery.
 - **Root cause:** Validation scope was not closed after a successful result, and stale-server confusion triggered unnecessary rechecks.
 - **Prevention:** Maintain a clear completion checklist; rerun only the check affected by a subsequent code change; report passed checks once and proceed.
-- **Next action:** After the final edit, run the smallest affected tests plus the required final suite/build/browser checks once, then stop unless a concrete failure appears.
+- **Next action:** After the final edit, run the smallest affected tests plus the required final suite/build/Playwright checks once, then stop unless a concrete failure appears.
 
 ### 2026-10-03 — Browser test draft left in local storage
 
@@ -283,23 +276,6 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Prevention:** Prefer sequential or scripted single-flow interactions for form-heavy checks; when command output is large, inspect saved output files with targeted `rg`/bounded reads; include a concise "Quick lessons learned" section in reports when meaningful.
 - **Next action:** After each substantial run, provide "Quick lessons learned" and explicitly ask the user whether to persist the lessons into this log; update this log only with explicit user approval.
 
-### 2026-10-09 — Integrated browser viewport capture
-
-- **Symptom:** Screenshots showed cropped layouts or a different breakpoint from the requested viewport, delaying responsive validation.
-- **Root cause:** Integrated-browser screenshot helpers reset or rescale emulated viewport dimensions; a successful `setViewportSize()` call alone did not guarantee capture at that width.
-- **Prevention:** Verify `innerWidth` at capture time. If screenshot helpers alter the viewport, use a CDP device-metrics override and direct `Page.captureScreenshot` on the same integrated-browser tab. Inspect the captured images as well as rendered bounds.
-- **Additional observation:** Hidden or concurrently controlled tabs can return stale rendered frames even when `innerWidth` matches the requested width. Inspect an actual breakpoint-dependent layout and confirm the frame has updated before trusting the screenshot. If viewport, frame, or input evidence remains inconsistent after a bounded diagnostic attempt, stop retries and report responsive validation as incomplete rather than marking it passed.
-- **Next action:** Use a dedicated QA tab, capture evidence at every required width, and wait for cart hydration and the actual end of the page before checking footer clearance.
-
-### 2026-10-10 — Integrated browser pointer-coordinate drift
-
-- **Symptom:** Visible, stable buttons timed out with unrelated elements intercepting pointer events. The DOM and Playwright agreed on the button bounds, but a pointer requested at (446, 30) arrived near (295, 20).
-- **Root cause:** The existing integrated-browser session had an input-coordinate scaling mismatch. Hidden-tab status alone did not explain it: the mismatch persisted while visible and after zoom reset, clearing CDP emulation and reloading. The underlying VS Code defect and its original trigger are not established.
-- **Verified recovery:** Close the affected integrated-browser tab and reopen the same localhost URL, replacing rather than duplicating the tab. Acquire the replacement page ID. The new session delivered matching pointer coordinates and real menu clicks passed.
-- **Mandatory prevention:** Before UI validation, and after changing viewport size or capture/emulation settings, wait for two animation frames, verify `innerWidth`, compare one `page.mouse.move()` request with the actual `pointermove` client coordinates (within 1 CSS pixel), and perform one real semantic-control click. Use a temporary event listener and remove it after the probe. A correct DOM hit test or screenshot alone does not establish correct pointer input.
-- **Bounded recovery:** If coordinates remain mismatched after the render wait, replace the tab once and repeat preflight before continuing. Request user assistance if the tool cannot close the tab. Do not repeatedly retry clicks, force clicks, dispatch DOM clicks, apply compensating coordinate multipliers or change website CSS to hide a browser-tool failure. If replacement fails, stop and report integrated-browser validation as incomplete; independent Playwright does not replace it.
-- **Next action:** Use this preflight before the eight-width responsive checks. Keep the same localhost server throughout; resetting the browser session does not require restarting the app or database.
-
 ### 2026-10-09 — Local Supabase email login and signup flags
 
 - **Symptom:** A local email user could be created, but signing in failed with "Email logins are disabled".
@@ -312,14 +288,14 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Symptom:** Browser checks timed out waiting for a booking name even though local authentication and booking retrieval worked.
 - **Root cause:** Text selectors matched a hidden responsive copy; client-side navigation also exposed the initial loading state before booking controls were ready.
 - **Prevention:** Select visible semantic controls rather than the first duplicated text label. For data-access smoke checks, sign in through the same Playwright context's request API, navigate to `/admin`, and wait for the actual booking control. Test the login form separately when its behavior is in scope.
-- **Next action:** Use a booking button's accessible name and wait for loaded controls when a disposable local admin account is available; preserve the separate integrated-browser validation requirement.
+- **Next action:** Use a booking button's accessible name and wait for loaded controls in the isolated Playwright context when a disposable local admin account is available.
 
 ### 2026-10-10 — Mocked photo conversion missed HEIC compatibility
 
 - **Symptom:** Photo-ID uploads passed unit tests, but a customer's HEIC image failed conversion in the browser.
 - **Root cause:** Conversion tests mocked the decoder and therefore verified the wrapper without exercising real HEIC decoding or browser-bundle compatibility.
 - **Prevention:** Keep wrapper unit tests, but also test the actual decoder with a generated, private-data-free HEIC fixture through the booking form. Check the submitted JPEG MIME type, signature and upload-size limit.
-- **Next action:** Run `tests/e2e/photo-id.spec.ts` on desktop and mobile after decoder changes, then complete the separate mandatory integrated-browser responsive checks. Do not claim compatibility with a particular customer file based only on a synthetic fixture.
+- **Next action:** Run `tests/e2e/photo-id.spec.ts` on desktop and mobile after decoder changes, and use Playwright for responsive checks. Do not claim compatibility with a particular customer file based only on a synthetic fixture.
 
 ### 2026-10-10 — Hung Docker container starts and unbounded local startup
 
@@ -342,13 +318,6 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Prevention:** Keep `npm run dev` as the default local entry point; expose additional commands only when a recurring workflow requires them.
 - **Next action:** Keep local startup, health checks, and optional Stripe forwarding together in `scripts/local-dev.mjs`.
 
-### 2026-10-10 — Stale integrated-browser screenshot frames
-
-- **Symptom:** An integrated-browser screenshot did not reflect the requested viewport or the current rendered page.
-- **Root cause:** Screenshot helpers could reset emulated dimensions or capture a stale frame even when the viewport setter succeeded.
-- **Prevention:** Verify `innerWidth` and a breakpoint-dependent layout on the active tab before trusting a screenshot.
-- **Next action:** If the frame remains stale, apply `Emulation.setDeviceMetricsOverride` through CDP and capture directly with `Page.captureScreenshot`; stop and report incomplete validation if the frame still cannot be verified.
-
 ### 2026-10-10 — Restricted environment file access blocked a local test launch
 
 - **Symptom:** Local end-to-end testing was delayed after access to `.env.local` was denied.
@@ -368,7 +337,7 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Symptom:** The first browser check showed a missing payment link instead of the consent copy.
 - **Root cause:** The test used a dummy token against the real local API, which correctly returned 404.
 - **Prevention:** Intercept the local payment API with a disposable test response when validating checkout UI, so the actual page renders without creating a real payment link or triggering a charge.
-- **Next action:** Verify the consent text, checkbox interaction, and responsive layout in the integrated browser at the required viewport widths.
+- **Next action:** Verify the consent text, checkbox interaction, and responsive layout with Playwright at the required viewport widths.
 
 ### 2026-10-12 — Google Ads keyword pagination returned stale rows
 
@@ -398,26 +367,12 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Prevention:** Wait for a completion marker or child-process exit, or write captured arguments atomically before asserting.
 - **Next action:** Make the launcher test wait for complete capture contents rather than file existence alone.
 
-### 2026-11-06 — Integrated browser pointer probe did not register
-
-- **Symptom:** The integrated browser did not report a `pointermove` during the required input-coordinate preflight, including after the page was reopened; camera UI validation could not proceed.
-- **Root cause:** Not established; the browser tool did not deliver the expected pointer event.
-- **Prevention:** Keep the existing bounded recovery: wait for rendering, replace the tab once, and retry the preflight; do not compensate in application CSS or substitute independent Playwright for integrated-browser validation.
-- **Next action:** Stop after the bounded retry and report the required viewport checks as incomplete if the integrated browser still cannot provide pointer evidence.
-
 ### 2026-11-05 — Duplicate Communications component declaration
 
 - **Symptom:** The admin console failed to compile because `CommunicationsSection` was declared twice.
 - **Root cause:** The Communications component was left in both its original and relocated positions during integration.
 - **Prevention:** Search for duplicate component declarations after moving or consolidating components.
 - **Next action:** Keep one canonical definition and run the focused test and build checks after integration.
-
-### 2026-11-06 — Integrated browser pointer probe blocks itself
-
-- **Symptom:** A browser pointer probe stayed pending and prevented the intended mouse move from running.
-- **Root cause:** The probe awaited a pointer event inside the same script that was supposed to perform the later mouse action.
-- **Prevention:** Install the event listener in one browser call, move the pointer in a separate call, then read and remove the listener in a final call.
-- **Next action:** Keep pointer diagnostics split into bounded calls and stop after the single allowed tab replacement if input still fails.
 
 ### 2026-11-06 — Supabase CLI project not linked
 

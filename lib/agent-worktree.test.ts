@@ -87,6 +87,7 @@ describe("agent worktree helper", () => {
     expect(execFileSync("git", ["branch", "--show-current"], { cwd: worktree.path, encoding: "utf8" }).trim())
       .toBe("agent/booking-ui");
     expect(formatInstructions(worktree)).toContain(`PORT=${worktree.port} scripts/dev-detached.sh`);
+    expect(formatInstructions(worktree)).toContain(`PORT=${worktree.port} npm run test:e2e`);
     expect(formatInstructions(worktree)).toContain("Uncommitted changes from the source checkout were not copied.");
   });
 

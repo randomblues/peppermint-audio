@@ -368,11 +368,13 @@ npm run dev
 
 ## Browser testing
 
-Use the local development server for browser checks of uncommitted changes:
+Use Playwright only for UI checks; do not use the VS Code integrated browser. Run checks against the local development app and the uncommitted changes:
 
 ```bash
-npm run dev
+npm run test:e2e
 ```
+
+Playwright automatically selects a stable port for each worktree and starts its own local server; it does not attach to another agent's running server. Set `PORT` only when explicitly choosing a port.
 
 The deployed preview at `https://peppermint-audio.vercel.app/` may be used for separate post-deployment checks. Do not use the production custom domain from this environment because Netskope can interfere with it.
 

@@ -31,7 +31,15 @@ export function validateAgentName(name) {
 
 export function portForAgent(name) {
   validateAgentName(name);
-  const hash = createHash("sha256").update(name).digest();
+  return portForSeed(name);
+}
+
+export function portForWorktreePath(root) {
+  return portForSeed(path.resolve(root));
+}
+
+function portForSeed(seed) {
+  const hash = createHash("sha256").update(seed).digest();
   const slot = hash.readUInt32BE(0) % (PORT_MAX - PORT_MIN + 1);
   return PORT_MIN + slot;
 }
@@ -114,6 +122,7 @@ export function formatInstructions(worktree) {
     `App port: ${worktree.port} (${worktree.url})`,
     `Start: cd -- ${directory} && PORT=${worktree.port} scripts/dev-detached.sh`,
     `Stop:  cd -- ${directory} && scripts/dev-stop.sh ${worktree.port}`,
+    `UI tests: cd -- ${directory} && PORT=${worktree.port} npm run test:e2e`,
     "Uncommitted changes from the source checkout were not copied.",
   ].join("\n");
 }
