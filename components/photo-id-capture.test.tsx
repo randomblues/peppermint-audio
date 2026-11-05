@@ -69,6 +69,7 @@ describe("PhotoIdCapture", () => {
     fireEvent.click(screen.getByRole("button", { name: "Capture front" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/a little dark/i);
+    expect(screen.getByText("Photo quality note")).toBeInTheDocument();
     const [, cropX, cropY, cropWidth, cropHeight] = drawImage.mock.calls[0];
     expect(cropX).toBeGreaterThan(0);
     expect(cropY).toBeGreaterThan(0);
@@ -109,7 +110,10 @@ describe("PhotoIdCapture", () => {
     }
     getImageData.mockReturnValue({ data: detailedPixels } as unknown as ImageData);
     fireEvent.click(screen.getByRole("button", { name: "Capture front" }));
-    expect(within(await screen.findByRole("dialog", { name: "Review your photo" })).getByRole("status")).toHaveTextContent(
+    const review = await screen.findByRole("dialog", { name: "Review your photo" });
+    expect(within(review).queryByText("Final clarity check")).not.toBeInTheDocument();
+    expect(within(review).queryByText(/Next: back|Finish ID/)).not.toBeInTheDocument();
+    expect(within(review).getByRole("status")).toHaveTextContent(
       "Make sure your ID is clear and readable, or your booking may be declined.",
     );
     fireEvent.click(screen.getByRole("button", { name: "Use this photo" }));

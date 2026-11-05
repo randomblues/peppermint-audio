@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Camera, Check, ScanLine, X } from "lucide-react";
+import { Camera, Check, RotateCcw, ScanLine, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { getPhotoIdLiveGuidance } from "@/lib/photo-id-live-guidance";
@@ -402,23 +402,65 @@ export function PhotoIdCapture({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={reviewUrl} alt={`Captured ${capturedCount === 0 ? "front" : "back"} of photo ID`} className="max-h-[54dvh] max-w-full rounded-2xl object-contain" />
               </div>
-              {qualityTip ? (
-                <p role="alert" className="flex max-w-md items-start gap-2 rounded-xl border border-amber-300/35 bg-amber-950/75 px-4 py-3 text-center text-sm text-amber-50 shadow-lg backdrop-blur-md">
-                  <span className="mt-0.5 size-2 shrink-0 rounded-full bg-amber-300" aria-hidden="true" />
-                  {qualityTip}
-                </p>
-              ) : (
-                <p role="status" className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-4 py-2 text-sm text-white shadow-lg backdrop-blur-md">
-                  <Check className="size-4 text-primary" aria-hidden="true" />
-                Make sure your ID is clear and readable, or your booking may be declined.
-                </p>
-              )}
-              <div className="flex w-full max-w-md flex-col gap-3 sm:flex-row">
-                <Button type="button" variant="outline" onClick={retakePhoto} className="w-full border-white/30 bg-black/40 text-white hover:bg-black/70 sm:flex-1">
-                  Retake photo
+              <div
+                role={qualityTip ? "alert" : "status"}
+                aria-live={qualityTip ? "assertive" : "polite"}
+                className={`relative w-full max-w-md overflow-hidden rounded-2xl border p-4 text-left shadow-[0_18px_48px_rgb(0_0_0/0.4),inset_0_1px_0_rgb(255_255_255/0.08)] backdrop-blur-xl ${
+                  qualityTip
+                    ? "border-amber-300/25 bg-[linear-gradient(135deg,rgb(56_28_9/0.88),rgb(12_9_8/0.94))]"
+                    : "border-white/10 bg-[linear-gradient(135deg,rgb(9_27_27/0.92),rgb(4_9_19/0.96))]"
+                }`}
+              >
+                <span className={`pointer-events-none absolute -right-8 -top-10 size-28 rounded-full blur-3xl ${qualityTip ? "bg-amber-300/10" : "bg-primary/10"}`} aria-hidden="true" />
+                <div className="relative">
+                  <div className="min-w-0">
+                    {qualityTip ? (
+                      <div className="mb-1.5 flex items-center justify-between gap-3">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-100/70">
+                          Photo quality note
+                        </p>
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200/20 bg-amber-200/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-amber-100/80">
+                          <span className="size-1.5 rounded-full bg-amber-300" aria-hidden="true" />
+                          Review
+                        </span>
+                      </div>
+                    ) : null}
+                    <p className={`text-sm leading-5 ${qualityTip ? "text-amber-50/95" : "text-white/90"}`}>
+                      {qualityTip || "Make sure your ID is clear and readable, or your booking may be declined."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="grid w-full max-w-md grid-cols-2 gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  aria-label="Retake photo"
+                  onClick={retakePhoto}
+                  className="group flex h-[4.5rem] w-full items-center justify-start gap-2.5 rounded-2xl border-white/15 bg-[linear-gradient(145deg,rgb(255_255_255/0.08),rgb(255_255_255/0.025))] px-2.5 text-left text-white/85 shadow-[0_8px_24px_rgb(0_0_0/0.3),inset_0_1px_0_rgb(255_255_255/0.1)] backdrop-blur-md transition-all hover:-translate-y-0.5 hover:border-white/30 hover:bg-white/10 active:translate-y-0"
+                >
+                  <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.06] text-white/65 transition-colors group-hover:border-white/20 group-hover:bg-white/10 group-hover:text-white">
+                    <RotateCcw className="size-4" aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0 text-left leading-tight">
+                    <span className="block truncate text-xs font-semibold">Retake photo</span>
+                    <span className="mt-1 block truncate text-[9px] font-medium uppercase tracking-[0.13em] text-white/40">New shot</span>
+                  </span>
                 </Button>
-                <Button type="button" onClick={usePhoto} className="w-full sm:flex-1">
-                  Use this photo
+                <Button
+                  type="button"
+                  aria-label="Use this photo"
+                  onClick={usePhoto}
+                  className="group relative flex h-[4.5rem] w-full items-center justify-start gap-2.5 overflow-hidden rounded-2xl border border-primary/40 bg-[linear-gradient(145deg,rgb(10_38_33/0.98),rgb(7_22_25/0.98)_58%,rgb(5_13_20/0.98))] px-2.5 text-left text-white shadow-[0_8px_28px_rgb(0_0_0/0.38),0_0_22px_rgb(16_185_129/0.1),inset_0_1px_0_rgb(255_255_255/0.1)] transition-all hover:-translate-y-0.5 hover:border-primary/75 hover:shadow-[0_12px_34px_rgb(0_0_0/0.44),0_0_28px_rgb(16_185_129/0.2),inset_0_1px_0_rgb(255_255_255/0.12)] active:translate-y-0"
+                >
+                  <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,transparent_16%,rgb(16_185_129/0.09)_52%,transparent_82%)] opacity-80" aria-hidden="true" />
+                  <span className="pointer-events-none absolute inset-x-5 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent opacity-70" aria-hidden="true" />
+                  <span className="relative grid size-9 shrink-0 place-items-center rounded-xl border border-primary/30 bg-primary/10 text-primary shadow-[inset_0_1px_0_rgb(255_255_255/0.08),0_0_16px_rgb(16_185_129/0.12)]">
+                    <Check className="size-4" aria-hidden="true" />
+                  </span>
+                  <span className="relative min-w-0 text-left leading-tight">
+                    <span className="block truncate text-xs font-bold text-white">Use this photo</span>
+                  </span>
                 </Button>
               </div>
             </div>
