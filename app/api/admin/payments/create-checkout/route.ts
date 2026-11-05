@@ -112,6 +112,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "This booking is already configured for bank transfer. Do not create a second payment method." }, { status: 409 });
   }
 
+  const reservation = await session.admin.rpc("reserve_booking_inventory", {
+    p_booking_id: bookingId,
+    p_hire_line_items: hireLineItems,
+  });
+  if (reservation.error) {
+    console.error("Payment request inventory reservation failed:", reservation.error);
+    return NextResponse.json({ error: `Inventory availability could not be checked: ${reservation.error.message}` }, { status: 500 });
+  }
+  if (!reservation.data?.ok) {
+    return NextResponse.json({ error: reservation.data?.error ?? "The booking cannot be reserved with current inventory." }, { status: 409 });
+  }
+
+  let bookingSaved = false;
   try {
     const holdDate = securityDepositCents > 0 ? depositHoldDate(result.data.pickup_date) : null;
     const immediateDeposit = Boolean(holdDate && isImmediateDepositBooking(result.data.pickup_date));
@@ -169,6 +182,7 @@ export async function POST(request: Request) {
       updated_at: new Date().toISOString(),
     }).eq("id", bookingId);
     if (update.error) throw new Error(`Payment details could not be saved: ${update.error.message}`);
+    bookingSaved = true;
     const invoiceEmailId = await sendInvoiceEmail(session.admin, bookingId, `${siteUrl(request)}/pay/${paymentToken}`, false, undefined, recipientResult.recipient);
 
     return NextResponse.json({
@@ -183,6 +197,15 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Stripe checkout creation failed:", error);
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Stripe payment links could not be created." }, { status: 502 });
+    const release = bookingSaved ? null : await session.admin.rpc("release_booking_inventory", { p_booking_id: bookingId });
+    if (release?.error) {
+      console.error("Failed payment request inventory hold could not be released:", release.error);
+    }
+    const detail = error instanceof Error ? error.message : "Stripe payment links could not be created.";
+    return NextResponse.json({
+      error: release?.error
+        ? `${detail} Inventory release also failed: ${release.error.message}`
+        : detail,
+    }, { status: 502 });
   }
 }

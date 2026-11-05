@@ -384,6 +384,27 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Prevention:** For local checks unrelated to Stripe webhooks, start the app with `LOCAL_STRIPE_WEBHOOKS=false`; enable forwarding only when webhook testing is intended and Stripe CLI authentication is available.
 - **Next action:** Keep unrelated local browser validation on the local Supabase stack without optional Stripe forwarding.
 
+### 2026-11-05 — Enquiry tests use an expired event date
+
+- **Symptom:** Four enquiry route tests returned validation errors instead of reaching their email assertions.
+- **Root cause:** The shared test payload hard-codes `eventDate` to `2026-10-10`, while enquiry validation rejects dates earlier than the current Melbourne date.
+- **Prevention:** Freeze the test clock or derive a deterministic future event date for date-sensitive enquiry tests.
+- **Next action:** Update the shared enquiry test fixture so the validation boundary remains deterministic across dates.
+
+### 2026-11-05 — Detached launcher test reads partial capture output
+
+- **Symptom:** The launcher argument test intermittently read only `run` from its capture file and failed its full-argument assertion; the isolated test passed.
+- **Root cause:** The fake `npm` process creates the capture file in its first `printf`, while `waitForFile` returns as soon as the path exists, before later arguments are appended.
+- **Prevention:** Wait for a completion marker or child-process exit, or write captured arguments atomically before asserting.
+- **Next action:** Make the launcher test wait for complete capture contents rather than file existence alone.
+
+### 2026-11-05 — Duplicate Communications component declaration
+
+- **Symptom:** The admin console failed to compile because `CommunicationsSection` was declared twice.
+- **Root cause:** The Communications component was left in both its original and relocated positions during integration.
+- **Prevention:** Search for duplicate component declarations after moving or consolidating components.
+- **Next action:** Keep one canonical definition and run the focused test and build checks after integration.
+
 # Agent working rules
 
 These rules are mandatory. Safety, preservation of existing work, bounded execution, and truthful verification take priority over speed.

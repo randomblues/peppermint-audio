@@ -380,6 +380,10 @@ export async function sendBillingDocument(admin: AdminClient, bookingId: string,
       recipientEmail: recipient?.billToEmail || booking.email,
       emailType: documentEmailType(documentType),
       providerMessageId: response.data?.id,
+      attachments: [{
+        filename: `${documentType}-${invoice.invoice_number}.pdf`,
+        content: pdf,
+      }],
     });
   } catch (error) {
     console.error("Billing email log failed:", error);

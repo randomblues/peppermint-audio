@@ -14,7 +14,7 @@ import { confirmPaidStripeBooking } from "./booking-confirmation";
 
 const booking = {
   id: "booking-1", status: "submitted", hire_payment_status: "paid",
-  email: "customer@example.com", first_name: "Alex", confirmation_email_sent: false,
+  email: "customer@example.com", first_name: "Alex", confirmation_email_sent: false, hire_line_items: [],
 };
 
 function client(overrides = {}, error: { message: string } | null = null) {
@@ -26,8 +26,9 @@ function client(overrides = {}, error: { message: string } | null = null) {
     maybeSingle: vi.fn<() => Promise<{ data: { id: string } | null; error: { message: string } | null }>>().mockResolvedValue({ data: { id: booking.id }, error: null }),
     then(resolve: (value: { error: null }) => unknown) { return Promise.resolve({ error: null }).then(resolve); },
   };
-  mocks.createAdminClient.mockReturnValue({ from: vi.fn().mockReturnValue(query) });
-  return query;
+  const rpc = vi.fn().mockResolvedValue({ data: { ok: true }, error: null });
+  mocks.createAdminClient.mockReturnValue({ from: vi.fn().mockReturnValue(query), rpc });
+  return Object.assign(query, { rpc });
 }
 
 describe("paid Stripe booking confirmation", () => {
@@ -61,6 +62,18 @@ describe("paid Stripe booking confirmation", () => {
     const query = client();
     query.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
     await confirmPaidStripeBooking(createAdminClient(), booking.id);
+    expect(mocks.sendBookingConfirmationEmail).not.toHaveBeenCalled();
+  });
+
+  it("does not confirm or email a paid Stripe booking when stock cannot be reserved", async () => {
+    const query = client();
+    query.rpc.mockResolvedValueOnce({
+      data: { ok: false, error: "Insufficient inventory for the selected dates." },
+      error: null,
+    });
+
+    await expect(confirmPaidStripeBooking(createAdminClient(), booking.id)).rejects.toThrow("Insufficient inventory for the selected dates.");
+    expect(query.update).not.toHaveBeenCalled();
     expect(mocks.sendBookingConfirmationEmail).not.toHaveBeenCalled();
   });
 

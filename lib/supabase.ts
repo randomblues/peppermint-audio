@@ -12,3 +12,4 @@ export function createAuthClient() {
 }
 
 export const PHOTO_ID_BUCKET = "booking-photo-ids";
+export const EMAIL_ATTACHMENT_BUCKET = "booking-email-attachments";

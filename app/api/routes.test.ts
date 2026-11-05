@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => {
     send,
     sendBookingConfirmationEmail: vi.fn(),
     recordCustomerEmail: vi.fn(),
+    removeCustomerEmailAttachments: vi.fn(),
     releaseCancelledDeferredDeposit: vi.fn(),
     markInvoiceStatus: vi.fn(),
     sendBillingDocument: vi.fn(),
@@ -40,6 +41,7 @@ vi.mock("@/lib/send-booking-confirmation", () => ({
 }));
 vi.mock("@/lib/email-log", () => ({
   recordCustomerEmail: mocks.recordCustomerEmail,
+  removeCustomerEmailAttachments: mocks.removeCustomerEmailAttachments,
 }));
 vi.mock("@/lib/deferred-deposits", () => ({ releaseCancelledDeferredDeposit: mocks.releaseCancelledDeferredDeposit }));
 vi.mock("@/lib/invoice-service", () => ({ markInvoiceStatus: mocks.markInvoiceStatus, sendBillingDocument: mocks.sendBillingDocument }));
@@ -63,7 +65,10 @@ const jsonRequest = (url: string, body: unknown) => request(url, {
 const responseJson = async (response: Response) => await response.json() as Record<string, unknown>;
 
 function adminSession(overrides: Record<string, unknown> = {}) {
-  return { user: { id: "admin-1" }, admin: overrides };
+  return {
+    user: { id: "admin-1" },
+    admin: { rpc: vi.fn().mockResolvedValue({ data: { ok: true }, error: null }), ...overrides },
+  };
 }
 
 describe("admin booking routes", () => {
@@ -71,6 +76,7 @@ describe("admin booking routes", () => {
     vi.clearAllMocks();
     mocks.requireAdmin.mockResolvedValue(adminSession());
     mocks.sendBookingConfirmationEmail.mockResolvedValue("email-1");
+    mocks.removeCustomerEmailAttachments.mockResolvedValue(undefined);
     mocks.send.mockResolvedValue({ data: { id: "custom-1" }, error: null });
   });
 
@@ -453,6 +459,9 @@ describe("admin booking routes", () => {
       subject: "Your documents",
       attachments: [{ filename: "details.pdf", content: Buffer.from("document contents").toString("base64") }],
     }));
+    expect(mocks.recordCustomerEmail).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      attachments: [{ filename: "details.pdf", content: Buffer.from("document contents") }],
+    }));
   });
 
   it("rejects unauthorised and malformed PATCH requests", async () => {
@@ -469,6 +478,7 @@ describe("admin booking routes", () => {
     mocks.requireAdmin.mockResolvedValue(adminSession({ from, storage: { from: vi.fn().mockReturnValue({ remove }) } }));
     expect(await responseJson(await deleteBooking(jsonRequest("/api/admin/bookings", { id: "b1", confirm: true })))).toEqual({ ok: true });
     expect(remove).toHaveBeenCalledWith(["a/id.jpg", "b/id.png"]);
+    expect(mocks.removeCustomerEmailAttachments).toHaveBeenCalledWith(expect.anything(), "b1");
     expect(deletion.delete).toHaveBeenCalled();
 
     expect((await deleteBooking(jsonRequest("/api/admin/bookings", { id: "b1", confirm: false }))).status).toBe(400);

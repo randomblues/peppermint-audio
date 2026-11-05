@@ -18,6 +18,17 @@ type InvoiceRow = {
   gst_inclusive?: boolean | null;
 };
 
+type PurchaseRow = {
+  id: string;
+  product_name: string;
+  purchase_date: string;
+  quantity: number;
+  total_cost_cents: number;
+  gst_paid_cents: number;
+  supplier: string;
+  reference: string;
+};
+
 function isDate(value: string | null): value is string {
   return value !== null && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(`${value}T00:00:00Z`).getTime());
 }
@@ -60,11 +71,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Report format must be json or csv." }, { status: 400 });
   }
 
-  const result = await session.admin
+  const [result, purchaseResult] = await Promise.all([
+    session.admin
     .from("invoices")
     .select("booking_id,invoice_number,issued_at,paid_at,status,payment_method,hire_amount_cents,security_deposit_cents,total_amount_cents,gst_inclusive")
-    .order("issued_at", { ascending: true });
+    .order("issued_at", { ascending: true }),
+    session.admin
+      .from("inventory_purchases")
+      .select("id,product_name,purchase_date,quantity,total_cost_cents,gst_paid_cents,supplier,reference")
+      .order("purchase_date", { ascending: true }),
+  ]);
   if (result.error) return NextResponse.json({ error: `GST report lookup failed: ${result.error.message}` }, { status: 500 });
+  if (purchaseResult.error) return NextResponse.json({ error: `Equipment purchase report lookup failed: ${purchaseResult.error.message}` }, { status: 500 });
 
   const rows = (result.data as InvoiceRow[] ?? []).filter((invoice) => {
     if (basis === "paid" && (invoice.status !== "paid" || !invoice.paid_at)) return false;
@@ -84,6 +102,18 @@ export async function GET(request: Request) {
     securityDepositCents: invoice.security_deposit_cents,
     totalAmountCents: invoice.total_amount_cents,
   }));
+  const purchases = (purchaseResult.data as PurchaseRow[] ?? [])
+    .filter((purchase) => purchase.purchase_date >= from && purchase.purchase_date <= to)
+    .map((purchase) => ({
+      id: purchase.id,
+      productName: purchase.product_name,
+      date: purchase.purchase_date,
+      quantity: purchase.quantity,
+      totalCostCents: purchase.total_cost_cents,
+      gstPaidCents: purchase.gst_paid_cents,
+      supplier: purchase.supplier,
+      reference: purchase.reference,
+    }));
 
   const summary = rows.reduce((totals, row) => ({
     invoiceCount: totals.invoiceCount + 1,
@@ -98,6 +128,11 @@ export async function GET(request: Request) {
     securityDepositCents: 0,
     totalAmountCents: 0,
   });
+  const purchaseSummary = purchases.reduce((totals, purchase) => ({
+    purchaseCount: totals.purchaseCount + 1,
+    totalCostCents: totals.totalCostCents + purchase.totalCostCents,
+    gstPaidCents: totals.gstPaidCents + purchase.gstPaidCents,
+  }), { purchaseCount: 0, totalCostCents: 0, gstPaidCents: 0 });
 
   if (format === "csv") {
     const columns = ["invoice_number", "date", "paid_at", "status", "payment_method", "taxable_sales_aud", "gst_included_aud", "refundable_deposit_aud", "total_amount_aud"];
@@ -123,7 +158,33 @@ export async function GET(request: Request) {
       csv(aud(summary.securityDepositCents)),
       csv(aud(summary.totalAmountCents)),
     ].join(","));
-    return new NextResponse([columns.join(","), ...data].join("\n"), {
+    const purchaseColumns = ["purchase_date", "product", "quantity", "total_cost_aud", "gst_paid_aud", "supplier", "reference"];
+    const purchaseData = purchases.map((purchase) => [
+      csv(purchase.date),
+      csv(purchase.productName),
+      csv(purchase.quantity),
+      csv(aud(purchase.totalCostCents)),
+      csv(aud(purchase.gstPaidCents)),
+      csv(purchase.supplier),
+      csv(purchase.reference),
+    ].join(","));
+    purchaseData.push([
+      csv("TOTAL"),
+      "",
+      csv(purchaseSummary.purchaseCount),
+      csv(aud(purchaseSummary.totalCostCents)),
+      csv(aud(purchaseSummary.gstPaidCents)),
+      "",
+      "",
+    ].join(","));
+    return new NextResponse([
+      columns.join(","),
+      ...data,
+      "",
+      "EQUIPMENT_PURCHASES",
+      purchaseColumns.join(","),
+      ...purchaseData,
+    ].join("\n"), {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="gst-report-${from}-to-${to}-${basis}.csv"`,
@@ -131,5 +192,5 @@ export async function GET(request: Request) {
     });
   }
 
-  return NextResponse.json({ basis, from, to, summary, rows });
+  return NextResponse.json({ basis, from, to, summary, rows, purchaseSummary, purchases });
 }

@@ -134,6 +134,8 @@ export async function POST(request: Request) {
     updated_at: new Date().toISOString(),
   };
 
+  let reservationTouched = false;
+  let bookingSaved = false;
   try {
     if (body.saveOnly === true) {
       if (existing.data.payment_method === "stripe_card_hold"
@@ -143,8 +145,34 @@ export async function POST(request: Request) {
           error: "This booking has an active card payment request. Use Send invoice to update the hire items and replace the payment link together.",
         }, { status: 409 });
       }
+      if (existing.data.payment_method) {
+        const reservation = await session.admin.rpc("reserve_booking_inventory", {
+          p_booking_id: bookingId,
+          p_hire_line_items: hireLineItems,
+        });
+        if (reservation.error) {
+          console.error("Payment request inventory reservation failed:", reservation.error);
+          return NextResponse.json({ error: `Inventory availability could not be checked: ${reservation.error.message}` }, { status: 500 });
+        }
+        if (!reservation.data?.ok) {
+          return NextResponse.json({ error: reservation.data?.error ?? "The booking cannot be reserved with current inventory." }, { status: 409 });
+        }
+        reservationTouched = true;
+      }
       const write = await session.admin.from("bookings").update(update).eq("id", bookingId);
-      if (write.error) return NextResponse.json({ error: write.error.message }, { status: 500 });
+      if (write.error) {
+        if (reservationTouched) {
+          const restore = await session.admin.rpc("reserve_booking_inventory", {
+            p_booking_id: bookingId,
+            p_hire_line_items: existing.data.hire_line_items,
+          });
+          if (restore.error || !restore.data?.ok) {
+            console.error("Previous inventory reservation could not be restored:", restore.error ?? restore.data?.error);
+            return NextResponse.json({ error: `${write.error.message} The previous inventory reservation could not be restored.` }, { status: 500 });
+          }
+        }
+        return NextResponse.json({ error: write.error.message }, { status: 500 });
+      }
       return NextResponse.json({ ok: true, bookingId, hireAmountCents });
     }
 
@@ -163,6 +191,19 @@ export async function POST(request: Request) {
       if (write.error) return NextResponse.json({ error: write.error.message }, { status: 500 });
       return NextResponse.json({ ok: true, bookingId, hireAmountCents, securityDepositCents: depositCents, gstInclusive });
     }
+
+    const reservation = await session.admin.rpc("reserve_booking_inventory", {
+      p_booking_id: bookingId,
+      p_hire_line_items: hireLineItems,
+    });
+    if (reservation.error) {
+      console.error("Payment request inventory reservation failed:", reservation.error);
+      return NextResponse.json({ error: `Inventory availability could not be checked: ${reservation.error.message}` }, { status: 500 });
+    }
+    if (!reservation.data?.ok) {
+      return NextResponse.json({ error: reservation.data?.error ?? "The booking cannot be reserved with current inventory." }, { status: 409 });
+    }
+    reservationTouched = true;
 
     if (targetMethod === "bank_transfer" || targetMethod === "cash_on_pickup") {
       const pendingStatus = targetMethod === "cash_on_pickup" ? "cash_due" : "bank_transfer_pending";
@@ -239,6 +280,7 @@ export async function POST(request: Request) {
 
     const write = await session.admin.from("bookings").update(update).eq("id", bookingId);
     if (write.error) throw new Error(`Booking payment details could not be saved: ${write.error.message}`);
+    bookingSaved = true;
     const nextPaymentUrl = targetMethod === "stripe_card_hold" ? `${siteUrl(request)}/pay/${String(update.payment_token)}` : null;
     const invoiceEmailId = await sendInvoiceEmail(
       session.admin,
@@ -253,6 +295,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, bookingId, reference: invoiceNumberForBooking(bookingId), paymentUrl: nextPaymentUrl, hireAmountCents, securityDepositCents: depositCents, gstInclusive, invoiceEmailId });
   } catch (error) {
     console.error("Existing booking update failed:", error);
-    return NextResponse.json({ error: error instanceof Error ? error.message : "The booking could not be updated." }, { status: 502 });
+    const detail = error instanceof Error ? error.message : "The booking could not be updated.";
+    if (reservationTouched && !bookingSaved) {
+      const restore = existing.data.payment_method
+        ? await session.admin.rpc("reserve_booking_inventory", { p_booking_id: bookingId, p_hire_line_items: existing.data.hire_line_items })
+        : await session.admin.rpc("release_booking_inventory", { p_booking_id: bookingId });
+      if (restore.error || ("data" in restore && !restore.data?.ok)) {
+        const reason = restore.error?.message ?? restore.data?.error ?? "Unknown restoration error.";
+        console.error("Previous inventory reservation could not be restored:", reason);
+        return NextResponse.json({ error: `${detail} The previous inventory reservation could not be restored: ${reason}` }, { status: 502 });
+      }
+    }
+    return NextResponse.json({ error: detail }, { status: 502 });
   }
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { requireAdminJson } from "@/lib/admin-request";
 import { PHOTO_ID_BUCKET } from "@/lib/supabase";
+import { removeCustomerEmailAttachments } from "@/lib/email-log";
 import { ConfirmationError, sendTrackedBookingConfirmation } from "@/lib/booking-confirmation";
 import { markInvoiceStatus, sendBillingDocument } from "@/lib/invoice-service";
 import { lineItemsTotalCents, parseBookingLineItems, type BookingLineItem } from "@/lib/booking-line-items";
@@ -77,15 +78,17 @@ export async function PATCH(request: Request) {
   const { session, body } = auth;
   if (!body.id || (body.status && !["submitted", "confirmed", "completed", "cancelled"].includes(body.status))) return NextResponse.json({ error: "Invalid update." }, { status: 400 });
   let lineItemUpdate: { hire_line_items: unknown; hire_amount_cents: number } | null = null;
+  let alreadyConfirmed = false;
   if (body.hire_line_items !== undefined) {
     const parsedItems = parseBookingLineItems(body.hire_line_items);
     if ("error" in parsedItems) return NextResponse.json({ error: parsedItems.error }, { status: 400 });
     const current = await session.admin.from("bookings")
-      .select("payment_method,hire_payment_status,deposit_payment_status,pickup_date,dropoff_date")
+      .select("status,payment_method,hire_payment_status,deposit_payment_status,pickup_date,dropoff_date")
       .eq("id", body.id)
       .single();
     if (current.error) return NextResponse.json({ error: current.error.message }, { status: 500 });
     if (!current.data) return NextResponse.json({ error: "Booking could not be found." }, { status: 404 });
+    alreadyConfirmed = current.data.status === "confirmed";
     const paymentSent = Boolean(current.data.payment_method)
       || !["unpaid", null, undefined].includes(current.data.hire_payment_status)
       || !["not_required", null, undefined].includes(current.data.deposit_payment_status);
@@ -129,7 +132,31 @@ export async function PATCH(request: Request) {
         payment_received_at: new Date().toISOString(),
       };
     }
+    const reservation = await session.admin.rpc("reserve_booking_inventory", {
+      p_booking_id: body.id,
+      p_hire_line_items: lineItemUpdate?.hire_line_items ?? result.data.hire_line_items,
+    });
+    if (reservation.error) {
+      console.error("Booking inventory reservation failed:", reservation.error);
+      return NextResponse.json({ error: `Inventory availability could not be checked: ${reservation.error.message}` }, { status: 500 });
+    }
+    if (!reservation.data?.ok) {
+      return NextResponse.json({ error: reservation.data?.error ?? "The booking cannot be reserved with current inventory." }, { status: 409 });
+    }
     confirmation = result.data;
+  }
+  if (!confirmation && alreadyConfirmed && lineItemUpdate) {
+    const reservation = await session.admin.rpc("reserve_booking_inventory", {
+      p_booking_id: body.id,
+      p_hire_line_items: lineItemUpdate.hire_line_items,
+    });
+    if (reservation.error) {
+      console.error("Confirmed booking inventory update failed:", reservation.error);
+      return NextResponse.json({ error: `Inventory availability could not be checked: ${reservation.error.message}` }, { status: 500 });
+    }
+    if (!reservation.data?.ok) {
+      return NextResponse.json({ error: reservation.data?.error ?? "The booking cannot be reserved with current inventory." }, { status: 409 });
+    }
   }
   const update = {
     ...(body.status ? { status: body.status } : {}),
@@ -140,6 +167,13 @@ export async function PATCH(request: Request) {
   };
   const { error } = await session.admin.from("bookings").update(update).eq("id", body.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (body.status === "cancelled" || body.status === "completed") {
+    const release = await session.admin.rpc("release_booking_inventory", { p_booking_id: body.id });
+    if (release.error) {
+      console.error("Booking inventory release failed:", release.error);
+      return NextResponse.json({ error: `Booking status was updated, but its inventory reservation could not be released: ${release.error.message}` }, { status: 500 });
+    }
+  }
   if (confirmation) {
     const bookingId = body.id;
     try {
@@ -188,6 +222,12 @@ export async function DELETE(request: Request) {
   if (paths.length) {
     const removal = await session.admin.storage.from(PHOTO_ID_BUCKET).remove(paths);
     if (removal.error) return NextResponse.json({ error: `Private photo ID deletion failed: ${removal.error.message}` }, { status: 502 });
+  }
+  try {
+    await removeCustomerEmailAttachments(session.admin, body.id);
+  } catch (error) {
+    console.error("Customer email attachment deletion failed:", error);
+    return NextResponse.json({ error: "Customer email attachments could not be deleted." }, { status: 502 });
   }
   const { error } = await session.admin.from("bookings").delete().eq("id", body.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

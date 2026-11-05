@@ -55,6 +55,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "A bank-transfer invoice already exists for this booking with different amounts. Do not replace it silently." }, { status: 409 });
   }
 
+  const reservation = await session.admin.rpc("reserve_booking_inventory", {
+    p_booking_id: bookingId,
+    p_hire_line_items: hireLineItems,
+  });
+  if (reservation.error) {
+    console.error("Payment request inventory reservation failed:", reservation.error);
+    return NextResponse.json({ error: `Inventory availability could not be checked: ${reservation.error.message}` }, { status: 500 });
+  }
+  if (!reservation.data?.ok) {
+    return NextResponse.json({ error: reservation.data?.error ?? "The booking cannot be reserved with current inventory." }, { status: 409 });
+  }
+
   const reference = invoiceNumberForBooking(bookingId);
   const update = await session.admin.from("bookings").update({
     payment_method: cashOnPickup ? "cash_on_pickup" : "bank_transfer",
@@ -68,7 +80,16 @@ export async function POST(request: Request) {
     bank_transfer_reference: reference,
     updated_at: new Date().toISOString(),
   }).eq("id", bookingId);
-  if (update.error) return NextResponse.json({ error: update.error.message }, { status: 500 });
+  if (update.error) {
+    if (!result.data.payment_method) {
+      const release = await session.admin.rpc("release_booking_inventory", { p_booking_id: bookingId });
+      if (release.error) {
+        console.error("Payment request inventory hold could not be released:", release.error);
+        return NextResponse.json({ error: `Payment request could not be saved, and its inventory hold could not be released: ${release.error.message}` }, { status: 500 });
+      }
+    }
+    return NextResponse.json({ error: update.error.message }, { status: 500 });
+  }
   try {
     const invoiceEmailId = await sendInvoiceEmail(session.admin, bookingId, null, false, bankTransferOption, recipientResult.recipient);
     return NextResponse.json({ ok: true, reference, invoiceEmailId, gstInclusive, ...(cashOnPickup ? { paymentMethod: "cash_on_pickup" } : {}) });

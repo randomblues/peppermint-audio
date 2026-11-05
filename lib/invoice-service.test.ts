@@ -6,6 +6,7 @@ vi.mock("resend", () => ({ Resend: class { emails = { send: mocks.send }; } }));
 vi.mock("@/lib/email-log", () => ({ recordCustomerEmail: vi.fn() }));
 
 import { billingDocumentIntro, ensureInvoice, sendBillingDocument } from "./invoice-service";
+import { recordCustomerEmail } from "./email-log";
 import { catalogLineItemFromKey } from "./booking-line-items";
 import { depositHoldDate, melbourneDateKey } from "./payment-flow";
 
@@ -56,6 +57,9 @@ describe("billing delivery tracking and retry safety", () => {
       { idempotencyKey: "billing-doc-1-initial" }, { idempotencyKey: "billing-doc-1-initial" },
     ]);
     expect(mocks.send.mock.calls[0][0]).toEqual(mocks.send.mock.calls[1][0]);
+    expect(recordCustomerEmail).toHaveBeenCalledWith(admin, expect.objectContaining({
+      attachments: [{ filename: "invoice-PA-TEST.pdf", content: Buffer.from("test-pdf") }],
+    }));
     await sendBillingDocument(admin as never, "booking-1", "invoice");
     expect(mocks.send).toHaveBeenCalledTimes(2);
   });

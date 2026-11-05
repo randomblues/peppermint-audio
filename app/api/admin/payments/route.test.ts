@@ -18,6 +18,7 @@ vi.mock("@/lib/invoice-service", () => ({ sendInvoiceEmail: mocks.sendInvoiceEma
 import { POST as createCheckout } from "./create-checkout/route";
 import { POST as createBankTransfer } from "./bank-transfer/route";
 import { POST as updateBooking } from "./update-booking/route";
+import { POST as sendInvoice } from "./send-invoice/route";
 import { catalogLineItemFromKey } from "@/lib/booking-line-items";
 import { depositHoldDate, melbourneDateKey } from "@/lib/payment-flow";
 
@@ -35,7 +36,7 @@ const request = (url: string, body: unknown) => new Request(`http://localhost${u
   body: JSON.stringify(body),
 });
 
-function adminSession(readData: Record<string, unknown>) {
+function adminSession(readData: Record<string, unknown>, inventoryResult = { data: { ok: true }, error: null }) {
   const read = {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
@@ -46,12 +47,60 @@ function adminSession(readData: Record<string, unknown>) {
     eq: vi.fn().mockResolvedValue({ error: null }),
   };
   return {
-    session: { admin: { from: vi.fn().mockReturnValueOnce(read).mockReturnValueOnce(update) } },
+    session: {
+      admin: {
+        from: vi.fn().mockReturnValueOnce(read).mockReturnValueOnce(update),
+        rpc: vi.fn().mockResolvedValue(inventoryResult),
+      },
+    },
     update,
   };
 }
 
 describe("admin payment routes", () => {
+  it("does not issue payment when the requested hire exceeds available stock", async () => {
+    const inventoryResult = {
+      data: { ok: false, error: "Insufficient inventory. Bose speaker: this booking needs 2 units, but only 1 is available." },
+      error: null,
+    };
+    const { session } = adminSession({
+      id: "booking-1", email: "alex@example.com", first_name: "Alex", last_name: "Smith",
+      status: "submitted", pickup_date: "2099-10-09", dropoff_date: "2099-10-10",
+      hire_line_items: hireLineItems,
+      payment_method: null, hire_payment_status: "unpaid", deposit_payment_status: "not_required",
+    }, inventoryResult);
+    mocks.requireAdmin.mockResolvedValue(session);
+
+    const response = await createBankTransfer(request("/api/admin/payments/bank-transfer", {
+      bookingId: "booking-1",
+      securityDepositAmount: "0",
+    }));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: inventoryResult.data.error });
+    expect(mocks.sendInvoiceEmail).not.toHaveBeenCalled();
+  });
+
+  it("checks inventory before resending an unpaid invoice", async () => {
+    const { session } = adminSession({
+      id: "booking-1",
+      status: "submitted",
+      hire_line_items: hireLineItems,
+      hire_payment_status: "bank_transfer_pending",
+      deposit_payment_status: "not_required",
+    });
+    mocks.requireAdmin.mockResolvedValue(session);
+
+    const response = await sendInvoice(request("/api/admin/payments/send-invoice", { bookingId: "booking-1" }));
+
+    expect(response.status).toBe(200);
+    expect(session.admin.rpc).toHaveBeenCalledWith("reserve_booking_inventory", {
+      p_booking_id: "booking-1",
+      p_hire_line_items: hireLineItems,
+    });
+    expect(mocks.sendInvoiceEmail).toHaveBeenCalled();
+  });
+
   it.each(["stripe", "bank", "cash", "update"])("uses multi-night catalogue totals for %s without discounting the deposit", async (method) => {
     const { session, update } = adminSession({
       id: "booking-1", email: "alex@example.com", first_name: "Alex", last_name: "Smith",
@@ -454,7 +503,7 @@ describe("admin payment routes", () => {
       update: vi.fn().mockReturnThis(),
       eq: vi.fn().mockResolvedValue({ error: null }),
     };
-    mocks.requireAdmin.mockResolvedValue({ user: { id: "admin-1" }, admin: { from: vi.fn().mockReturnValueOnce(read).mockReturnValueOnce(update) } });
+    mocks.requireAdmin.mockResolvedValue({ user: { id: "admin-1" }, admin: { from: vi.fn().mockReturnValueOnce(read).mockReturnValueOnce(update), rpc: vi.fn().mockResolvedValue({ data: { ok: true }, error: null }) } });
 
     const response = await updateBooking(request("/api/admin/payments/update-booking", {
       bookingId: "booking-original",
@@ -487,7 +536,7 @@ describe("admin payment routes", () => {
       update: vi.fn().mockReturnThis(),
       eq: vi.fn().mockResolvedValue({ error: null }),
     };
-    mocks.requireAdmin.mockResolvedValue({ user: { id: "admin-1" }, admin: { from: vi.fn().mockReturnValueOnce(read).mockReturnValueOnce(update) } });
+    mocks.requireAdmin.mockResolvedValue({ user: { id: "admin-1" }, admin: { from: vi.fn().mockReturnValueOnce(read).mockReturnValueOnce(update), rpc: vi.fn().mockResolvedValue({ data: { ok: true }, error: null }) } });
 
     const response = await updateBooking(request("/api/admin/payments/update-booking", {
       bookingId: "booking-original",
@@ -583,7 +632,7 @@ describe("admin payment routes", () => {
       update: vi.fn().mockReturnThis(),
       eq: vi.fn().mockResolvedValue({ error: null }),
     };
-    mocks.requireAdmin.mockResolvedValue({ user: { id: "admin-1" }, admin: { from: vi.fn().mockReturnValueOnce(read).mockReturnValueOnce(update) } });
+    mocks.requireAdmin.mockResolvedValue({ user: { id: "admin-1" }, admin: { from: vi.fn().mockReturnValueOnce(read).mockReturnValueOnce(update), rpc: vi.fn().mockResolvedValue({ data: { ok: true }, error: null }) } });
     mocks.paymentIntentRetrieve
       .mockRejectedValueOnce({ type: "StripeInvalidRequestError", code: "resource_missing", message: "No such payment_intent: 'pi_missing_hire'" })
       .mockRejectedValueOnce({ type: "StripeInvalidRequestError", code: "resource_missing", message: "No such payment_intent: 'pi_missing_deposit'" });
@@ -624,7 +673,7 @@ describe("admin payment routes", () => {
       update: vi.fn().mockReturnThis(),
       eq: vi.fn().mockResolvedValue({ error: null }),
     };
-    mocks.requireAdmin.mockResolvedValue({ user: { id: "admin-1" }, admin: { from: vi.fn().mockReturnValueOnce(read).mockReturnValueOnce(update) } });
+    mocks.requireAdmin.mockResolvedValue({ user: { id: "admin-1" }, admin: { from: vi.fn().mockReturnValueOnce(read).mockReturnValueOnce(update), rpc: vi.fn().mockResolvedValue({ data: { ok: true }, error: null }) } });
     mocks.customerRetrieve.mockRejectedValueOnce({ code: "resource_missing", message: "No such customer: 'cus_missing'" });
     mocks.customerCreate.mockResolvedValueOnce({ id: "cus_replacement" });
 

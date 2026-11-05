@@ -22,7 +22,10 @@ describe("payment link route", () => {
         deposit_hold_date: "2026-11-08", payment_token_expires_at: "2099-01-01T00:00:00Z",
       }, error: null }),
     };
-    mocks.createAdminClient.mockReturnValue({ from: vi.fn(() => query) });
+    mocks.createAdminClient.mockReturnValue({
+      from: vi.fn(() => query),
+      rpc: vi.fn().mockResolvedValue({ data: { ok: true }, error: null }),
+    });
     mocks.readDepositBooking.mockResolvedValue({ id: "booking-1", deposit_consent_at: "2026-10-01", stripe_deposit_payment_intent_id: "pi_deposit" });
     const intent = { id: "pi_deposit" };
     mocks.getStripe.mockReturnValue({ paymentIntents: { retrieve: vi.fn().mockResolvedValue(intent) } });
@@ -53,7 +56,10 @@ describe("payment link route", () => {
       update: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(),
       then: (resolve: (value: object) => unknown) => Promise.resolve({ error: null }).then(resolve),
     };
-    mocks.createAdminClient.mockReturnValue({ from: vi.fn().mockReturnValueOnce(query).mockReturnValueOnce(write) });
+    mocks.createAdminClient.mockReturnValue({
+      from: vi.fn().mockReturnValueOnce(query).mockReturnValueOnce(write),
+      rpc: vi.fn().mockResolvedValue({ data: { ok: true }, error: null }),
+    });
     const response = await POST(new Request("http://localhost/api/payment/token", {
       method: "POST", body: JSON.stringify({ consent: true }),
     }), { params: Promise.resolve({ token: "token" }) });
@@ -93,7 +99,8 @@ describe("payment link route", () => {
       eq: vi.fn().mockReturnThis(),
       single: vi.fn().mockResolvedValue({ data: booking, error: null }),
     };
-    mocks.createAdminClient.mockReturnValue({ from: vi.fn().mockReturnValue(query) });
+    const rpc = vi.fn().mockResolvedValue({ data: { ok: true }, error: null });
+    mocks.createAdminClient.mockReturnValue({ from: vi.fn().mockReturnValue(query), rpc });
     mocks.getStripe.mockReturnValue({
       paymentIntents: {
         retrieve: vi.fn()
@@ -106,11 +113,41 @@ describe("payment link route", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("reserve_booking_inventory", {
+      p_booking_id: "booking-1",
+      p_hire_line_items: null,
+    });
     expect(payload.hireLineItems).toEqual([expect.objectContaining({
       name: "Bose S1 Pro PA Speaker",
       option: "Single speaker",
       unitPriceCents: 5500,
     })]);
     expect(payload.hireAmountCents).toBe(5500);
+  });
+
+  it("uses a generic customer response when an unpaid link no longer has a valid reservation", async () => {
+    const query = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: {
+        id: "booking-1",
+        status: "submitted",
+        payment_method: "stripe_card_hold",
+        payment_token_expires_at: "2099-01-01T00:00:00.000Z",
+        hire_line_items: [],
+      }, error: null }),
+    };
+    const rpc = vi.fn().mockResolvedValue({
+      data: { ok: false, error: "Internal stock details must not be sent to a customer." },
+      error: null,
+    });
+    mocks.createAdminClient.mockReturnValue({ from: vi.fn().mockReturnValue(query), rpc });
+
+    const response = await GET(new Request("http://localhost/api/payment/token"), { params: Promise.resolve({ token: "token" }) });
+    const payload = await response.json();
+
+    expect(response.status).toBe(410);
+    expect(payload.error).toBe("This payment link is no longer available. Please contact Peppermint Audio.");
+    expect(JSON.stringify(payload)).not.toContain("stock");
   });
 });

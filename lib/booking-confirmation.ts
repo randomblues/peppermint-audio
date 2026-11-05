@@ -46,6 +46,14 @@ export async function confirmPaidStripeBooking(admin: SupabaseClient, bookingId:
   const booking = result.data;
   if (!booking) throw new Error("Paid booking could not be found.");
   if (booking.hire_payment_status !== "paid" || !["submitted", "confirmed"].includes(booking.status)) return;
+  const reservation = await admin.rpc("reserve_booking_inventory", {
+    p_booking_id: bookingId,
+    p_hire_line_items: booking.hire_line_items,
+  });
+  if (reservation.error) throw new Error(`Paid booking inventory could not be checked: ${reservation.error.message}`);
+  if (!reservation.data?.ok) {
+    throw new Error(reservation.data?.error ?? "Paid booking could not be confirmed with current inventory.");
+  }
   if (booking.status === "submitted") {
     const update = await admin.from("bookings")
       .update({ status: "confirmed", updated_at: new Date().toISOString() })

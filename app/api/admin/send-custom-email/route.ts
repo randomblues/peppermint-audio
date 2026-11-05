@@ -52,6 +52,13 @@ export async function POST(request: Request) {
   const { apiKey, from } = emailConfiguration();
   if (!apiKey || !from) return NextResponse.json({ error: "Email service is not configured." }, { status: 500 });
 
+  const attachmentContent = attachment
+    ? Buffer.from(
+      "arrayBuffer" in attachment
+        ? await attachment.arrayBuffer()
+        : await new Response(attachment).arrayBuffer(),
+    )
+    : null;
   const response = await new Resend(apiKey).emails.send({
     from,
     to: [booking.data.email],
@@ -62,14 +69,10 @@ export async function POST(request: Request) {
       title: subject,
       content: emailPanel(`<div style="color:#405148;font-size:16px;line-height:1.7;white-space:pre-line">${escapeEmailHtml(message)}</div>`, "soft"),
     }),
-    ...(attachment ? {
+    ...(attachment && attachmentContent ? {
       attachments: [{
         filename: attachment.name,
-        content: Buffer.from(
-          "arrayBuffer" in attachment
-            ? await attachment.arrayBuffer()
-            : await new Response(attachment).arrayBuffer(),
-        ).toString("base64"),
+        content: attachmentContent.toString("base64"),
       }],
     } : {}),
   });
@@ -80,6 +83,9 @@ export async function POST(request: Request) {
       recipientEmail: booking.data.email,
       emailType: "custom",
       providerMessageId: response.data?.id,
+      ...(attachment && attachmentContent ? {
+        attachments: [{ filename: attachment.name, content: attachmentContent }],
+      } : {}),
     });
   } catch (error) {
     console.error("Email log failed:", error);

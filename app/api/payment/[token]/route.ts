@@ -25,6 +25,18 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
     return NextResponse.json({ error: "This payment link has expired. Please contact Peppermint Audio for a new link." }, { status: 410 });
   }
 
+  const reservation = await admin.rpc("reserve_booking_inventory", {
+    p_booking_id: result.data.id,
+    p_hire_line_items: null,
+  });
+  if (reservation.error) {
+    console.error("Payment link inventory check failed:", reservation.error);
+    return NextResponse.json({ error: "This payment link could not be verified. Please contact Peppermint Audio." }, { status: 500 });
+  }
+  if (!reservation.data?.ok) {
+    return NextResponse.json({ error: "This payment link is no longer available. Please contact Peppermint Audio." }, { status: 410 });
+  }
+
   try {
     const stripe = getStripe();
     const [hirePaymentIntent, depositPaymentIntent] = await Promise.all([
@@ -86,6 +98,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
       || !["submitted", "confirmed"].includes(booking.status)
       || !booking.payment_token_expires_at || Date.parse(booking.payment_token_expires_at) <= Date.now()) {
       return NextResponse.json({ error: "This payment link is no longer available." }, { status: 410 });
+    }
+    const reservation = await admin.rpc("reserve_booking_inventory", {
+      p_booking_id: booking.id,
+      p_hire_line_items: null,
+    });
+    if (reservation.error) {
+      console.error("Payment link inventory check failed:", reservation.error);
+      return NextResponse.json({ error: "This payment link could not be verified. Please contact Peppermint Audio." }, { status: 500 });
+    }
+    if (!reservation.data?.ok) {
+      return NextResponse.json({ error: "This payment link is no longer available. Please contact Peppermint Audio." }, { status: 410 });
     }
     if (verifyingDeposit) {
       const current = await readDepositBooking(admin, booking.id);

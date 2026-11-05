@@ -32,13 +32,23 @@ const invoices = [
     total_amount_cents: 5500,
   },
 ];
+const purchases = [{
+  id: "purchase-1",
+  product_name: "Bose S1 Pro PA Speaker",
+  purchase_date: "2026-07-05",
+  quantity: 2,
+  total_cost_cents: 110000,
+  gst_paid_cents: 10000,
+  supplier: "Audio shop",
+  reference: "INV-100",
+}];
 
 function session() {
-  const query = {
+  const query = (data: unknown[]) => ({
     select: vi.fn().mockReturnThis(),
-    order: vi.fn().mockResolvedValue({ data: invoices, error: null }),
-  };
-  return { admin: { from: vi.fn().mockReturnValue(query) } };
+    order: vi.fn().mockResolvedValue({ data, error: null }),
+  });
+  return { admin: { from: vi.fn((table: string) => query(table === "invoices" ? invoices : purchases)) } };
 }
 
 describe("admin GST report route", () => {
@@ -60,6 +70,8 @@ describe("admin GST report route", () => {
         securityDepositCents: 10000,
         totalAmountCents: 20000,
       },
+      purchaseSummary: { purchaseCount: 1, totalCostCents: 110000, gstPaidCents: 10000 },
+      purchases: [{ productName: "Bose S1 Pro PA Speaker", gstPaidCents: 10000 }],
     });
   });
 
@@ -72,6 +84,9 @@ describe("admin GST report route", () => {
     expect(body).toContain("invoice_number,date,paid_at");
     expect(body).toContain('"PA-TWO"');
     expect(body).toContain('"55.00"');
+    expect(body).toContain("EQUIPMENT_PURCHASES");
+    expect(body).toContain('"Audio shop"');
+    expect(body).toContain('"100.00"');
   });
 
   it("rejects unauthorised access and invalid ranges", async () => {

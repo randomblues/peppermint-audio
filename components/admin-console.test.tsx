@@ -31,11 +31,12 @@ const booking = {
   }],
   status: "submitted",
   internal_notes: "Call about access",
-  photo_id_paths: ["private/alex-id.jpg"],
+  photo_id_paths: ["private/alex-id.jpg", "private/alex-id-back.jpg"],
   email_logs: [{
     id: "email-one",
     recipient_email: "alex@example.com",
     email_type: "confirmation",
+    provider_message_id: "provider-one",
     sent_at: "2026-10-03T00:00:00.000Z",
   }],
 };
@@ -174,21 +175,53 @@ describe("AdminConsole", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("searches email history by booking and opens the selected booking history", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ bookings: [booking] }));
+  it("shows communications inside booking details and opens the selected email", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (String(input).startsWith("/api/admin/email-history")) {
+        return Promise.resolve(jsonResponse({ email: {
+        id: "provider-one",
+        subject: "Your booking is confirmed",
+        from: "Peppermint Audio <hello@example.com>",
+        to: ["alex@example.com"],
+        created_at: "2026-10-03T00:00:00.000Z",
+        html: "<h1>Your booking is confirmed</h1>",
+        text: "Your booking is confirmed",
+        attachments: [{
+          filename: "invoice.pdf",
+          content_type: "application/pdf",
+          size: 512,
+          url: "/api/admin/email-history/attachment?id=email-one&index=0",
+        }],
+        attachmentsArchived: true,
+        } }));
+      }
+      return Promise.resolve(jsonResponse({ bookings: [booking] }));
+    });
     vi.stubGlobal("fetch", fetchMock);
     render(<AdminConsole />);
     await screen.findByText("Alex Smith");
 
-    fireEvent.click(screen.getByRole("link", { name: "Email history" }));
-    expect(await screen.findByRole("heading", { name: "Email history" })).toBeInTheDocument();
-    expect(screen.getByText("1 email")).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Search email history"), { target: { value: "Alex" } });
-    expect(screen.getByText("Alex Smith")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Alex Smith alex@example.com/ }));
-    const historyDialog = screen.getByRole("dialog", { name: "Alex Smith" });
-    expect(historyDialog).toBeInTheDocument();
-    expect(historyDialog).toHaveTextContent("Booking confirmation");
+    const bookingDialog = screen.getByRole("dialog", { name: "Alex Smith" });
+    const communications = within(bookingDialog).getByRole("button", { name: /Communications/ });
+    expect(communications).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("link", { name: "Email history" })).not.toBeInTheDocument();
+
+    fireEvent.click(communications);
+    expect(communications).toHaveAttribute("aria-expanded", "true");
+    expect(within(bookingDialog).getByRole("heading", { name: "Email history" })).toBeInTheDocument();
+    expect(within(bookingDialog).getByRole("button", { name: "Send Email" })).toBeInTheDocument();
+    fireEvent.click(within(bookingDialog).getByRole("button", { name: "Send Email" }));
+    expect(screen.getByRole("dialog", { name: "Send an email" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Close email dialog" }));
+    fireEvent.click(within(bookingDialog).getByRole("button", { name: "View Booking confirmation sent email" }));
+    expect(await screen.findByText("Your booking is confirmed")).toBeInTheDocument();
+    expect(screen.getByTitle("Rendered Booking confirmation email")).toHaveAttribute("srcdoc", "<h1>Your booking is confirmed</h1>");
+    expect(await screen.findByLabelText("invoice.pdf, page 1")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Download" })).toHaveAttribute("href", "/api/admin/email-history/attachment?id=email-one&index=0");
+    expect(fetchMock).toHaveBeenCalledWith("/api/admin/email-history?id=email-one");
+    fireEvent.click(within(bookingDialog).getByRole("button", { name: "Back to email history" }));
+    expect(within(bookingDialog).getByRole("heading", { name: "Email history" })).toBeInTheDocument();
   });
 
   it("updates status and notes, sends a reminder, and opens photo links", async () => {
@@ -199,9 +232,21 @@ describe("AdminConsole", () => {
     const open = vi.spyOn(window, "open").mockImplementation(() => null);
     render(<AdminConsole />);
     fireEvent.click(await screen.findByText("Alex Smith"));
+    const bookingDialog = screen.getByRole("dialog", { name: "Alex Smith" });
+    expect(bookingDialog).toHaveClass("sm:max-w-3xl", "rounded-2xl");
+    expect(document.querySelector(".backdrop-blur-md")).toBeInTheDocument();
     expect(screen.getAllByText("Booking reference: PA-ONE").length).toBeGreaterThan(0);
     expect(screen.getByText("PA-ONE")).toBeInTheDocument();
     expect(screen.getByLabelText("Update booking status")).toHaveClass("appearance-none", "pr-9");
+    expect(screen.getByText("Customer").closest(".grid")).toHaveClass("sm:grid-cols-2");
+    const photoIdActions = screen.getByRole("heading", { name: "Photo ID" }).nextElementSibling as HTMLElement;
+    expect(photoIdActions).toHaveClass("flex", "flex-wrap", "gap-2");
+    const privateIdButtons = within(photoIdActions).getAllByRole("button", { name: "View private ID" });
+    expect(privateIdButtons).toHaveLength(2);
+    for (const button of privateIdButtons) {
+      expect(button).toHaveClass("h-7");
+      expect(button).not.toHaveClass("w-full");
+    }
     expect(screen.getAllByRole("heading", { name: "Hire items" })).toHaveLength(1);
     const savedHireItems = screen.getByRole("heading", { name: "Hire items" }).closest("section")!;
     const savedHireItem = within(savedHireItems).getByText("Wireless microphone");
@@ -222,6 +267,7 @@ describe("AdminConsole", () => {
     expect(screen.queryByText("Package", { exact: true })).not.toBeInTheDocument();
     expect(screen.queryByText("Guests", { exact: true })).not.toBeInTheDocument();
     expect(screen.queryByText("Customer email delivery records are kept for 30 days.")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Communications/ }));
     expect(screen.getByRole("button", { name: "Send Email" })).toBeInTheDocument();
     expect(screen.queryByText("Actions & outcomes")).not.toBeInTheDocument();
     expect(screen.queryByText("Internal email")).not.toBeInTheDocument();
@@ -249,7 +295,7 @@ describe("AdminConsole", () => {
     expect((screen.getByLabelText("Email subject") as HTMLInputElement).value).toContain("Pickup reminder for");
     expect((screen.getByLabelText("Email message") as HTMLTextAreaElement).value).toContain("181 Nicholson St, Abbotsford VIC 3067");
     expect((screen.getByLabelText("Email message") as HTMLTextAreaElement).value).toContain("Wireless microphone");
-    fireEvent.click(screen.getByRole("button", { name: "View private ID" }));
+    fireEvent.click(privateIdButtons[0]);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/photo-link?path=private%2Falex-id.jpg"));
     expect(open).toHaveBeenCalledWith("https://signed.example/id.jpg", "_blank", "noopener,noreferrer");
   });
@@ -285,6 +331,7 @@ describe("AdminConsole", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<AdminConsole />);
     fireEvent.click(await screen.findByText("Alex Smith"));
+    fireEvent.click(screen.getByRole("button", { name: /Communications/ }));
     fireEvent.click(screen.getByRole("button", { name: "Send Email" }));
     fireEvent.change(screen.getByLabelText("Load an email template"), { target: { value: "invoice" } });
     expect(screen.getByLabelText("Email subject")).toHaveValue("Your Peppermint Audio invoice");
@@ -351,10 +398,31 @@ describe("AdminConsole", () => {
     expect(replace).toHaveBeenCalledWith("/admin/login");
   });
 
+  it("opens the internal inventory workspace from admin navigation", async () => {
+    const fetchMock = vi.fn().mockImplementation((request: RequestInfo | URL) => {
+      return typeof request === "string" && request === "/api/admin/inventory"
+        ? jsonResponse({ products: [], mappings: [], purchases: [], movements: [] })
+        : jsonResponse({ bookings: [] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AdminConsole />);
+    await screen.findByText("No bookings match these filters");
+    fireEvent.click(screen.getByRole("link", { name: "Inventory" }));
+
+    expect(await screen.findByRole("heading", { name: "Equipment inventory" })).toBeInTheDocument();
+    expect(await screen.findByText(/Inventory details are only available in this admin area/)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith("/api/admin/inventory", { cache: "no-store" });
+  });
+
   it("combines full-time salary with business profit in the tax estimate", async () => {
     const fetchMock = vi.fn().mockImplementation((request: RequestInfo | URL) => {
       return typeof request === "string" && request.startsWith("/api/admin/tax-report")
-        ? jsonResponse({ summary: { invoiceCount: 0, taxableSalesCents: 0, gstIncludedCents: 0, securityDepositCents: 0, totalAmountCents: 0 }, rows: [] })
+        ? jsonResponse({
+          summary: { invoiceCount: 0, taxableSalesCents: 0, gstIncludedCents: 0, securityDepositCents: 0, totalAmountCents: 0 },
+          rows: [],
+          purchaseSummary: { purchaseCount: 0, totalCostCents: 0, gstPaidCents: 0 },
+          purchases: [],
+        })
         : jsonResponse({ bookings: [booking] });
     });
     vi.stubGlobal("fetch", fetchMock);
