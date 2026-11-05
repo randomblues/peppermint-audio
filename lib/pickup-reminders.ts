@@ -47,7 +47,7 @@ export function getPickupInstructions(booking: PickupInstructionSource) {
     transportText: [
       "Please make sure there is adequate space in your transport when collecting the equipment.",
       "For the smaller packages, a sedan with an empty boot or folded-down rear seats should generally be suitable.",
-      "The Big Celebration package includes a subwoofer and requires additional space. The same applies if a subwoofer has been selected as an add-on.",
+      "The Big Celebration package includes a PreSonus AIR15s subwoofer and requires additional space. The same applies if a subwoofer has been selected as an add-on.",
       "Help will be provided on site to load the equipment, but the hirer is responsible for transporting and safely handling it after pickup.",
     ],
   };

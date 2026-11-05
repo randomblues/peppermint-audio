@@ -205,6 +205,21 @@ describe("PackageCard", () => {
     });
   });
 
+  it("stacks the full package title and badge on mobile without narrowing the description or price", () => {
+    const pkg = packageTiers.find((packageTier) => packageTier.slug === "big-celebration");
+    if (!pkg) throw new Error("Big Celebration package is missing");
+
+    render(<PackageCard pkg={pkg} />);
+
+    const title = screen.getByText(pkg.name);
+    const row = title.parentElement;
+    expect(row).toHaveClass("flex-col", "items-start", "sm:flex-row", "sm:justify-between", "w-full");
+    expect(row?.parentElement).toHaveClass("flex", "flex-col", "items-start");
+    expect(screen.getByText("Highly recommended for weddings")).toHaveClass("max-w-full", "whitespace-normal");
+    expect(screen.getByText(pkg.bestFor).parentElement).toBe(row?.parentElement);
+    expect(screen.getByText("$240")).toHaveClass("whitespace-nowrap");
+  });
+
   it("uses compact content and details link when requested", () => {
     const pkg = packageTiers[0];
     render(<PackageCard pkg={pkg} compact />);

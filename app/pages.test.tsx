@@ -233,6 +233,11 @@ describe("static site pages", () => {
     expect(screen.getByRole("heading", { name: "Set up your sound system" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Your setup" })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /Bose S1 Pro/i })[0]).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Big Celebration.*PreSonus AIR15s/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "PreSonus AIR15s" })).toHaveAttribute(
+      "href",
+      "https://www.youtube.com/results?search_query=PreSonus+AIR15s+setup",
+    );
     expect(screen.getByText("Bose S1 Pro", { selector: "a" })).toHaveAttribute(
       "href",
       expect.stringContaining("youtube.com/results"),

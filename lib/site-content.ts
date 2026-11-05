@@ -189,6 +189,19 @@ export const equipmentCatalog: EquipmentItem[] = [
     ],
   },
   {
+    slug: "presonus-air15s",
+    name: "PreSonus AIR15s Active Subwoofer",
+    category: "Subwoofers",
+    description: "Active 15-inch subwoofer for adding deep low-end to PA setups, parties, and live music.",
+    image: "/presonus-air15s-front.webp",
+    options: [{ label: "Single subwoofer", price: 65 }],
+    details: [
+      "15-inch active subwoofer",
+      "1200W peak Class D power",
+      "Availability confirmed before hire",
+    ],
+  },
+  {
     slug: "behringer-xm8500",
     name: "Behringer Ultravoice XM8500 Dynamic Microphone",
     category: "Microphones",
@@ -431,7 +444,7 @@ export const packageTiers: PackageTier[] = [
     name: "Big Celebration Package",
     price: 240,
     capacity: "up to 300 people",
-    summary: "Two 1100W peak speakers, stands, two wireless microphones, a subwoofer, and mixer for bigger celebrations.",
+    summary: "Two 1100W peak speakers, stands, two wireless microphones, a PreSonus AIR15s subwoofer, and mixer for bigger celebrations.",
     bestFor: "Weddings, large parties, celebrations, and live gigs",
     image: "/big-celebration-package-v3.png",
     addOnSlugs: [
@@ -445,7 +458,7 @@ export const packageTiers: PackageTier[] = [
       "2 x Yamaha DXR15 Speakers (1100W peak each).",
       "2 x Speaker Stands.",
       "2 x Wireless Microphones.",
-      "1 x 15-Inch Subwoofer.",
+      "1 x 15 inch PreSonus AIR15s Active Subwoofer.",
       "Easy to use 2-channel Behringer Xenyx mixer.",
       "Power Cables for All Equipment.",
       "AUX or Bluetooth Phone Connection.",

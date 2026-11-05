@@ -36,8 +36,8 @@ const youtubeLinks = [
     query: "https://www.youtube.com/results?search_query=Behringer+Xenyx+2+channel+mixer+setup",
   },
   {
-    label: "PreSonus AIR15",
-    query: "https://www.youtube.com/results?search_query=PreSonus+AIR15+setup",
+    label: "PreSonus AIR15s",
+    query: "https://www.youtube.com/results?search_query=PreSonus+AIR15s+setup",
   },
 ];
 
@@ -85,10 +85,10 @@ const packageGuides = [
   {
     id: "big",
     title: "Big Celebration",
-    equipment: "Yamaha DXR15 + PreSonus AIR15",
+    equipment: "Yamaha DXR15 + PreSonus AIR15s",
     steps: [
-      "Put the Yamaha speakers on stands and the AIR15 subwoofer on the floor between or near them.",
-      "Connect the mixer MAIN OUT to the AIR15 inputs, then connect the AIR15 outputs to the Yamaha speakers.",
+      "Put the Yamaha speakers on stands and the AIR15s subwoofer on the floor between or near them.",
+      "Connect the mixer MAIN OUT to the AIR15s inputs, then connect the AIR15s outputs to the Yamaha speakers.",
       "If included, connect the wireless microphone receiver outputs to microphone channels on the mixer.",
     ],
   },

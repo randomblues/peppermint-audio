@@ -57,6 +57,8 @@ describe("pickup reminders", () => {
     expect(email.text).toContain("pickup is tomorrow, 29 September 2026 at 10:00");
     expect(email.text).toContain("Hire items:");
     expect(email.text).toContain("Wireless Microphone");
+    expect(email.text).toContain("The Big Celebration package includes a PreSonus AIR15s subwoofer");
+    expect(email.html).toContain("The Big Celebration package includes a PreSonus AIR15s subwoofer");
   });
 
   it("uses safe fallbacks when hire items and details are absent", () => {

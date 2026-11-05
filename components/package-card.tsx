@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardFooter,
@@ -172,11 +171,13 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
             </div>
           </CardHeader>
         ) : (
-          <CardHeader>
-            <CardTitle>{pkg.name}</CardTitle>
-            <CardAction>{pkg.notes ? <Badge>{pkg.notes}</Badge> : null}</CardAction>
+          <CardHeader className="flex flex-col items-start gap-2">
+            <div className="flex w-full flex-col items-start gap-2 sm:flex-row sm:justify-between">
+              <CardTitle className="min-w-0">{pkg.name}</CardTitle>
+              {pkg.notes ? <Badge className="max-w-full whitespace-normal text-left">{pkg.notes}</Badge> : null}
+            </div>
             <CardDescription>{pkg.bestFor}</CardDescription>
-            <p className="mt-2 text-3xl font-semibold tracking-tight">${pkg.price}<span className="text-base font-normal text-muted-foreground"> / night</span></p>
+            <p className="mt-2 whitespace-nowrap text-3xl font-semibold tracking-tight">${pkg.price}<span className="text-base font-normal text-muted-foreground"> / night</span></p>
           </CardHeader>
         )}
         <CardContent>

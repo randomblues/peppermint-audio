@@ -7,6 +7,7 @@ describe("equipmentCatalog", () => {
     const expectedItems = [
       ["behringer-xm8500", "/behringer-xm8500.jpg", 10],
       ["behringer-b1200d-pro", "/behringer-b1200d-pro.jpg", 50],
+      ["presonus-air15s", "/presonus-air15s-front.webp", 65],
       ["shure-sm58", "/shure-sm58.jpg", 15],
       ["shure-sm57", "/shure-sm57.webp", 15],
       ["shure-sm7b", "/shure-sm7b.jpg", 35],
@@ -30,6 +31,14 @@ describe("equipmentCatalog", () => {
       });
     }
 
+    expect(equipmentCatalog.find((item) => item.slug === "presonus-air15s")).toMatchObject({
+      name: "PreSonus AIR15s Active Subwoofer",
+      details: [
+        "15-inch active subwoofer",
+        "1200W peak Class D power",
+        "Availability confirmed before hire",
+      ],
+    });
     expect(equipmentCatalog.some((item) => item.slug === "hire-wireless-microphones")).toBe(false);
   });
 
@@ -60,6 +69,10 @@ describe("equipmentCatalog", () => {
         }),
         expect.objectContaining({
           slug: "big-celebration",
+          summary: expect.stringContaining("PreSonus AIR15s subwoofer"),
+          inclusions: expect.arrayContaining([
+            "1 x 15 inch PreSonus AIR15s Active Subwoofer.",
+          ]),
           image: "/big-celebration-package-v3.png",
         }),
       ]),
