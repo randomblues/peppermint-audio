@@ -125,6 +125,31 @@ body {
   }
 }
 
+.photo-id-scanline {
+  animation: photo-id-scanline 2.8s ease-in-out infinite;
+}
+
+@keyframes photo-id-scanline {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(-45%);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateY(45%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo-id-scanline {
+    animation: none;
+    opacity: 0.65;
+    transform: translateY(0);
+  }
+}
+
 .admin-console-shell {
   background:
     radial-gradient(circle at 80% -10%, color-mix(in oklab, var(--primary) 8%, transparent), transparent 34rem),

@@ -6,6 +6,7 @@ import { ArrowRight, Check, CircleCheck, Clock3, FileImage, MessageCircle, Uploa
 
 import { useCart } from "@/components/cart-provider";
 import { HirePriceSummary } from "@/components/hire-price-summary";
+import { PhotoIdCapture } from "@/components/photo-id-capture";
 import { TimePicker } from "@/components/time-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -386,6 +387,7 @@ export function BookingForm() {
             {currentStep === 3 ? (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">Upload clear photos of the front and back of your valid photo ID.</p>
+                <PhotoIdCapture capturedCount={values.idFiles.length} onCapture={(file) => updateIdFiles([file])} />
                 <div
                   data-testid="photo-id-dropzone"
                   className={`rounded-xl border border-dashed p-5 transition-all duration-200 ${isDragOver ? "border-primary bg-primary/8 ring-4 ring-primary/20 shadow-[0_0_0_1px_color-mix(in_oklab,var(--primary)_45%,transparent),0_16px_40px_rgb(0_0_0/0.25)]" : "border-input bg-muted/30 hover:border-primary/35 hover:bg-primary/5"}`}
@@ -411,8 +413,8 @@ export function BookingForm() {
                     <div className={`rounded-full border bg-background p-2 text-primary transition-all duration-200 ${isDragOver ? "border-primary/55 shadow-[0_0_24px_color-mix(in_oklab,var(--primary)_35%,transparent)]" : "border-border"}`}>
                       <Upload className="size-5" aria-hidden="true" />
                     </div>
-                    <p className="text-sm font-medium text-foreground">{isDragOver ? "Drop files to upload" : "Drag and drop your photo ID files here"}</p>
-                    <p className="text-xs text-muted-foreground">Front and back images or PDF, up to 2 files total. Add them one at a time or together.</p>
+                    <p className="text-sm font-medium text-foreground">{isDragOver ? "Drop files to upload" : "Or choose existing photo ID files"}</p>
+                    <p className="text-xs text-muted-foreground">Upload images or a PDF, up to 2 files total. You can also add files from your device.</p>
                     <Input
                       id="photo-id-files"
                       type="file"

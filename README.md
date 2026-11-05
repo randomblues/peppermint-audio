@@ -208,10 +208,11 @@ limited to 1.5 MB each. The API retains the 1.5 MB per-file cap so two IDs and t
 booking fields fit within Vercel's request-body limit. If conversion or compression
 fails, the form explains how to retry rather than submitting an oversized file.
 On phones, **Take front photo** opens a full-screen camera guide with a card
-outline and a local lighting, glare, and focus check. Customers can review,
-retake, or use each side; the checks are advisory, and the existing file upload
-remains available as a fallback. Camera access and image checks run in the
-browser, and the images are only uploaded when the booking request is submitted.
+outline and local lighting, glare, and focus checks. Customers can review and
+retake each side; photos that fail a check cannot be used from the scanner.
+These basic checks do not verify ID identity. The existing file upload remains
+available as a fallback. Camera access and image checks run in the browser, and
+the images are only uploaded when the booking request is submitted.
 The browser regression test uses `tests/fixtures/synthetic-photo.heic`, an
 800x500 generated colour gradient encoded with macOS `sips`; it contains no ID
 or customer data and exercises the real decoder rather than a mocked conversion.
