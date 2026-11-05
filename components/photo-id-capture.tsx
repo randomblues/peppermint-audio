@@ -410,7 +410,7 @@ export function PhotoIdCapture({
               ) : (
                 <p role="status" className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-4 py-2 text-sm text-white shadow-lg backdrop-blur-md">
                   <Check className="size-4 text-primary" aria-hidden="true" />
-                Make sure this is a photo of your ID and that its details are readable.
+                Make sure your ID is clear and readable, or your booking may be declined.
                 </p>
               )}
               <div className="flex w-full max-w-md flex-col gap-3 sm:flex-row">

@@ -110,7 +110,7 @@ describe("PhotoIdCapture", () => {
     getImageData.mockReturnValue({ data: detailedPixels } as unknown as ImageData);
     fireEvent.click(screen.getByRole("button", { name: "Capture front" }));
     expect(within(await screen.findByRole("dialog", { name: "Review your photo" })).getByRole("status")).toHaveTextContent(
-      "Make sure this is a photo of your ID and that its details are readable.",
+      "Make sure your ID is clear and readable, or your booking may be declined.",
     );
     fireEvent.click(screen.getByRole("button", { name: "Use this photo" }));
     await waitFor(() => expect(onCapture).toHaveBeenCalledWith(
@@ -156,7 +156,7 @@ describe("PhotoIdCapture", () => {
 
     const review = await screen.findByRole("dialog", { name: "Review your photo" });
     expect(within(review).getByRole("status")).toHaveTextContent(
-      /Make sure this is a photo of your ID/,
+      /ID is clear and readable/,
     );
     expect(within(review).queryByText(/recognize this as an ID/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Use this photo" })).toBeInTheDocument();
