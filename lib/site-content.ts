@@ -21,6 +21,7 @@ export type PackageTier = {
 type AddOn = {
   name: string;
   price: number;
+  popular?: boolean;
   description: string;
   details: string[];
   category?: "DI boxes" | "Lighting" | "Microphones" | "Mixers" | "Accessories";
@@ -37,6 +38,7 @@ export type EquipmentItem = {
   slug: string;
   name: string;
   category: string;
+  popular?: boolean;
   description: string;
   image?: string;
   imageSize?: "compact";
@@ -91,6 +93,7 @@ export const addOnCatalog: Record<string, AddOn> = {
   "party-lights-bar": {
     name: "CR Lite MagikBar Hub Party Bar",
     price: 30,
+    popular: true,
     description: "Multi-effect lighting bar for dance floors, DJs, and parties.",
     details: [
       "Multiple party lighting effects on one bar",
@@ -113,6 +116,7 @@ export const addOnCatalog: Record<string, AddOn> = {
   "di-box": {
     name: "Pro DI Box",
     price: 15,
+    popular: true,
     description: "Passive direct box for connecting instruments to a mixer with a balanced, isolated signal.",
     details: [
       "Passive DI; no external power required",
@@ -217,6 +221,7 @@ export const equipmentCatalog: EquipmentItem[] = [
     slug: "yamaha-dxr15",
     name: "Yamaha DXR15 PA Speaker",
     category: "Speakers",
+    popular: true,
     description: "High-output active PA speakers for parties, live music, and larger venues.",
     image: "/yamaha-dxr15-product.jpg",
     options: [
@@ -246,6 +251,7 @@ export const equipmentCatalog: EquipmentItem[] = [
     slug: "presonus-air15s",
     name: "PreSonus AIR15s Active Subwoofer",
     category: "Subwoofers",
+    popular: true,
     description: "Active 15-inch subwoofer for adding deep low-end to PA setups, parties, and live music.",
     image: "/presonus-air15s-front-cropped.webp",
     options: [{ label: "Single subwoofer", price: 65 }],
@@ -272,6 +278,7 @@ export const equipmentCatalog: EquipmentItem[] = [
     slug: "shure-sm58",
     name: "Shure SM58",
     category: "Microphones",
+    popular: true,
     description: "Industry-standard vocal microphone for speeches, singing, announcements, and live performance.",
     image: "/shure-sm58.jpg",
     options: [{ label: "Single microphone", price: 15 }],
@@ -324,12 +331,13 @@ export const equipmentCatalog: EquipmentItem[] = [
     slug: "beamz-s1500",
     name: "BeamZ S1500 Smoke Machine",
     category: "Effects",
-    description: "Smoke machine for adding atmosphere to parties, DJ sets, and lighting effects.",
+    popular: true,
+    description: "Add atmosphere to your event with clouds of smoke that drift through the space.",
     image: "/beamz-s1500-smoke-machine.webp",
     options: [{ label: "Single smoke machine", price: 30 }],
     details: [
+      "Creates visible smoke clouds for a more dramatic event atmosphere",
       "Supplied pre-filled with smoke liquid",
-      "Makes light beams more visible for party and DJ effects",
     ],
   },
   ...Object.entries(addOnCatalog)
@@ -338,6 +346,7 @@ export const equipmentCatalog: EquipmentItem[] = [
     slug: `hire-${slug}`,
     name: addOn.name.replace(" Upgrade", ""),
     category: addOn.category ?? "Accessories",
+    popular: addOn.popular,
     description: addOn.description,
     image: addOn.image,
     imageSize: addOn.imageSize,

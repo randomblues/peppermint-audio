@@ -18,6 +18,10 @@ describe("equipment catalogue filters", () => {
     expect(filterEquipment(equipmentCatalog, defaultEquipmentFilters)).toEqual(equipmentCatalog);
   });
 
+  it("finds tagged products with a popular search without changing their order", () => {
+    expect(search("popular")).toEqual(equipmentCatalog.filter((item) => item.popular));
+  });
+
   it.each([
     ["  YAMAHA-DXR15  ", ["yamaha-dxr15"]],
     ["yamaha 15", ["yamaha-dxr15"]],
@@ -28,6 +32,7 @@ describe("equipment catalogue filters", () => {
     ["wireless mics", ["k60-wireless"]],
     ["subs", ["behringer-b1200d-pro", "presonus-air15s"]],
     ["fog", ["beamz-s1500"]],
+    ["atmosphere smoke", ["beamz-s1500"]],
     ["podcasting", ["shure-sm7b"]],
     ["bluetooth", ["bose-s1-pro"]],
     ["scene recall", ["hire-behringer-x32"]],

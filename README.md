@@ -31,7 +31,7 @@ The locally served homepage photo, `public/home-live-sound.jpg`, is [A Stage wit
 
 The FAQ leads with five conversational questions about choosing a package, booking ahead, self-setup, specific requirements, and individual equipment hire. Multi-night pricing, pickup/delivery, and booking steps sit in a collapsed "A few practical bits" section. All answers and their contextual links live in `lib/site-content.ts`; FAQ structured data uses the same answers.
 
-The individual equipment catalogue supports instant search across product names, categories, descriptions, features, and hire options, a category dropdown, and sorting by starting nightly price or name. Filters use the `q`, `category`, and `sort` URL parameters so filtered views can be shared and restored with browser navigation. The same compact category dropdown is used on desktop and mobile; prices and cart selections remain unchanged.
+The individual equipment catalogue supports instant search across product names, categories, descriptions, features, and hire options, a category dropdown, and sorting by starting nightly price or name. Filters use the `q`, `category`, and `sort` URL parameters so filtered views can be shared and restored with browser navigation. The same compact category dropdown is used on desktop and mobile; prices and cart selections remain unchanged. Popular badges come from the catalogue data, appear on cards and detail pages, and can be found with a "popular" search without changing the catalogue order.
 
 Administrative routes are under `/admin`; they require a Supabase session and an explicit admin role or email in `ADMIN_EMAILS`.
 

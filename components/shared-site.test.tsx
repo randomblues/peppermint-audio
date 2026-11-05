@@ -73,6 +73,12 @@ describe("Navbar", () => {
       render(<EquipmentCard item={item} />);
 
       expect(screen.getByText(item.description)).toBeInTheDocument();
+      if (item.popular) {
+        expect(screen.getByText("Popular")).toBeInTheDocument();
+        expect(screen.getByText("Popular").querySelector("svg")).toBeNull();
+      } else {
+        expect(screen.queryByText("Popular")).not.toBeInTheDocument();
+      }
       for (const detail of item.details) {
         expect(screen.getByText(`- ${detail}`)).toBeInTheDocument();
       }

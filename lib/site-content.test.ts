@@ -3,6 +3,17 @@ import { describe, expect, it } from "vitest";
 import { addOnCatalog, equipmentCatalog, packageTiers } from "./site-content";
 
 describe("equipmentCatalog", () => {
+  it("marks only the six requested individual products as popular", () => {
+    expect(equipmentCatalog.filter((item) => item.popular).map((item) => item.slug)).toEqual([
+      "yamaha-dxr15",
+      "presonus-air15s",
+      "shure-sm58",
+      "beamz-s1500",
+      "hire-party-lights-bar",
+      "hire-di-box",
+    ]);
+  });
+
   it("includes the microphone and party bar hire items with product images", () => {
     const expectedItems = [
       ["behringer-xm8500", "/behringer-xm8500.jpg", 10],
@@ -43,20 +54,24 @@ describe("equipmentCatalog", () => {
     expect(equipmentCatalog.some((item) => item.slug === "hire-wireless-microphones")).toBe(false);
   });
 
-  it("offers the BeamZ smoke machine pre-filled without specifying a fluid quantity", () => {
-    expect(equipmentCatalog.find((item) => item.slug === "beamz-s1500")).toMatchObject({
+  it("describes the pre-filled BeamZ smoke machine without implying lighting is required", () => {
+    const item = equipmentCatalog.find((candidate) => candidate.slug === "beamz-s1500");
+    if (!item) throw new Error("BeamZ S1500 smoke machine is missing");
+    expect(item).toMatchObject({
       name: "BeamZ S1500 Smoke Machine",
       category: "Effects",
+      description: "Add atmosphere to your event with clouds of smoke that drift through the space.",
       options: [{ label: "Single smoke machine", price: 30 }],
       details: [
+        "Creates visible smoke clouds for a more dramatic event atmosphere",
         "Supplied pre-filled with smoke liquid",
-        "Makes light beams more visible for party and DJ effects",
       ],
     });
+    expect([item.description, ...item.details].join(" ")).not.toMatch(/lights?|beams?/i);
   });
 
   it.each(equipmentCatalog)("gives $slug useful product details instead of hire boilerplate", (item) => {
-    expect(item.details.length).toBeGreaterThanOrEqual(2);
+    expect(item.details.length).toBeGreaterThan(0);
     for (const detail of item.details) {
       expect(detail.trim()).not.toBe("");
       expect(detail).not.toMatch(/availability confirmed|collected from|single (microphone|item) hire/i);

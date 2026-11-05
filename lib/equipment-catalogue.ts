@@ -75,6 +75,7 @@ export function filterEquipment(items: EquipmentItem[], filters: EquipmentFilter
     const searchable = normaliseSearch([
       item.name,
       item.category,
+      item.popular ? "popular" : "",
       item.description,
       ...item.details,
       ...item.options.map((option) => option.label),

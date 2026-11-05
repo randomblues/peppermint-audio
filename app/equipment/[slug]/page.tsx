@@ -68,7 +68,14 @@ export default async function EquipmentDetailPage({ params }: EquipmentDetailPag
         </div>
         <div className="space-y-6">
           <div>
-            <Badge variant="secondary">{item.category}</Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary">{item.category}</Badge>
+              {item.popular ? (
+                <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+                  Popular
+                </Badge>
+              ) : null}
+            </div>
             <p className="mt-4 text-lg text-muted-foreground">{item.description}</p>
           </div>
           <EquipmentDetail item={item} />

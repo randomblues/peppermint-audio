@@ -53,9 +53,14 @@ export function EquipmentCard({ item, priority = false }: EquipmentCardProps) {
         </Link>
       </div>
       <CardHeader>
-        <Badge variant="secondary" className="w-fit">
-          {item.category}
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="secondary">{item.category}</Badge>
+          {item.popular ? (
+            <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+              Popular
+            </Badge>
+          ) : null}
+        </div>
         <CardTitle>
           <Link href={`/equipment/${item.slug}`} className="hover:text-primary">
             {item.name}

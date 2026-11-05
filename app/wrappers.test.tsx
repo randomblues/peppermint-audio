@@ -5,7 +5,7 @@ import RootLayout, { metadata } from "./layout";
 import AdminLoginPage from "./admin/login/page";
 import AdminPage from "./admin/page";
 import { metadata as cartMetadata } from "./cart/page";
-import { generateMetadata as generateEquipmentMetadata } from "./equipment/[slug]/page";
+import EquipmentDetailPage, { generateMetadata as generateEquipmentMetadata } from "./equipment/[slug]/page";
 import { metadata as packagesMetadata } from "./packages/page";
 import robots from "./robots";
 import sitemap from "./sitemap";
@@ -48,6 +48,17 @@ vi.mock("@/components/admin-console", () => ({
 }));
 
 describe("app wrappers and metadata", () => {
+  it.each(equipmentCatalog)("shows the correct popularity and copy on the detail page for $slug", async (item) => {
+    render(await EquipmentDetailPage({ params: Promise.resolve({ slug: item.slug }) }));
+    expect(screen.getByText(item.description)).toBeInTheDocument();
+    if (item.popular) {
+      expect(screen.getByText("Popular")).toBeInTheDocument();
+      expect(screen.getByText("Popular").querySelector("svg")).toBeNull();
+    } else {
+      expect(screen.queryByText("Popular")).not.toBeInTheDocument();
+    }
+  });
+
   it("exposes the root metadata contract", () => {
     expect(metadata.metadataBase?.toString()).toBe(`${business.website}/`);
     expect(metadata.title).toEqual({
