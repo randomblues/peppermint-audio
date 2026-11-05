@@ -14,7 +14,7 @@ import { Section } from "./section";
 import { WhatsAppButton } from "./whatsapp-button";
 import * as googleAds from "@/lib/google-ads";
 import { lineItemsFromCart } from "@/lib/booking-line-items";
-import { business, packageTiers } from "@/lib/site-content";
+import { business, equipmentCatalog, packageTiers } from "@/lib/site-content";
 
 const { usePathname } = vi.hoisted(() => ({
   usePathname: vi.fn(),
@@ -69,6 +69,50 @@ describe("Navbar", () => {
   });
 
   describe("EquipmentCard", () => {
+    it.each(equipmentCatalog)("shows product-specific catalogue details for $slug", (item) => {
+      render(<EquipmentCard item={item} />);
+
+      expect(screen.getByText(item.description)).toBeInTheDocument();
+      for (const detail of item.details) {
+        expect(screen.getByText(`- ${detail}`)).toBeInTheDocument();
+      }
+      expect(screen.getByRole("button", { name: "Add to cart" }).closest('[data-slot="card-footer"]')).toHaveClass("mt-auto");
+      expect(screen.queryByText(/Availability confirmed before hire|Collected from Abbotsford 3067/)).not.toBeInTheDocument();
+    });
+
+    it("adds the pre-filled BeamZ smoke machine to the cart at its catalogue rate", () => {
+      localStorage.clear();
+      const item = equipmentCatalog.find((candidate) => candidate.slug === "beamz-s1500");
+      if (!item) throw new Error("BeamZ S1500 smoke machine is missing");
+
+      render(
+        <CartProvider>
+          <EquipmentCard item={item} />
+        </CartProvider>,
+      );
+
+      expect(screen.getByText("- Supplied pre-filled with smoke liquid")).toBeInTheDocument();
+      expect(screen.getByRole("img", { name: item.name })).toHaveAttribute(
+        "src",
+        expect.stringContaining("beamz-s1500-smoke-machine.webp"),
+      );
+      expect(screen.getByRole("button", { name: "View details" })).toHaveAttribute(
+        "href",
+        "/equipment/beamz-s1500",
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Add to cart" }));
+
+      expect(lineItemsFromCart(localStorage.getItem("peppermint-audio-cart") ?? "[]")).toEqual([
+        expect.objectContaining({
+          kind: "equipment",
+          name: item.name,
+          quantity: 1,
+          unitPriceCents: 3000,
+        }),
+      ]);
+      localStorage.clear();
+    });
+
     it("defaults to the pair option and carries a changed selection into the enquiry", () => {
       const item = {
         slug: "test-speaker",

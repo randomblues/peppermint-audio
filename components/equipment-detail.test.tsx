@@ -3,8 +3,18 @@ import { describe, expect, it } from "vitest";
 
 import { EquipmentDetail } from "./equipment-detail";
 import { CartProvider } from "./cart-provider";
+import { equipmentCatalog } from "@/lib/site-content";
 
 describe("EquipmentDetail", () => {
+  it.each(equipmentCatalog)("shows the catalogue features for $slug", (item) => {
+    render(<EquipmentDetail item={item} />);
+
+    for (const detail of item.details) {
+      expect(screen.getByText(`- ${detail}`)).toBeInTheDocument();
+    }
+    expect(screen.queryByText(/Availability confirmed before hire|Collected from Abbotsford 3067/)).not.toBeInTheDocument();
+  });
+
   it("keeps the pair selected by default and carries a single selection into booking enquiry", () => {
     render(
       <CartProvider>

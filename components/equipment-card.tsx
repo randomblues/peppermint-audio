@@ -93,7 +93,7 @@ export function EquipmentCard({ item, priority = false }: EquipmentCardProps) {
           ))}
         </ul>
       </CardContent>
-      <CardFooter className="gap-2">
+      <CardFooter className="mt-auto gap-2">
         <Button
           className="min-w-0 flex-1 rounded-xl border border-primary/40 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_88%,white),color-mix(in_oklab,var(--primary)_78%,white)_42%,color-mix(in_oklab,var(--primary)_70%,black))] text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_10px_24px_rgb(0_0_0/0.28),0_0_28px_color-mix(in_oklab,var(--primary)_22%,transparent)] transition-all hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.24),0_14px_26px_rgb(0_0_0/0.3),0_0_34px_color-mix(in_oklab,var(--primary)_30%,transparent)]"
           onClick={() =>

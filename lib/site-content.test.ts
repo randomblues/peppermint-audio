@@ -1,17 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { equipmentCatalog, packageTiers } from "./site-content";
+import { addOnCatalog, equipmentCatalog, packageTiers } from "./site-content";
 
 describe("equipmentCatalog", () => {
   it("includes the microphone and party bar hire items with product images", () => {
     const expectedItems = [
       ["behringer-xm8500", "/behringer-xm8500.jpg", 10],
       ["behringer-b1200d-pro", "/behringer-b1200d-pro.jpg", 50],
-      ["presonus-air15s", "/presonus-air15s-front.webp", 65],
+      ["presonus-air15s", "/presonus-air15s-front-cropped.webp", 65],
       ["shure-sm58", "/shure-sm58.jpg", 15],
       ["shure-sm57", "/shure-sm57.webp", 15],
       ["shure-sm7b", "/shure-sm7b.jpg", 35],
       ["k60-wireless", "/k60-wireless-microphone.webp", 25],
+      ["beamz-s1500", "/beamz-s1500-smoke-machine.webp", 30],
       ["hire-party-lights-bar", "/cr-lite-magikbar.avif", 30],
       ["hire-behringer-x32", "/behringer-x32.jpg", 110],
       ["hire-spirit-e12-mixer", "/soundcraft-spirit-e12.jpg", 30],
@@ -36,10 +37,41 @@ describe("equipmentCatalog", () => {
       details: [
         "15-inch active subwoofer",
         "1200W peak Class D power",
-        "Availability confirmed before hire",
+        "Variable low-pass filter for matching PA speakers",
       ],
     });
     expect(equipmentCatalog.some((item) => item.slug === "hire-wireless-microphones")).toBe(false);
+  });
+
+  it("offers the BeamZ smoke machine pre-filled without specifying a fluid quantity", () => {
+    expect(equipmentCatalog.find((item) => item.slug === "beamz-s1500")).toMatchObject({
+      name: "BeamZ S1500 Smoke Machine",
+      category: "Effects",
+      options: [{ label: "Single smoke machine", price: 30 }],
+      details: [
+        "Supplied pre-filled with smoke liquid",
+        "Makes light beams more visible for party and DJ effects",
+      ],
+    });
+  });
+
+  it.each(equipmentCatalog)("gives $slug useful product details instead of hire boilerplate", (item) => {
+    expect(item.details.length).toBeGreaterThanOrEqual(2);
+    for (const detail of item.details) {
+      expect(detail.trim()).not.toBe("");
+      expect(detail).not.toMatch(/availability confirmed|collected from|single (microphone|item) hire/i);
+    }
+    expect(item.description).not.toMatch(/add this item on its own when you only need/i);
+  });
+
+  it("uses the same product copy for add-ons listed as individual equipment", () => {
+    for (const [slug, addOn] of Object.entries(addOnCatalog)) {
+      if (slug === "wireless-microphones") continue;
+      expect(equipmentCatalog.find((item) => item.slug === `hire-${slug}`)).toMatchObject({
+        description: addOn.description,
+        details: addOn.details,
+      });
+    }
   });
 
   it("keeps the speech packages distinct and uses the combined product image", () => {

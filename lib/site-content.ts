@@ -21,6 +21,8 @@ export type PackageTier = {
 type AddOn = {
   name: string;
   price: number;
+  description: string;
+  details: string[];
   category?: "DI boxes" | "Lighting" | "Microphones" | "Mixers" | "Accessories";
   image?: string;
   imageSize?: "compact";
@@ -89,29 +91,58 @@ export const addOnCatalog: Record<string, AddOn> = {
   "party-lights-bar": {
     name: "CR Lite MagikBar Hub Party Bar",
     price: 30,
+    description: "Multi-effect lighting bar for dance floors, DJs, and parties.",
+    details: [
+      "Multiple party lighting effects on one bar",
+      "Colour washes and patterned effects for dance floors",
+    ],
     category: "Lighting",
     image: "/cr-lite-magikbar.avif",
   },
   "wireless-microphones": {
     name: "Wireless Microphone Upgrade",
     price: 20,
+    description: "Wireless microphone upgrade for speeches, toasts, and moving around the venue.",
+    details: [
+      "Wireless handheld microphone",
+      "Receiver connects to your mixer or PA speaker",
+      "Cable-free movement for speeches and performances",
+    ],
     category: "Microphones",
   },
   "di-box": {
     name: "Pro DI Box",
     price: 15,
+    description: "Passive direct box for connecting instruments to a mixer with a balanced, isolated signal.",
+    details: [
+      "Passive DI; no external power required",
+      "Transformer-isolated balanced XLR output",
+      "15dB pad and ground-lift controls",
+    ],
     category: "DI boxes",
     image: "/pro-di-box.webp",
   },
   "generic-di-box": {
     name: "Generic DI Box",
     price: 10,
+    description: "Direct box for connecting an instrument signal to the balanced microphone input of a mixer.",
+    details: [
+      "Instrument input with a link-through connection",
+      "Balanced XLR output to your mixer",
+      "Ground-lift switch to help reduce ground-loop hum",
+    ],
     category: "DI boxes",
     image: "/generic-di-box.jpg",
   },
   "four-channel-di-box": {
     name: "4-Channel DI Box",
     price: 20,
+    description: "Four-channel direct box for connecting keyboards, instruments, and other audio sources to a mixer.",
+    details: [
+      "Four independent DI channels",
+      "Balanced XLR outputs for each channel",
+      "Individual ground-lift and 20dB pad switches",
+    ],
     category: "DI boxes",
     image: "/dbx-di4.jpg",
     imageSize: "compact",
@@ -119,24 +150,47 @@ export const addOnCatalog: Record<string, AddOn> = {
   "spirit-e12-mixer": {
     name: "Spirit E12 / 12-Channel Soundcraft Mixer Upgrade",
     price: 30,
+    description: "Analogue mixer for bands, speeches, and events with several microphones or instruments.",
+    details: [
+      "12 mono mic/line inputs plus two stereo inputs",
+      "3-band EQ with swept midrange",
+      "Two aux sends for monitors or external effects",
+    ],
     category: "Mixers",
     image: "/soundcraft-spirit-e12.jpg",
   },
   "behringer-x32": {
     name: "Behringer X32 Digital Mixer Upgrade",
     price: 110,
+    description: "Digital mixing console for live bands, larger events, and multi-microphone setups.",
+    details: [
+      "32 microphone preamps and 16 mix buses",
+      "Motorised faders with scene recall",
+      "Built-in effects and channel processing",
+    ],
     category: "Mixers",
     image: "/behringer-x32.jpg",
   },
   "party-light-par-can": {
     name: "Party Light PAR Can",
     price: 10,
+    description: "LED PAR light for adding a colour wash to walls, backdrops, and small stages.",
+    details: [
+      "LED PAR fixture for wash lighting",
+      "Lights walls, backdrops, and performance areas",
+      "Adjustable bracket for aiming the light",
+    ],
     category: "Lighting",
     image: "/par-can-generic.jpg",
   },
   "extension-reel-10m": {
     name: "10m Extension Reel",
     price: 10,
+    description: "Extension lead on a reel for reaching mains power further from your event setup.",
+    details: [
+      "10m cable length",
+      "Reel design for neat cable storage and transport",
+    ],
     category: "Accessories",
     image: "/10m-extension-reel.jpeg",
   },
@@ -185,7 +239,7 @@ export const equipmentCatalog: EquipmentItem[] = [
     details: [
       "500W active subwoofer",
       "12-inch low-frequency driver",
-      "Availability confirmed before hire",
+      "Built-in amplifier; no separate power amp needed",
     ],
   },
   {
@@ -193,12 +247,12 @@ export const equipmentCatalog: EquipmentItem[] = [
     name: "PreSonus AIR15s Active Subwoofer",
     category: "Subwoofers",
     description: "Active 15-inch subwoofer for adding deep low-end to PA setups, parties, and live music.",
-    image: "/presonus-air15s-front.webp",
+    image: "/presonus-air15s-front-cropped.webp",
     options: [{ label: "Single subwoofer", price: 65 }],
     details: [
       "15-inch active subwoofer",
       "1200W peak Class D power",
-      "Availability confirmed before hire",
+      "Variable low-pass filter for matching PA speakers",
     ],
   },
   {
@@ -208,7 +262,11 @@ export const equipmentCatalog: EquipmentItem[] = [
     description: "Reliable wired dynamic microphone for speeches, vocals, announcements, and live events.",
     image: "/behringer-xm8500.jpg",
     options: [{ label: "Single microphone", price: 10 }],
-    details: ["Single microphone hire", "Availability confirmed before hire"],
+    details: [
+      "Cardioid dynamic vocal microphone",
+      "Built-in wind and pop filtering",
+      "Wired XLR connection",
+    ],
   },
   {
     slug: "shure-sm58",
@@ -217,7 +275,11 @@ export const equipmentCatalog: EquipmentItem[] = [
     description: "Industry-standard vocal microphone for speeches, singing, announcements, and live performance.",
     image: "/shure-sm58.jpg",
     options: [{ label: "Single microphone", price: 15 }],
-    details: ["Single microphone hire", "Availability confirmed before hire"],
+    details: [
+      "Cardioid dynamic microphone for vocals and speech",
+      "Built-in pop filter and spherical grille",
+      "Wired XLR connection to a mixer or PA speaker",
+    ],
   },
   {
     slug: "shure-sm57",
@@ -226,7 +288,11 @@ export const equipmentCatalog: EquipmentItem[] = [
     description: "Versatile dynamic microphone for instruments, amps, percussion, and stage use.",
     image: "/shure-sm57.webp",
     options: [{ label: "Single microphone", price: 15 }],
-    details: ["Single microphone hire", "Availability confirmed before hire"],
+    details: [
+      "Cardioid dynamic instrument microphone",
+      "Suited to drums, guitar amps, and brass",
+      "Wired XLR connection",
+    ],
   },
   {
     slug: "shure-sm7b",
@@ -235,7 +301,11 @@ export const equipmentCatalog: EquipmentItem[] = [
     description: "Broadcast-style dynamic microphone for vocals, podcasting, voiceover, and studio applications.",
     image: "/shure-sm7b.jpg",
     options: [{ label: "Single microphone", price: 35 }],
-    details: ["Single microphone hire", "Availability confirmed before hire"],
+    details: [
+      "Dynamic microphone for vocals, podcasting, and voiceover",
+      "Bass roll-off and presence boost controls",
+      "XLR connection; microphone preamp or audio interface required",
+    ],
   },
   {
     slug: "k60-wireless",
@@ -244,7 +314,23 @@ export const equipmentCatalog: EquipmentItem[] = [
     description: "Wireless handheld microphone system for speeches, presentations, karaoke, and events.",
     image: "/k60-wireless-microphone.webp",
     options: [{ label: "Single microphone", price: 25 }],
-    details: ["Wireless receiver included", "Availability confirmed before hire"],
+    details: [
+      "Wireless handheld microphone",
+      "Wireless receiver included",
+      "Receiver connects to your mixer or PA speaker",
+    ],
+  },
+  {
+    slug: "beamz-s1500",
+    name: "BeamZ S1500 Smoke Machine",
+    category: "Effects",
+    description: "Smoke machine for adding atmosphere to parties, DJ sets, and lighting effects.",
+    image: "/beamz-s1500-smoke-machine.webp",
+    options: [{ label: "Single smoke machine", price: 30 }],
+    details: [
+      "Supplied pre-filled with smoke liquid",
+      "Makes light beams more visible for party and DJ effects",
+    ],
   },
   ...Object.entries(addOnCatalog)
     .filter(([slug]) => slug !== "wireless-microphones")
@@ -252,11 +338,11 @@ export const equipmentCatalog: EquipmentItem[] = [
     slug: `hire-${slug}`,
     name: addOn.name.replace(" Upgrade", ""),
     category: addOn.category ?? "Accessories",
-    description: `Add this item on its own when you only need ${addOn.name.toLowerCase().replace(" upgrade", "")}.`,
+    description: addOn.description,
     image: addOn.image,
     imageSize: addOn.imageSize,
     options: [{ label: "Single item", price: addOn.price }],
-    details: ["Collected from Abbotsford 3067", "Availability confirmed before hire"],
+    details: addOn.details,
     })),
 ];
 
