@@ -367,8 +367,8 @@ export function PhotoIdCapture({
             </div>
           ) : null}
 
-          <header className="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-4 px-5 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-7">
-            <div className="min-w-0 flex-1">
+          <header className="absolute inset-x-0 top-0 z-10 px-5 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-7">
+            <div className="mx-auto flex w-full flex-col items-center text-center">
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/75">
                 <span className="grid size-7 place-items-center rounded-lg border border-white/15 bg-white/10">
                   <ScanLine className="size-4 text-primary" aria-hidden="true" />
@@ -376,8 +376,8 @@ export function PhotoIdCapture({
                 <span>Photo ID scan</span>
               </div>
               <p className="mt-3 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-white/55">{capturedCount === 0 ? "Side 1 of 2 · Front" : "Side 2 of 2 · Back"}</p>
-              <h2 id="photo-id-capture-title" className="mt-1 text-xl font-semibold tracking-tight text-white sm:text-2xl">{reviewFile ? "Review your photo" : "Line up your photo ID"}</h2>
-              <div className="mt-3 flex max-w-xs gap-1.5" aria-hidden="true">
+              <h2 id="photo-id-capture-title" className="mt-1 text-center text-2xl font-bold tracking-tight text-white sm:text-3xl">{reviewFile ? "Review your photo" : capturedCount === 0 ? "Front of your ID" : "Back of your ID"}</h2>
+              <div className="mt-3 flex w-full max-w-xs gap-1.5" aria-hidden="true">
                 <span className="h-1 flex-1 rounded-full bg-primary shadow-[0_0_10px_color-mix(in_oklab,var(--primary)_60%,transparent)]" />
                 <span className={`h-1 flex-1 rounded-full ${capturedCount > 0 ? "bg-primary shadow-[0_0_10px_color-mix(in_oklab,var(--primary)_60%,transparent)]" : "bg-white/20"}`} />
               </div>
@@ -389,7 +389,7 @@ export function PhotoIdCapture({
               size="icon"
               aria-label="Close camera"
               onClick={closeCamera}
-              className="size-10 rounded-full border-white/20 bg-black/40 text-white shadow-lg backdrop-blur-md hover:border-white/40 hover:bg-white/10"
+              className="absolute right-5 top-[max(1rem,env(safe-area-inset-top))] size-10 rounded-full border-white/20 bg-black/40 text-white shadow-lg backdrop-blur-md hover:border-white/40 hover:bg-white/10 sm:right-7"
             >
               <X aria-hidden="true" />
             </Button>

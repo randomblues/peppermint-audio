@@ -53,8 +53,9 @@ describe("PhotoIdCapture", () => {
     render(<PhotoIdCapture capturedCount={0} onCapture={onCapture} />);
     fireEvent.click(screen.getByRole("button", { name: "Scan photo ID" }));
 
-    const dialog = await screen.findByRole("dialog", { name: "Line up your photo ID" });
+    const dialog = await screen.findByRole("dialog", { name: "Front of your ID" });
     expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(within(dialog).getByRole("heading", { name: "Front of your ID" })).toHaveClass("text-center");
     expect(screen.getByText("Fit all four corners inside")).toBeInTheDocument();
     expect(getUserMedia).toHaveBeenCalledWith(expect.objectContaining({
       audio: false,
@@ -122,6 +123,24 @@ describe("PhotoIdCapture", () => {
     ));
 
     fireEvent.click(screen.getByRole("button", { name: "Close camera" }));
+    await waitFor(() => expect(stop).toHaveBeenCalled());
+  });
+
+  it("clearly labels the back of the ID in the centered camera prompt", async () => {
+    const stop = vi.fn();
+    const stream = { getTracks: () => [{ stop }] } as unknown as MediaStream;
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: { getUserMedia: vi.fn().mockResolvedValue(stream) },
+    });
+    vi.spyOn(HTMLVideoElement.prototype, "play").mockResolvedValue();
+
+    render(<PhotoIdCapture capturedCount={1} onCapture={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Scan back of ID" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Back of your ID" });
+    expect(within(dialog).getByRole("heading", { name: "Back of your ID" })).toHaveClass("text-center");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close camera" }));
     await waitFor(() => expect(stop).toHaveBeenCalled());
   });
 

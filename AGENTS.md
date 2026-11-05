@@ -398,6 +398,13 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Prevention:** Wait for a completion marker or child-process exit, or write captured arguments atomically before asserting.
 - **Next action:** Make the launcher test wait for complete capture contents rather than file existence alone.
 
+### 2026-11-06 — Integrated browser pointer probe did not register
+
+- **Symptom:** The integrated browser did not report a `pointermove` during the required input-coordinate preflight, including after the page was reopened; camera UI validation could not proceed.
+- **Root cause:** Not established; the browser tool did not deliver the expected pointer event.
+- **Prevention:** Keep the existing bounded recovery: wait for rendering, replace the tab once, and retry the preflight; do not compensate in application CSS or substitute independent Playwright for integrated-browser validation.
+- **Next action:** Stop after the bounded retry and report the required viewport checks as incomplete if the integrated browser still cannot provide pointer evidence.
+
 ### 2026-11-05 — Duplicate Communications component declaration
 
 - **Symptom:** The admin console failed to compile because `CommunicationsSection` was declared twice.

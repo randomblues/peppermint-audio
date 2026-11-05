@@ -10,6 +10,8 @@ Marketing website for a Melbourne PA equipment hire business, built with:
 - Supabase for booking storage, authentication, and private photo-ID files
 - Stripe for customer payment links and deposit authorisations
 
+For parallel agent work, see the [isolated worktree and browser workflow](./README/AGENT-WORKTREES.md).
+
 ## Public routes
 
 - `/` Home
