@@ -241,19 +241,17 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
             <ShoppingCart className="size-4" aria-hidden="true" />
             Add to cart
           </Button>
-          <Button
-            variant={compact ? "ghost" : "outline"}
-            className={
-              compact
-                ? "w-full rounded-xl border border-primary/15 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--background)_95%,var(--primary)_8%),color-mix(in_oklab,var(--background)_82%,black))] text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_6px_16px_rgb(0_0_0/0.2)] backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:text-foreground hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_8px_20px_rgb(0_0_0/0.24),0_0_14px_color-mix(in_oklab,var(--primary)_12%,transparent)]"
-                : "w-full rounded-xl border border-primary/15 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--background)_95%,var(--primary)_8%),color-mix(in_oklab,var(--background)_82%,black))] text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_6px_16px_rgb(0_0_0/0.2)] backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:text-foreground hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_8px_20px_rgb(0_0_0/0.24),0_0_14px_color-mix(in_oklab,var(--primary)_12%,transparent)]"
-            }
-            nativeButton={false}
-            render={<Link href={`/packages?package=${pkg.slug}`} />}
-          >
-            View package details
-            <ArrowUpRight className="size-3.5" aria-hidden="true" />
-          </Button>
+          {compact ? (
+            <Button
+              variant="ghost"
+              className="w-full rounded-xl border border-primary/15 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--background)_95%,var(--primary)_8%),color-mix(in_oklab,var(--background)_82%,black))] text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_6px_16px_rgb(0_0_0/0.2)] backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:text-foreground hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_8px_20px_rgb(0_0_0/0.24),0_0_14px_color-mix(in_oklab,var(--primary)_12%,transparent)]"
+              nativeButton={false}
+              render={<Link href={`/packages?package=${pkg.slug}#package-details-${pkg.slug}`} />}
+            >
+              View package details
+              <ArrowUpRight className="size-3.5" aria-hidden="true" />
+            </Button>
+          ) : null}
         </CardFooter>
       </Card>
       <DialogPrimitive.Root open={showCheckoutPrompt} onOpenChange={setShowCheckoutPrompt}>

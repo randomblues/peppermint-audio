@@ -203,10 +203,7 @@ describe("PackageCard", () => {
     expect(screen.getByText(`$${pkg.price}`)).toBeInTheDocument();
     expect(screen.getByText(`Ideal for ${pkg.capacity}`)).toBeInTheDocument();
     expect(screen.getByText(`- ${pkg.inclusions[0]}`)).toBeInTheDocument();
-    expect(screen.getByText("View package details").closest("a")).toHaveAttribute(
-      "href",
-      `/packages?package=${pkg.slug}`,
-    );
+    expect(screen.queryByRole("button", { name: "View package details" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add to cart" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: pkg.name })).toHaveAttribute(
       "src",
@@ -293,6 +290,10 @@ describe("PackageCard", () => {
       "w-full",
       "rounded-xl",
       "text-muted-foreground",
+    );
+    expect(screen.getByText("View package details").closest("a")).toHaveAttribute(
+      "href",
+      `/packages?package=${pkg.slug}#package-details-${pkg.slug}`,
     );
   });
 
@@ -425,7 +426,7 @@ describe("PackageCard", () => {
     expect(screen.getByRole("img", { name: pkg.name })).toHaveClass("p-2");
     expect(screen.getByText("View package details").closest("a")).toHaveAttribute(
       "href",
-      `/packages?package=${pkg.slug}`,
+      `/packages?package=${pkg.slug}#package-details-${pkg.slug}`,
     );
   });
 });

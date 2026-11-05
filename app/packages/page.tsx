@@ -58,7 +58,12 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
           ))}
         </TabsList>
         {packageTiers.map((pkg) => (
-          <TabsContent key={pkg.slug} value={pkg.slug} className="mx-auto mt-6 w-full max-w-3xl">
+          <TabsContent
+            key={pkg.slug}
+            id={`package-details-${pkg.slug}`}
+            value={pkg.slug}
+            className="mx-auto mt-6 w-full max-w-3xl scroll-mt-24"
+          >
             <PackageCard pkg={pkg} priority={pkg.slug === selectedPackage} />
           </TabsContent>
         ))}

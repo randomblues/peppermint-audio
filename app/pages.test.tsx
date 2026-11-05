@@ -106,6 +106,10 @@ describe("static site pages", () => {
       "aria-selected",
       "true",
     );
+    expect(screen.getByRole("tabpanel", { name: /Big Celebration Package/ })).toHaveAttribute(
+      "id",
+      "package-details-big-celebration",
+    );
     expect(screen.getAllByText("Big Celebration Package").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("Ask about a custom package").closest("a")).toHaveAttribute(
       "href",
