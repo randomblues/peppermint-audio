@@ -21,7 +21,6 @@ describe("admin inventory route", () => {
 
     const products = { data: [{ id: "p1", name: "Speaker", category: "Speakers", quantity_on_hand: 4 }], error: null };
     const mappings = { data: [], error: null };
-    const trackedListings = { data: [], error: null };
     const purchases = { data: [], error: null };
     const movements = { data: [], error: null };
     const query = (response: unknown) => ({
@@ -32,7 +31,6 @@ describe("admin inventory route", () => {
     const from = vi.fn()
       .mockReturnValueOnce(query(products))
       .mockReturnValueOnce(query(mappings))
-      .mockReturnValueOnce(query(trackedListings))
       .mockReturnValueOnce(query(purchases))
       .mockReturnValueOnce(query(movements));
     mocks.requireAdmin.mockResolvedValueOnce({ admin: { from } });
@@ -42,10 +40,27 @@ describe("admin inventory route", () => {
     expect(await response.json()).toMatchObject({
       products: products.data,
       mappings: mappings.data,
-      trackedListings: [],
       purchases: purchases.data,
       movements: movements.data,
     });
+  });
+
+  it("does not accept requests to toggle automatic stock checks", async () => {
+    const rpc = vi.fn();
+    mocks.requireAdminJson.mockResolvedValue({
+      session: { admin: { rpc } },
+      body: {
+        action: "set_listing_tracked",
+        catalogKey: "equipment:bose-s1-pro:Single speaker",
+        tracked: false,
+      },
+    });
+
+    const response = await POST(new Request("http://localhost/api/admin/inventory", { method: "POST" }));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "A valid inventory action is required." });
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("creates products through the service-side database function", async () => {

@@ -18,7 +18,6 @@ const purchase = {
 const inventory = {
   products: [product],
   mappings: [{ product_id: product.id, catalog_key: "equipment:bose-s1-pro:Single speaker", units_per_line_item: 1 }],
-  trackedListings: [],
   purchases: [purchase],
   movements: [{ id: "adjustment-1", product_id: product.id, movement_type: "adjustment", quantity_change: -1, reason: "Damaged", created_at: "2026-03-11T00:00:00Z" }],
 };
@@ -42,16 +41,18 @@ afterEach(() => {
 });
 
 describe("AdminInventory", () => {
-  it("saves listing mappings and enables booking checks from the product details", async () => {
+  it("saves listing mappings without exposing stock check controls", async () => {
     const fetchMock = installFetch();
     render(<AdminInventory />);
 
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Filter inventory products by category")).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: /Check stock/ })).not.toBeInTheDocument();
     await openBoseProduct();
+    expect(screen.queryByRole("heading", { name: "Booking availability" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: /Check stock/ })).not.toBeInTheDocument();
     expect(screen.getByText("On hand:")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Inventory units for listing 1"), { target: { value: "2" } });
-    expect(screen.getByRole("button", { name: "Enable checks for Bose S1 Pro · Single" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Save listings" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/inventory", expect.objectContaining({
@@ -63,16 +64,16 @@ describe("AdminInventory", () => {
       }),
     })));
     expect(await screen.findByRole("status")).toHaveTextContent("Listings saved for Bose speaker.");
+  });
 
-    fireEvent.click(screen.getByRole("button", { name: "Enable checks for Bose S1 Pro · Single" }));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/admin/inventory", expect.objectContaining({
-      method: "POST",
-      body: JSON.stringify({
-        action: "set_listing_tracked",
-        catalogKey: "equipment:bose-s1-pro:Single speaker",
-        tracked: true,
-      }),
-    })));
+  it("keeps product details free of availability controls", async () => {
+    installFetch();
+    render(<AdminInventory />);
+
+    expect(screen.queryByRole("heading", { name: "Booking availability" })).not.toBeInTheDocument();
+    await openBoseProduct();
+    expect(screen.queryByRole("heading", { name: "Booking availability" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: /Check stock/ })).not.toBeInTheDocument();
   });
 
   it("records purchase amounts and GST as entered from the receipt", async () => {

@@ -196,9 +196,7 @@ export function AdminInventory() {
   const [products, setProducts] = useState<Product[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [movements, setMovements] = useState<Movement[]>([]);
-  const [trackedListings, setTrackedListings] = useState<string[]>([]);
   const [mappingDrafts, setMappingDrafts] = useState<Record<string, Mapping[]>>({});
-  const [savedMappings, setSavedMappings] = useState<Record<string, Mapping[]>>({});
   const [purchaseDrafts, setPurchaseDrafts] = useState<Record<string, PurchaseDraft>>({});
   const [productSearch, setProductSearch] = useState("");
   const [productCategoryFilter, setProductCategoryFilter] = useState("All categories");
@@ -218,25 +216,22 @@ export function AdminInventory() {
       const data = await response.json() as {
         products?: Product[];
         mappings?: Array<{ product_id: string; catalog_key: string; units_per_line_item: number }>;
-        trackedListings?: string[];
         purchases?: Purchase[];
         movements?: Movement[];
         error?: string;
       };
       if (!response.ok) throw new Error(data.error ?? "Inventory could not be loaded.");
-      const savedMappings = data.mappings ?? [];
+      const mappings = data.mappings ?? [];
       const nextProducts = data.products ?? [];
       setProducts(nextProducts);
       setPurchases(data.purchases ?? []);
       setMovements(data.movements ?? []);
-      setTrackedListings(data.trackedListings ?? []);
       const nextMappings = Object.fromEntries(nextProducts.map((product) => [
         product.id,
-        savedMappings.filter((mapping) => mapping.product_id === product.id)
+        mappings.filter((mapping) => mapping.product_id === product.id)
           .map(({ catalog_key, units_per_line_item }) => ({ catalogKey: catalog_key, unitsPerLineItem: units_per_line_item })),
       ]));
       setMappingDrafts(nextMappings);
-      setSavedMappings(nextMappings);
       setPurchaseDrafts((current) => Object.fromEntries(nextProducts.map((product) => [
         product.id,
         current[product.id] ?? { date: todayLocal(), quantity: "1", totalCost: "", gstPaid: "", supplier: "", reference: "" },
@@ -448,7 +443,6 @@ export function AdminInventory() {
                       : null}
                     {group.products.map((product) => {
                       const drafts = mappingDrafts[product.id] ?? [];
-                      const savedProductMappings = savedMappings[product.id] ?? [];
                       const productPurchases = purchases.filter((purchase) => purchase.product_id === product.id);
                       const productAdjustments = movements.filter((movement) => movement.product_id === product.id && movement.movement_type !== "purchase");
                       const purchase = purchaseDrafts[product.id] ?? { date: todayLocal(), quantity: "1", totalCost: "", gstPaid: "", supplier: "", reference: "" };
@@ -477,47 +471,6 @@ export function AdminInventory() {
                     <Button disabled={saving} onClick={() => void save(async () => {
                       await postInventory({ action: "replace_mappings", productId: product.id, mappings: drafts });
                     }, `Listings saved for ${product.name}.`)}>Save listings</Button>
-
-                    <div className="space-y-3 border-t pt-4">
-                      <div>
-                        <h4 className="font-medium">Booking availability checks</h4>
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">Enable checks for a saved listing to prevent more units being hired than you own. Booking requests are checked before payment or confirmation.</p>
-                      </div>
-                      {drafts.length ? <div className="space-y-2">
-                        {drafts.map((mapping) => {
-                          const listing = inventoryCatalogOptions.find((option) => option.catalogKey === mapping.catalogKey);
-                          const tracked = trackedListings.includes(mapping.catalogKey);
-                          const saved = savedProductMappings.some((item) =>
-                            item.catalogKey === mapping.catalogKey && item.unitsPerLineItem === mapping.unitsPerLineItem);
-                          const label = listing?.label ?? mapping.catalogKey;
-                          return (
-                            <div key={mapping.catalogKey} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium">{label}</p>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  {tracked ? "Automatic stock checks are on" : saved ? "Automatic stock checks are off" : "Save this listing before enabling checks"}
-                                </p>
-                              </div>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant={tracked ? "outline" : "default"}
-                                disabled={saving || loading || !saved}
-                                onClick={() => void save(async () => {
-                                  await postInventory({
-                                    action: "set_listing_tracked",
-                                    catalogKey: mapping.catalogKey,
-                                    tracked: !tracked,
-                                  });
-                                }, tracked ? `Booking checks turned off for ${label}.` : `Booking checks turned on for ${label}.`)}
-                              >
-                                {tracked ? `Turn off checks for ${label}` : `Enable checks for ${label}`}
-                              </Button>
-                            </div>
-                          );
-                        })}
-                      </div> : <p className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">Add and save a hire listing above before enabling its booking checks.</p>}
-                    </div>
 
                     <div className="grid gap-4 border-t pt-4 lg:grid-cols-2">
                       <form className="min-w-0 space-y-3" onSubmit={(event) => {

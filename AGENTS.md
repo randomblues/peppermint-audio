@@ -405,6 +405,20 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Prevention:** Search for duplicate component declarations after moving or consolidating components.
 - **Next action:** Keep one canonical definition and run the focused test and build checks after integration.
 
+### 2026-11-06 — Integrated browser pointer probe blocks itself
+
+- **Symptom:** A browser pointer probe stayed pending and prevented the intended mouse move from running.
+- **Root cause:** The probe awaited a pointer event inside the same script that was supposed to perform the later mouse action.
+- **Prevention:** Install the event listener in one browser call, move the pointer in a separate call, then read and remove the listener in a final call.
+- **Next action:** Keep pointer diagnostics split into bounded calls and stop after the single allowed tab replacement if input still fails.
+
+### 2026-11-06 — Supabase CLI project not linked
+
+- **Symptom:** Supabase authentication and project listing succeeded, but remote database queries reported no linked project.
+- **Root cause:** CLI authentication is account-wide, while project linkage is local to the repository work directory.
+- **Prevention:** Run `supabase link --project-ref <ref>` from the repository root and verify the project reports `linked: true` before remote queries.
+- **Next action:** Verify the remote target with a read-only query before applying an explicitly approved SQL change.
+
 # Agent working rules
 
 These rules are mandatory. Safety, preservation of existing work, bounded execution, and truthful verification take priority over speed.

@@ -51,10 +51,6 @@ create table if not exists public.inventory_product_mappings (
   units_per_line_item integer not null check (units_per_line_item > 0),
   primary key (product_id, catalog_key)
 );
-create table if not exists public.inventory_tracked_listings (
-  catalog_key text primary key,
-  created_at timestamptz not null default now()
-);
 create table if not exists public.inventory_purchases (
   id uuid primary key default gen_random_uuid(),
   product_id uuid not null references public.inventory_products(id) on delete restrict,
@@ -100,10 +96,6 @@ alter table public.inventory_product_mappings enable row level security;
 revoke all on public.inventory_product_mappings from anon, authenticated;
 drop policy if exists "service role manages inventory mappings" on public.inventory_product_mappings;
 create policy "service role manages inventory mappings" on public.inventory_product_mappings for all to service_role using (true) with check (true);
-alter table public.inventory_tracked_listings enable row level security;
-revoke all on public.inventory_tracked_listings from anon, authenticated;
-drop policy if exists "service role manages tracked inventory listings" on public.inventory_tracked_listings;
-create policy "service role manages tracked inventory listings" on public.inventory_tracked_listings for all to service_role using (true) with check (true);
 alter table public.inventory_purchases enable row level security;
 revoke all on public.inventory_purchases from anon, authenticated;
 drop policy if exists "service role manages inventory purchases" on public.inventory_purchases;
@@ -192,22 +184,8 @@ begin
 end;
 $$;
 
-create or replace function public.set_inventory_listing_tracked(p_catalog_key text, p_tracked boolean)
-returns void language plpgsql security definer set search_path = public as $$
-begin
-  perform pg_advisory_xact_lock(7164, 1);
-  if p_tracked then
-    if not exists (select 1 from public.inventory_product_mappings where catalog_key = p_catalog_key) then
-      raise exception 'Add at least one inventory product mapping before marking this listing complete.';
-    end if;
-    insert into public.inventory_tracked_listings (catalog_key)
-    values (p_catalog_key)
-    on conflict (catalog_key) do nothing;
-  else
-    delete from public.inventory_tracked_listings where catalog_key = p_catalog_key;
-  end if;
-end;
-$$;
+drop function if exists public.set_inventory_listing_tracked(text, boolean);
+drop table if exists public.inventory_tracked_listings;
 
 create or replace function public.record_inventory_purchase(
   p_product_id uuid,
@@ -274,7 +252,7 @@ declare
   v_reserved_items jsonb;
   v_line jsonb;
   v_catalog_key text;
-  v_untracked text[] := '{}';
+  v_unmapped text[] := '{}';
   v_product record;
   v_required integer;
   v_reserved integer;
@@ -311,17 +289,16 @@ begin
     v_catalog_key := v_line->>'catalogKey';
     if v_catalog_key is null or not exists (
       select 1
-      from public.inventory_tracked_listings tracked
-      join public.inventory_product_mappings mapping on mapping.catalog_key = tracked.catalog_key
-      where tracked.catalog_key = v_catalog_key
+      from public.inventory_product_mappings mapping
+      where mapping.catalog_key = v_catalog_key
     ) then
-      v_untracked := array_append(v_untracked, coalesce(v_line->>'name', v_catalog_key, 'Unidentified equipment'));
+      v_unmapped := array_append(v_unmapped, coalesce(v_line->>'name', v_catalog_key, 'Unidentified equipment'));
     end if;
   end loop;
-  if cardinality(v_untracked) > 0 then
+  if cardinality(v_unmapped) > 0 then
     return jsonb_build_object(
       'ok', false,
-      'error', 'Inventory tracking is not configured for: ' || array_to_string(array(select distinct item from unnest(v_untracked) item), ', ') || '. Add the product to inventory and map this listing before requesting payment or confirming the booking.'
+      'error', 'Inventory mapping is missing for: ' || array_to_string(array(select distinct item from unnest(v_unmapped) item), ', ') || '. Add the inventory product and map this listing before requesting payment or confirming the booking.'
     );
   end if;
 
@@ -426,8 +403,6 @@ revoke all on function public.create_inventory_product(text, text, integer, json
 grant execute on function public.create_inventory_product(text, text, integer, jsonb) to service_role;
 revoke all on function public.replace_inventory_product_mappings(uuid, jsonb) from public, anon, authenticated;
 grant execute on function public.replace_inventory_product_mappings(uuid, jsonb) to service_role;
-revoke all on function public.set_inventory_listing_tracked(text, boolean) from public, anon, authenticated;
-grant execute on function public.set_inventory_listing_tracked(text, boolean) to service_role;
 revoke all on function public.record_inventory_purchase(uuid, date, integer, integer, integer, text, text) from public, anon, authenticated;
 grant execute on function public.record_inventory_purchase(uuid, date, integer, integer, integer, text, text) to service_role;
 revoke all on function public.adjust_inventory_stock(uuid, integer, text) from public, anon, authenticated;
@@ -527,9 +502,6 @@ begin
     join public.inventory_products product on product.name = mapping.product_name
     on conflict (product_id, catalog_key) do nothing;
 
-    insert into public.inventory_tracked_listings (catalog_key)
-    select distinct catalog_key from public.inventory_product_mappings
-    on conflict (catalog_key) do nothing;
   end if;
 end;
 $$;

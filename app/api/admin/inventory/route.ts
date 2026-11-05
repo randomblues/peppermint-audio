@@ -4,7 +4,6 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { requireAdminJson } from "@/lib/admin-request";
 import {
   inventoryAdjustmentSchema,
-  inventoryCatalogKeySchema,
   inventoryMappingsSchema,
   inventoryProductSchema,
   inventoryPurchaseSchema,
@@ -14,10 +13,9 @@ export async function GET() {
   const session = await requireAdmin();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const [products, mappings, trackedListings, purchases, movements] = await Promise.all([
+  const [products, mappings, purchases, movements] = await Promise.all([
     session.admin.from("inventory_products").select("id,name,category,quantity_on_hand,created_at,updated_at").order("category").order("name"),
     session.admin.from("inventory_product_mappings").select("product_id,catalog_key,units_per_line_item").order("catalog_key"),
-    session.admin.from("inventory_tracked_listings").select("catalog_key").order("catalog_key"),
     session.admin.from("inventory_purchases")
       .select("id,product_id,product_name,purchase_date,quantity,total_cost_cents,gst_paid_cents,supplier,reference,created_at")
       .order("purchase_date", { ascending: false }),
@@ -25,13 +23,12 @@ export async function GET() {
       .select("id,product_id,movement_type,quantity_change,reason,created_at")
       .order("created_at", { ascending: false }),
   ]);
-  const error = products.error ?? mappings.error ?? trackedListings.error ?? purchases.error ?? movements.error;
+  const error = products.error ?? mappings.error ?? purchases.error ?? movements.error;
   if (error) return NextResponse.json({ error: `Inventory could not be loaded: ${error.message}` }, { status: 500 });
 
   return NextResponse.json({
     products: products.data ?? [],
     mappings: mappings.data ?? [],
-    trackedListings: (trackedListings.data ?? []).map((listing) => listing.catalog_key),
     purchases: purchases.data ?? [],
     movements: movements.data ?? [],
   });
@@ -71,19 +68,6 @@ export async function POST(request: Request) {
       p_mappings: parsed.data,
     });
     if (error) return NextResponse.json({ error: `Product mappings could not be saved: ${error.message}` }, { status: 500 });
-    return NextResponse.json({ ok: true });
-  }
-
-  if (body.action === "set_listing_tracked") {
-    const parsed = inventoryCatalogKeySchema.safeParse(body.catalogKey);
-    if (!parsed.success || typeof body.tracked !== "boolean") {
-      return NextResponse.json({ error: parsed.success ? "Listing tracking must be true or false." : parsed.error.issues[0]?.message ?? "Catalog listing is invalid." }, { status: 400 });
-    }
-    const { error } = await session.admin.rpc("set_inventory_listing_tracked", {
-      p_catalog_key: parsed.data,
-      p_tracked: body.tracked,
-    });
-    if (error) return NextResponse.json({ error: `Listing coverage could not be saved: ${error.message}` }, { status: 409 });
     return NextResponse.json({ ok: true });
   }
 
