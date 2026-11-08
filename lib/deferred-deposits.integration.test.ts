@@ -14,7 +14,7 @@ vi.mock("resend", () => ({
 }));
 
 import { attemptDeferredDeposit, readDepositBooking, releaseCancelledDeferredDeposit, syncDeferredDeposit } from "./deferred-deposits";
-import { depositHoldDate } from "./payment-flow";
+import { depositHoldDate, melbourneDateKey, melbourneHour } from "./payment-flow";
 import { getMelbourneTomorrow } from "./pickup-reminders";
 
 describe.skipIf(process.env.RUN_STRIPE_DEPOSIT_INTEGRATION !== "1")("local Stripe deferred-deposit integration", () => {
@@ -41,6 +41,11 @@ describe.skipIf(process.env.RUN_STRIPE_DEPOSIT_INTEGRATION !== "1")("local Strip
     try {
       const pickup = getMelbourneTomorrow();
       const dropoff = new Date(Date.parse(`${pickup}T00:00:00Z`) + 3 * 86_400_000).toISOString().slice(0, 10);
+      const scheduledRun = new Date(Date.parse(`${pickup}T00:00:00Z`) - 86_400_000);
+      for (let minute = 0; minute < 48 * 60 && (melbourneDateKey(scheduledRun) !== pickup || melbourneHour(scheduledRun) !== 7); minute += 1) {
+        scheduledRun.setTime(scheduledRun.getTime() + 60_000);
+      }
+      if (melbourneDateKey(scheduledRun) !== pickup || melbourneHour(scheduledRun) !== 7) throw new Error("Could not locate the pickup-day 7am test time.");
       const pendingHire = await stripe.paymentIntents.create({
         amount: 10000, currency: "aud", customer: customer.id,
         allowed_payment_method_types: ["card"], setup_future_usage: "off_session",
@@ -51,7 +56,7 @@ describe.skipIf(process.env.RUN_STRIPE_DEPOSIT_INTEGRATION !== "1")("local Strip
         id: bookingId, email: "deposit-integration@example.invalid",
         first_name: "Disposable", last_name: "Deposit Integration", mobile: "0400000000",
         event_type: "Local integration test", event_address: "Local only",
-        pickup_date: pickup, dropoff_date: dropoff, dropoff_time: "10:00",
+        pickup_date: pickup, pickup_time: "10:00", dropoff_date: dropoff, dropoff_time: "10:00",
         payment_method: "stripe_card_hold", hire_amount_cents: 10000, security_deposit_cents: 10000,
         hire_payment_status: "pending", deposit_payment_status: "scheduled",
         deposit_hold_date: depositHoldDate(pickup), deposit_consent_at: new Date().toISOString(),
@@ -66,11 +71,11 @@ describe.skipIf(process.env.RUN_STRIPE_DEPOSIT_INTEGRATION !== "1")("local Strip
       const paid = await admin.from("bookings").update({ hire_payment_status: "paid" }).eq("id", bookingId);
       if (paid.error) throw paid.error;
 
-      const beforeSchedule = new Date(Date.parse(`${pickup}T00:00:00Z`) - 3 * 86_400_000);
+      const beforeSchedule = new Date(scheduledRun.getTime() - 3 * 86_400_000);
       await attemptDeferredDeposit(admin, bookingId, beforeSchedule);
       expect((await readDepositBooking(admin, bookingId))?.stripe_deposit_payment_intent_id).toBeNull();
 
-      expect(await attemptDeferredDeposit(admin, bookingId)).toBe("authorized");
+      expect(await attemptDeferredDeposit(admin, bookingId, scheduledRun)).toBe("authorized");
       const secured = await readDepositBooking(admin, bookingId);
       depositId = secured?.stripe_deposit_payment_intent_id ?? null;
       expect(depositId).toBeTruthy();

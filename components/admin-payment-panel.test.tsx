@@ -48,8 +48,10 @@ describe("AdminPaymentPanel", () => {
   it("shows scheduled deposit state and errors separately from the paid hire", () => {
     renderOpenPaymentPanel(booking({
       payment_method: "stripe_card_hold", hire_payment_status: "paid", deposit_payment_status: "scheduled",
+      deposit_hold_date: "2026-10-01",
       deposit_error: "Authentication is required before pickup.",
     }));
+    expect(screen.getByText(/Deposit hold scheduled for 2026-10-01 at 7:00 am Melbourne time/)).toBeInTheDocument();
     expect(screen.getByText(/paid hire does not yet mean the deposit is secured/)).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("Authentication is required");
   });

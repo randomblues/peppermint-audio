@@ -48,7 +48,7 @@ For an eligible Standard request, the server:
 2. Creates or recovers the Stripe Customer.
 3. Cancels any still-pending PaymentIntents from a previous payment request.
 4. Creates the hire PaymentIntent with automatic capture.
-5. For pickup today or tomorrow in Melbourne, creates the deposit PaymentIntent with `capture_method: "manual"` when the deposit is greater than zero. For later pickup, configures the hire intent to save the card for off-session use and schedules the deposit hold for the day before pickup instead of creating it immediately.
+5. For pickup today or tomorrow in Melbourne, creates the deposit PaymentIntent with `capture_method: "manual"` when the deposit is greater than zero. For later pickup, configures the hire intent to save the card for off-session use and schedules the deposit hold for 7:00 am Melbourne time on pickup day instead of creating it immediately. New pickup times must be 7:30 am or later.
 6. Stores the Stripe IDs and payment state in Supabase.
 7. Generates a random payment token valid for at least 30 days and through return plus three days.
 8. Sends the customer an invoice with the Stripe payment link and both PayID and bank-account details.
@@ -82,7 +82,9 @@ Immediate checkout creates a fresh Stripe PaymentMethod from the same card entry
 
 For advance bookings, checkout charges only hire and saves the card with consent. The due hold is attempted by the daily deposit cron or hire-payment webhook. A successful hire payment does not mean that a scheduled deposit is already authorised. The actual hold expiry must cover return plus the check-in margin.
 
-The deposit cron and Stripe webhook can observe the same failed hold. A booking-level notification claim ensures only one alert is sent; claims left by terminated jobs can be retried after 15 minutes.
+The deposit cron and Stripe webhook can observe the same failed hold. A booking-level notification claim ensures only one alert is sent; claims left by terminated jobs can be retried after 15 minutes. The customer alert makes clear the booking cannot proceed without an authorised deposit by pickup, maps known decline codes to customer-safe guidance, and keeps raw provider diagnostics internal. The branded internal alert includes the booking details and failure reason.
+
+The deposit cron is configured for 20:00 and 21:00 UTC; its Melbourne-time guard runs the job only at 7:00 am local time, covering both daylight-saving offsets. If the hire payment completes after the scheduled run on the due date, the payment webhook attempts the hold as soon as the hire succeeds.
 
 The customer sees hire plus deposit due during immediate checkout, or hire only for advance checkout. A configured zero deposit creates no hold and does not show deposit instructions. Paid hire and authorised deposits are removed from the remaining total. Stripe Elements stays mounted while confirmation and verification run, then unmounts on success; checkout does not call `clear()` immediately before destroying the Element.
 

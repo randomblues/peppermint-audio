@@ -1,9 +1,10 @@
 export const MAX_STRIPE_HIRE_DAYS = 3;
+export const MIN_PICKUP_TIME = "07:30";
 const PAYMENT_LINK_VALIDITY_DAYS = 30;
 
 export function depositHoldDate(pickupDate: string) {
   if (rentalDays(pickupDate, pickupDate) === null) throw new Error("Invalid pickup date.");
-  return new Date(Date.parse(`${pickupDate}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  return pickupDate;
 }
 
 export function melbourneDateKey(date = new Date()) {
@@ -17,13 +18,23 @@ export function melbourneDateKey(date = new Date()) {
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
+export function melbourneHour(date = new Date()) {
+  const hour = new Intl.DateTimeFormat("en-AU", {
+    timeZone: "Australia/Melbourne",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date).find((part) => part.type === "hour")?.value;
+  return Number(hour);
+}
+
 export function isMelbourneDateInFuture(value: string, now = new Date()) {
   return value > melbourneDateKey(now);
 }
 
 export function isImmediateDepositBooking(pickupDate: string, now = new Date()) {
   const today = melbourneDateKey(now);
-  return pickupDate >= today && depositHoldDate(pickupDate) <= today;
+  const daysUntilPickup = rentalDays(today, pickupDate);
+  return daysUntilPickup !== null && daysUntilPickup <= 1;
 }
 
 export function paymentLinkExpiry(dropoffDate: string, now = Date.now()) {

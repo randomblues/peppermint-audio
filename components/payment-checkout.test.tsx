@@ -34,7 +34,7 @@ describe("PaymentCheckout", () => {
     hireLineItems: [{ id: "speaker", kind: "equipment", name: "Test speaker", quantity: 1, unitPriceCents: 5500 }],
     hireAmountCents: 11000, securityDepositCents: 10000,
     hirePaymentStatus: "pending", depositPaymentStatus: "scheduled",
-    depositHoldDate: "2099-11-08", depositConsentRecorded: false,
+    depositHoldDate: "2099-11-09", depositConsentRecorded: false,
     hireClientSecret: "hire_secret", depositClientSecret: null,
   };
 
@@ -68,13 +68,12 @@ describe("PaymentCheckout", () => {
     expect(securityDepositRow).toHaveTextContent("$100.00");
     expect(hireRow).toHaveTextContent("$110.00");
     expect(screen.queryByText("Paid", { exact: true })).not.toBeInTheDocument();
-    expect(securityDepositRow).toHaveTextContent("Card hold scheduled before pickup");
+    expect(securityDepositRow).toHaveTextContent("Card hold scheduled at 7am");
     expect(totalRow?.lastElementChild).toHaveClass("font-bold");
     expect(screen.queryByText(/^Hold date:/)).not.toBeInTheDocument();
     expect(screen.getByText("Total due today").parentElement?.parentElement?.nextElementSibling).toBeNull();
     expect(screen.getByRole("heading", { name: "How your security deposit works" })).toBeInTheDocument();
-    expect(screen.getByText("Your $100.00 security deposit is a temporary card authorisation scheduled for 8 November 2099.")).toBeInTheDocument();
-    expect(screen.getByText("Your $100.00 security deposit is a temporary card authorisation scheduled for 8 November 2099.").textContent).toContain("8\u00a0November\u00a02099");
+    expect(screen.getByText("Your $100.00 security deposit is a temporary card authorisation scheduled for 7:00 am Melbourne time on pickup day.")).toBeInTheDocument();
     expect(screen.queryByText(/\b(?<!security )deposit\b/i)).not.toBeInTheDocument();
     expect(screen.getByRole("checkbox").parentElement).toHaveTextContent(
       "I authorise Peppermint Audio to charge my equipment hire fee of $110.00 and place a separate temporary security deposit hold of $100.00 before the scheduled pickup date.",
@@ -82,7 +81,7 @@ describe("PaymentCheckout", () => {
     fireEvent.click(screen.getByRole("checkbox"));
     expect(pay).toBeEnabled();
     fireEvent.click(pay);
-    expect(await screen.findByText(/hold is scheduled before pickup; it has not been authorised yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/hold is scheduled for 7:00 am Melbourne time on pickup day; it has not been authorised yet/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1, name: "Payment received" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Pay for your hire" })).not.toBeInTheDocument();
     expect(screen.queryByText("Card details")).not.toBeInTheDocument();
@@ -103,10 +102,35 @@ describe("PaymentCheckout", () => {
     expect(screen.queryByText(/scheduled for.*one day before pickup/)).not.toBeInTheDocument();
   });
 
+  it("shows a pickup-day scheduled hold as not yet authorised, not as checkout payment", async () => {
+    vi.stubEnv("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", "pk_test_placeholder");
+    const pickupDate = melbourneDateKey();
+    const dropoffDate = new Date(Date.parse(`${pickupDate}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ...scheduled,
+        pickupDate,
+        dropoffDate,
+        hirePaymentStatus: "paid",
+        depositPaymentStatus: "scheduled",
+        depositHoldDate: pickupDate,
+        hireClientSecret: null,
+        depositClientSecret: null,
+      }),
+    }));
+    render(<PaymentCheckout token="pickup-day-token" />);
+    await expect(screen.findByRole("status")).resolves.toHaveTextContent(
+      "scheduled for 7:00 am Melbourne time on pickup day; it has not been authorised yet",
+    );
+    expect(screen.getByText("Your $100.00 security deposit is a temporary card authorisation scheduled for 7:00 am Melbourne time on pickup day.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Authorise/ })).not.toBeInTheDocument();
+  });
+
   it.each([
     ["pending", 10000, "Temporary card hold"],
-    ["scheduled", 10000, "Card hold scheduled before pickup"],
-    ["authorizing", 10000, "Card hold scheduled before pickup"],
+    ["scheduled", 10000, "Card hold scheduled at 7am"],
+    ["authorizing", 10000, "Card hold scheduled at 7am"],
     ["authorized", 10000, "Card hold authorised"],
     ["released", 10000, "Card hold released"],
     ["captured", 10000, "Captured"],

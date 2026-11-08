@@ -36,6 +36,8 @@ describe("bookingSchema", () => {
     expect(bookingSchema.safeParse({ ...validBooking, pickupDate: "2000-01-01" }).success).toBe(false);
     expect(bookingSchema.safeParse({ ...validBooking, dropoffDate: "2099-09-30" }).success).toBe(false);
     expect(bookingSchema.safeParse({ ...validBooking, pickupTime: "25:00" }).success).toBe(false);
+    expect(bookingSchema.safeParse({ ...validBooking, pickupTime: "07:00" }).success).toBe(false);
+    expect(bookingSchema.safeParse({ ...validBooking, pickupTime: "07:30" }).success).toBe(true);
     expect(bookingSchema.safeParse({ ...validBooking, pickupDate: "2099-10-01", dropoffDate: "2099-10-01", pickupTime: "17:00", dropoffTime: "10:00" }).success).toBe(false);
   });
 });

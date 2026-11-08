@@ -38,6 +38,7 @@ export default defineConfig({
     command: `npm run dev -- --port ${port} --hostname 127.0.0.1`,
     url: baseURL,
     reuseExistingServer: false,
+    env: { PLAYWRIGHT_DIST_DIR: `.next/playwright-${port}` },
   },
   projects: [
     {

@@ -15,6 +15,7 @@ import { GET } from "./route";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.setSystemTime(new Date("2026-11-08T20:00:00Z")); // 7am in Melbourne during daylight saving.
   vi.stubEnv("CRON_SECRET", "test-cron-secret");
   const query = {
     select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), in: vi.fn().mockReturnThis(), lt: vi.fn().mockReturnThis(),
@@ -32,10 +33,18 @@ describe("deposit-hold cron", () => {
     expect(mocks.admin).not.toHaveBeenCalled();
   });
 
+  it("skips the non-7am daylight-saving cron invocation", async () => {
+    vi.setSystemTime(new Date("2026-11-08T21:00:00Z")); // 8am in Melbourne during daylight saving.
+    const response = await GET(new Request("http://localhost/api/cron/deposit-holds", { headers: { authorization: "Bearer test-cron-secret" } }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ skipped: true });
+    expect(mocks.admin).not.toHaveBeenCalled();
+  });
+
   it("attempts due holds, verifies actual expiry and sends the authorisation document", async () => {
     const response = await GET(new Request("http://localhost/api/cron/deposit-holds", { headers: { authorization: "Bearer test-cron-secret" } }));
     expect(response.status).toBe(200);
-    expect(mocks.attempt).toHaveBeenCalledWith(expect.anything(), "booking-1");
+    expect(mocks.attempt).toHaveBeenCalledWith(expect.anything(), "booking-1", expect.any(Date));
     expect(mocks.retrieve).toHaveBeenCalledWith("pi_deposit", { expand: ["latest_charge"] });
     expect(mocks.document).toHaveBeenCalledWith(expect.anything(), "booking-1", "deposit_authorisation");
   });

@@ -13,7 +13,7 @@ vi.mock("@/lib/email-log", () => ({ recordCustomerEmail: mocks.record }));
 
 import { attemptDeferredDeposit, notifyDepositAttention, releaseCancelledDeferredDeposit, syncDeferredDeposit, type DeferredDepositBooking } from "./deferred-deposits";
 
-const now = new Date("2026-10-08T22:00:00Z"); // 9 October in Melbourne.
+const now = new Date("2026-10-09T20:00:00Z"); // 7am on 10 October in Melbourne.
 let booking: DeferredDepositBooking;
 let update: ReturnType<typeof vi.fn>;
 
@@ -63,7 +63,7 @@ beforeEach(() => {
     pickup_date: "2026-10-10", dropoff_date: "2026-10-13", dropoff_time: "18:00",
     payment_method: "stripe_card_hold", hire_payment_status: "paid", security_deposit_cents: 10000,
     stripe_customer_id: "cus_1", stripe_hire_payment_intent_id: "pi_hire", stripe_deposit_payment_intent_id: null,
-    deposit_hold_date: "2026-10-09", deposit_consent_at: "2026-09-01T00:00:00Z",
+    deposit_hold_date: "2026-10-10", deposit_consent_at: "2026-09-01T00:00:00Z",
     deposit_payment_status: "scheduled", deposit_capture_before: null, deposit_error: null,
     deposit_attention_sent_at: null, deposit_attention_claimed_at: null, payment_token: "secure-token",
   };
@@ -86,7 +86,7 @@ describe("deferred deposit holds", () => {
   it("does not hold a card a month early", async () => {
     booking.pickup_date = "2026-11-10";
     booking.dropoff_date = "2026-11-13";
-    booking.deposit_hold_date = "2026-11-09";
+    booking.deposit_hold_date = "2026-11-10";
     await attemptDeferredDeposit(admin(), booking.id, now);
     expect(mocks.create).not.toHaveBeenCalled();
   });
@@ -160,16 +160,23 @@ describe("deferred deposit holds", () => {
   it("allows same-day pickup payment to place the hold immediately", async () => {
     booking.pickup_date = "2026-10-09";
     booking.dropoff_date = "2026-10-10";
-    booking.deposit_hold_date = "2026-10-08";
-    expect(await attemptDeferredDeposit(admin(), booking.id, now)).toBe("authorized");
+    booking.deposit_hold_date = "2026-10-09";
+    expect(await attemptDeferredDeposit(admin(), booking.id, new Date("2026-10-08T20:00:00Z"))).toBe("authorized");
   });
 
   it("does not silently place a missed hold after pickup", async () => {
     booking.pickup_date = "2026-10-08";
-    booking.deposit_hold_date = "2026-10-07";
+    booking.deposit_hold_date = "2026-10-08";
     await attemptDeferredDeposit(admin(), booking.id, now);
     expect(booking.deposit_payment_status).toBe("expired");
     expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("waits until 7am Melbourne time before attempting a scheduled hold", async () => {
+    const beforeSeven = new Date("2026-10-09T19:00:00Z"); // 6am on the pickup date in Melbourne.
+    await attemptDeferredDeposit(admin(), booking.id, beforeSeven);
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(booking.deposit_payment_status).toBe("scheduled");
   });
 
   it.each([null, { payment_method_details: { card: { capture_before: Date.parse("2026-10-11T00:00:00Z") / 1000 } } }])("cancels missing or insufficient expiry rather than claiming a secured deposit", async latest_charge => {
@@ -194,6 +201,14 @@ describe("deferred deposit holds", () => {
     expect(booking.stripe_deposit_payment_intent_id).toBe("pi_deposit");
   });
 
+  it("preserves the Stripe decline code for safe customer guidance", async () => {
+    const status = await syncDeferredDeposit(admin(), booking, intent("requires_payment_method", {
+      last_payment_error: { decline_code: "insufficient_funds", message: "Your card has insufficient funds." },
+    }));
+    expect(status).toBe("failed");
+    expect(booking.deposit_error).toBe("[decline_code: insufficient_funds] Your card has insufficient funds.");
+  });
+
   it("distinguishes an expired hold from an intentional release", async () => {
     expect(await syncDeferredDeposit(admin(), booking, intent("canceled"))).toBe("expired");
     expect(await syncDeferredDeposit(admin(), booking, intent("canceled", {
@@ -206,13 +221,53 @@ describe("deferred deposit holds", () => {
     booking.deposit_error = "internal diagnosis";
     await notifyDepositAttention(admin(), booking);
     expect(mocks.send).toHaveBeenCalledTimes(2);
+    const internal = mocks.send.mock.calls[0][0];
     const customer = mocks.send.mock.calls[1][0];
+    expect(internal.subject).toContain("Urgent");
+    expect(internal.html).toContain("Deposit hold failed");
+    expect(internal.html).toContain("background:#16251f");
+    expect(internal.html).toContain("internal diagnosis");
+    expect(internal.text).toContain("Do not release equipment");
+    expect(customer.subject).toContain("Action required before pickup");
     expect(customer.html).toContain("&lt;Alex&gt;");
     expect(customer.html).toContain("https://example.com/pay/secure-token");
+    expect(customer.html).toContain("background:#16251f");
+    expect(customer.html).toContain("background:#fff0f0");
+    expect(customer.html).toContain("color:#8f1d1d");
+    expect(customer.html).toContain("booking will not go ahead");
     expect(customer.html).not.toContain("internal diagnosis");
-    expect(customer.text).toContain("hire payment has already been received");
+    expect(customer.text).toContain("Your hire payment has been received");
+    expect(customer.text).toContain("additional verification step");
+    expect(customer.text).toContain("booking will not go ahead");
     await notifyDepositAttention(admin(), booking);
     expect(mocks.send).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks the customer to contact the business when there is no payment link", async () => {
+    booking.deposit_payment_status = "hold_too_short";
+    booking.payment_token = null;
+    await notifyDepositAttention(admin(), booking);
+    const customer = mocks.send.mock.calls[1][0];
+    expect(customer.text).toContain("call 0452 316 823");
+    expect(customer.text).toContain("booking will not go ahead");
+    expect(customer.text).not.toContain("/pay/");
+  });
+
+  it.each([
+    ["insufficient_funds", "due to insufficient funds"],
+    ["expired_card", "The saved card appears to have expired"],
+    ["incorrect_cvc", "could not verify the card's security code"],
+    ["card_not_supported", "cannot be used for the $100.00 security-deposit hold"],
+    ["generic_decline", "Your bank did not approve the $100.00 security-deposit hold"],
+    ["processing_error", "could not process the $100.00 security-deposit hold just now"],
+  ])("uses customer-friendly wording for %s", async (declineCode, message) => {
+    booking.deposit_payment_status = "failed";
+    booking.deposit_error = `[decline_code: ${declineCode}] Raw provider diagnostic`;
+    await notifyDepositAttention(admin(), booking);
+    const customer = mocks.send.mock.calls[1][0];
+    expect(customer.text).toContain(message);
+    expect(customer.text).not.toContain(declineCode);
+    expect(customer.text).not.toContain("Raw provider diagnostic");
   });
 
   it("sends and records only one customer alert when cron and webhook race", async () => {

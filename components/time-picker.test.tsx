@@ -58,6 +58,15 @@ describe("TimePicker", () => {
     expect(screen.getAllByRole("option")).toHaveLength(26);
   });
 
+  it("restricts pickup options to the configured minimum while showing older invalid values disabled", () => {
+    const { rerender } = render(<TimePicker id="pickup-time" label="Pickup time" value="" minTime="07:30" onChange={vi.fn()} />);
+    expect(screen.queryByRole("option", { name: "7:00" })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "7:30" })).toHaveValue("07:30");
+
+    rerender(<TimePicker id="pickup-time" label="Pickup time" value="07:00" minTime="07:30" onChange={vi.fn()} />);
+    expect(screen.getByRole("option", { name: "7:00" })).toBeDisabled();
+  });
+
   it("applies a period selected before choosing a time", () => {
     const onChange = vi.fn();
     render(<TimePicker id="pickup-time" label="Pickup time" value="" onChange={onChange} />);

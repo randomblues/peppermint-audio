@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/deposit-holds",
-      "schedule": "0 20 * * *"
+      "schedule": "0 20,21 * * *"
     },
     {
       "path": "/api/cron/email-history-cleanup",
@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/pickup-reminders",
-      "schedule": "0 20 * * *"
+      "schedule": "0 1,2 * * *"
     }
   ]
 }

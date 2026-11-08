@@ -3,9 +3,9 @@ import { EmailTransport as Resend, emailConfiguration } from "@/lib/email-transp
 
 import { createAdminClient } from "@/lib/supabase";
 import { getStripe } from "@/lib/stripe";
-import { depositHoldCoversReturn, formatAudCents, MAX_STRIPE_HIRE_DAYS, rentalDays } from "@/lib/payment-flow";
+import { depositHoldCoversReturn, formatAudCents, MAX_STRIPE_HIRE_DAYS, melbourneHour, rentalDays } from "@/lib/payment-flow";
 import { getMelbourneTomorrow } from "@/lib/pickup-reminders";
-import { emailLayout, emailPanel, escapeEmailHtml } from "@/lib/email-template";
+import { emailDetailsTable, emailLayout, emailPanel, escapeEmailHtml } from "@/lib/email-template";
 import { recordCustomerEmail } from "@/lib/email-log";
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -86,7 +86,8 @@ export async function syncDeferredDeposit(admin: Admin, booking: DeferredDeposit
     error = "Customer authentication is required for the security-deposit hold.";
   } else if (intent.status === "requires_payment_method") {
     status = "failed";
-    error = intent.last_payment_error?.message ?? "The card could not authorise the security deposit.";
+    const declineCode = intent.last_payment_error?.decline_code;
+    error = `${declineCode ? `[decline_code: ${declineCode}] ` : ""}${intent.last_payment_error?.message ?? "The card could not authorise the security deposit."}`;
   } else if (intent.status === "canceled") {
     status = booking.deposit_payment_status === "hold_too_short" || intent.metadata.holdTooShort === "true" ? "hold_too_short"
       : booking.deposit_payment_status === "released" || intent.metadata.releaseRequested === "true" ? "released" : "expired";
@@ -112,11 +113,13 @@ export async function attemptDeferredDeposit(admin: Admin, bookingId: string, no
   if (!["submitted", "confirmed"].includes(booking.status) || booking.hire_payment_status !== "paid"
     || booking.security_deposit_cents <= 0 || booking.deposit_hold_date >= getMelbourneTomorrow(now)) return;
   if (!["scheduled", "authorizing"].includes(booking.deposit_payment_status)) return;
-  const today = new Date(Date.parse(`${getMelbourneTomorrow(now)}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
-  if (booking.pickup_date < today) {
+  const tomorrow = getMelbourneTomorrow(now);
+  const today = new Date(Date.parse(`${tomorrow}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  if (booking.pickup_date < today || booking.deposit_hold_date < today) {
     await saveDeposit(admin, booking, { deposit_payment_status: "expired", deposit_error: "The scheduled deposit hold was missed before pickup. Arrange the deposit manually; no late automatic hold was placed." });
     return;
   }
+  if (booking.deposit_hold_date === today && melbourneHour(now) < 7) return;
   if (!booking.deposit_consent_at) throw new Error("Deposit card-saving consent has not been recorded.");
   const days = rentalDays(booking.pickup_date, booking.dropoff_date);
   if (days === null || days > MAX_STRIPE_HIRE_DAYS) throw new Error("This hire is not eligible for an automatic deposit hold.");
@@ -209,6 +212,30 @@ async function releaseDepositAttentionClaim(admin: Admin, bookingId: string, cla
   }
 }
 
+function customerDepositReason(status: string, error: string | null) {
+  if (status === "action_required") {
+    return "Your bank requires an additional verification step to authorise the security-deposit hold.";
+  }
+  if (status !== "failed") return null;
+
+  const declineCode = error?.match(/\[decline_code:\s*([a-z0-9_]+)\]/i)?.[1]
+    ?? (error?.toLowerCase().includes("insufficient funds") ? "insufficient_funds" : null);
+  if (!declineCode) return null;
+  return ({
+    insufficient_funds: "Your card issuer declined the deposit hold due to insufficient funds. Please add funds, use another card, or contact your bank.",
+    expired_card: "The saved card appears to have expired. Please use another valid card through the secure payment link.",
+    incorrect_cvc: "Your bank could not verify the card's security code. Please check the card details or use another card.",
+    card_not_supported: "This card cannot be used for the deposit hold. Please try another card or contact your bank.",
+    do_not_honor: "Your bank did not approve the deposit hold. Please contact your bank or try another card.",
+    generic_decline: "Your bank did not approve the deposit hold. Please contact your bank or try another card.",
+    transaction_not_allowed: "Your bank did not allow this type of deposit hold. Please contact your bank or try another card.",
+    restricted_card: "Your bank has restricted this card for the deposit hold. Please contact your bank or try another card.",
+    issuer_not_available: "Your bank could not be reached to approve the deposit hold. Please try again through the secure link or contact your bank.",
+    processing_error: "The card provider could not process the deposit hold just now. Please try again through the secure link or use another card.",
+    try_again_later: "Your bank could not approve the deposit hold just now. Please try again through the secure link or contact your bank.",
+  } satisfies Record<string, string>)[declineCode] ?? null;
+}
+
 export async function notifyDepositAttention(admin: Admin, booking: DeferredDepositBooking) {
   if (!["submitted", "confirmed"].includes(booking.status)) return;
   if (!["failed", "action_required", "hold_too_short", "expired"].includes(booking.deposit_payment_status)
@@ -221,24 +248,55 @@ export async function notifyDepositAttention(admin: Admin, booking: DeferredDepo
     if (!apiKey || !from || !to) throw new Error("Deposit notification email service is not configured.");
     const origin = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://peppermint-audio.vercel.app").replace(/\/$/, "");
     const actionable = ["failed", "action_required"].includes(booking.deposit_payment_status) && booking.payment_token;
-    const message = actionable
-      ? `Please complete your ${formatAudCents(booking.security_deposit_cents)} security-deposit hold before pickup using your secure payment link. Your hire payment has already been received.`
-      : "Please contact Peppermint Audio before pickup to arrange your security deposit. Your hire payment has already been received.";
+    const depositAmount = formatAudCents(booking.security_deposit_cents);
+    const reason = customerDepositReason(booking.deposit_payment_status, booking.deposit_error);
+    const customerMessage = actionable
+      ? `${reason
+        ? reason.replace("deposit hold", `${depositAmount} security-deposit hold`)
+        : `We couldn't authorise the ${depositAmount} security-deposit hold on the card saved for your booking.`} Your hire payment has been received, but the deposit is still outstanding. Please use the secure link below to complete it before pickup.`
+      : "We couldn't secure the security-deposit hold. Your hire payment has been received, but the deposit is still outstanding. Please contact us urgently to arrange it before pickup.";
+    const deadlineMessage = "If the deposit has not been authorised by your scheduled pickup time, your booking will not go ahead and we will not be able to release the equipment.";
     const url = actionable ? `${origin}/pay/${encodeURIComponent(booking.payment_token!)}` : null;
     const resend = new Resend(apiKey);
     const key = `${booking.id}-${booking.stripe_deposit_payment_intent_id}-${booking.deposit_payment_status}`;
     const internal = await resend.emails.send({
-      from, to: [to], subject: `Deposit needs attention: ${booking.id}`,
-      text: `Booking: ${booking.id}\nPickup: ${booking.pickup_date}\nDeposit status: ${booking.deposit_payment_status}\n${booking.deposit_error ?? ""}\nDo not hand over equipment without securing the deposit.`,
+      from, to: [to], subject: `Urgent: deposit hold failed before pickup (${booking.id})`,
+      text: [
+        `Urgent: the scheduled deposit hold failed for booking ${booking.id}.`,
+        "Resolve this before pickup. Do not release equipment until the deposit is secured.",
+        "",
+        `Customer: ${booking.first_name} <${booking.email}>`,
+        `Pickup date: ${booking.pickup_date}`,
+        `Deposit: ${depositAmount}`,
+        `Status: ${booking.deposit_payment_status}`,
+        `Reason: ${booking.deposit_error ?? "No provider reason was recorded."}`,
+        `Admin panel: ${origin}/admin`,
+      ].join("\n"),
+      html: emailLayout({
+        eyebrow: "Action required",
+        title: "Deposit hold failed",
+        intro: "The scheduled security-deposit hold could not be authorised. Please resolve this before pickup; the booking must not proceed and equipment must not be released until the deposit is secured.",
+        content: `${emailPanel(emailDetailsTable([
+          { label: "Booking", value: booking.id },
+          { label: "Customer", value: `${booking.first_name} <${booking.email}>` },
+          { label: "Pickup date", value: booking.pickup_date },
+          { label: "Deposit", value: depositAmount },
+          { label: "Status", value: booking.deposit_payment_status },
+          { label: "Reason", value: booking.deposit_error ?? "No provider reason was recorded." },
+        ]), "warning")}${emailPanel(`<a href="${escapeEmailHtml(`${origin}/admin`)}" style="display:inline-block;padding:14px 20px;border-radius:10px;background:#16251f;color:#fff;text-decoration:none;font-weight:700">Open admin panel</a>`, "accent")}`,
+      }),
     }, { idempotencyKey: `deposit-admin-${key}` });
     if (internal.error) throw new Error(`Deposit admin alert failed: ${internal.error.message}`);
     const customer = await resend.emails.send({
-      from, to: [booking.email], subject: "Your security deposit needs attention",
-      text: `Hi ${booking.first_name},\n\n${message}${url ? `\n${url}` : ""}`,
+      from, to: [booking.email], subject: "Action required before pickup: security deposit",
+      text: `Hi ${booking.first_name},\n\n${customerMessage}\n\n${url ? `${url}\n\n` : ""}${deadlineMessage}\n\nIf you need help, reply to this email or call 0452 316 823.`,
       html: emailLayout({
-        eyebrow: "Security deposit", title: "Please arrange your deposit before pickup",
-        intro: `Hi ${escapeEmailHtml(booking.first_name)}, ${escapeEmailHtml(message)}`,
-        content: url ? emailPanel(`<a href="${escapeEmailHtml(url)}">Complete your security-deposit hold</a>`, "accent") : "",
+        eyebrow: "Action required",
+        title: "Deposit required before pickup",
+        intro: `Hi ${escapeEmailHtml(booking.first_name)}, ${escapeEmailHtml(customerMessage)}`,
+        content: `${url
+          ? emailPanel(`<a href="${escapeEmailHtml(url)}" style="display:inline-block;padding:14px 20px;border-radius:10px;background:#16251f;color:#fff;text-decoration:none;font-weight:700">Complete your deposit securely</a>`, "accent")
+          : emailPanel("<p style=\"margin:0;color:#1d2823;font-size:14px;line-height:1.6\">Please reply to this email or call <a href=\"tel:+61452316823\" style=\"color:#17643e;font-weight:700\">0452 316 823</a> to arrange your deposit.</p>", "accent")}${emailPanel(`<p style="margin:0;color:#8f1d1d;font-size:14px;line-height:1.6"><strong>Important:</strong> ${escapeEmailHtml(deadlineMessage)}</p>`, "danger")}`,
       }),
     }, { idempotencyKey: `deposit-customer-${key}` });
     if (customer.error) throw new Error(`Deposit customer email failed: ${customer.error.message}`);

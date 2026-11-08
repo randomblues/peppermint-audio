@@ -2,7 +2,7 @@ import { EmailTransport as Resend, emailConfiguration } from "@/lib/email-transp
 
 import { emailFooterText } from "@/lib/email-footer";
 import { bookingHireTotalCents, lineItemHireTotalCents, lineItemsForBooking, type BookingLineItem } from "@/lib/booking-line-items";
-import { formatAudCents, isImmediateDepositBooking, isMelbourneDateInFuture, rentalDays } from "@/lib/payment-flow";
+import { formatAudCents, isImmediateDepositBooking, rentalDays } from "@/lib/payment-flow";
 import { emailDetailsTable, emailLayout, emailPanel, escapeEmailHtml } from "@/lib/email-template";
 import { recordCustomerEmail, type CustomerEmailType } from "@/lib/email-log";
 import { buildInvoicePdf, type InvoicePdfDetails, type InvoicePdfLineItem } from "@/lib/invoice-pdf";
@@ -210,11 +210,17 @@ function pdfDetails(documentType: BillingDocumentType, booking: InvoiceBooking, 
     "The security deposit is refundable when all equipment is returned on time and in the agreed condition.",
   ];
   if (invoice.payment_method === "stripe_card_hold" && deposit > 0 && documentType === "invoice") {
+    const immediateDeposit = ["pending", "authorized"].includes(booking.deposit_payment_status ?? "")
+      && isImmediateDepositBooking(booking.pickup_date);
+    const scheduledDeposit = ["scheduled", "authorizing"].includes(booking.deposit_payment_status ?? "");
+    const scheduledTime = booking.deposit_hold_date === booking.pickup_date
+      ? "7:00 am Melbourne time on pickup day"
+      : `7:00 am Melbourne time on ${formatDate(booking.deposit_hold_date ?? booking.pickup_date)}`;
     const cardDepositDetails = booking.deposit_hold_date
-      ? isMelbourneDateInFuture(booking.deposit_hold_date)
-        ? `For card payments, the ${formatAudCents(deposit)} security deposit is a temporary card hold scheduled for ${formatDate(booking.deposit_hold_date)} (one day before pickup).`
-        : isImmediateDepositBooking(booking.pickup_date)
-          ? `For card payments, the ${formatAudCents(deposit)} security deposit is a temporary card hold placed as part of checkout.`
+      ? immediateDeposit
+        ? `For card payments, the ${formatAudCents(deposit)} security deposit is a temporary card hold placed as part of checkout.`
+        : scheduledDeposit
+          ? `For card payments, the ${formatAudCents(deposit)} security deposit is a temporary card hold scheduled for ${scheduledTime}.`
           : `For card payments, the ${formatAudCents(deposit)} security deposit is a separate temporary card hold.`
       : `For card payments, the ${formatAudCents(deposit)} security deposit is a separate temporary card hold.`;
     notes.unshift(offersBankTransfer

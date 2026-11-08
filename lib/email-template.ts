@@ -26,11 +26,12 @@ export function emailDetailsTable(rows: Array<{ label: string; value: string }>)
   `;
 }
 
-export function emailPanel(content: string, tone: "soft" | "accent" | "warning" = "soft") {
+export function emailPanel(content: string, tone: "soft" | "accent" | "warning" | "danger" = "soft") {
   const styles = {
     soft: "border:1px solid #e1e9e3;background:#f7faf8",
     accent: "border:1px solid #b9ddc8;background:#edf8f1",
     warning: "border:1px solid #ead59a;background:#fff9e8",
+    danger: "border:1px solid #e6a8a8;background:#fff0f0",
   };
   return `<div style="${styles[tone]};border-radius:16px;padding:20px 22px;margin:20px 0">${content}</div>`;
 }

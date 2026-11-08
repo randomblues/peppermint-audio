@@ -78,6 +78,7 @@ describe("pickup reminder cron authorization", () => {
 describe("GET /api/cron/pickup-reminders", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.setSystemTime(new Date("2026-11-08T01:00:00Z")); // Noon in Melbourne during daylight saving.
     vi.stubEnv("CRON_SECRET", "cron-secret");
     vi.stubEnv("RESEND_API_KEY", "resend-key");
     vi.stubEnv("ENQUIRY_FROM_EMAIL", "Peppermint Audio <from@example.com>");
@@ -103,6 +104,16 @@ describe("GET /api/cron/pickup-reminders", () => {
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: "Email service is not configured." });
     expect(createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it("skips the non-noon daylight-saving cron invocation", async () => {
+    vi.setSystemTime(new Date("2026-11-08T02:00:00Z")); // 1pm in Melbourne during daylight saving.
+    const response = await GET(request());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ skipped: true });
+    expect(createAdminClient).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
   });
 
   it("queries tomorrow's non-cancelled, unreminded bookings", async () => {

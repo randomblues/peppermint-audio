@@ -18,7 +18,7 @@ import { bookingReferenceForId } from "@/lib/booking-reference";
 import { lineItemHireTotalCents, lineItemsFromCart, type BookingLineItem } from "@/lib/booking-line-items";
 import { getMelbourneToday } from "@/lib/date-utils";
 import { hireTerms } from "@/lib/site-content";
-import { formatAudCents, rentalDays } from "@/lib/payment-flow";
+import { formatAudCents, MIN_PICKUP_TIME, rentalDays } from "@/lib/payment-flow";
 import { bookingSchema, type BookingInputValues } from "@/lib/validation/booking";
 import { preparePhotoId } from "@/lib/prepare-photo-id";
 import { trackGoogleAdsBookingSubmission } from "@/lib/google-ads";
@@ -348,7 +348,10 @@ export function BookingForm() {
                     <Link href="/cart" className="font-medium underline">Change dates</Link>
                   </div>
                 </div>
-                <TimePicker id="pickup-time" label="Pickup time" value={values.pickupTime} onChange={(value) => update("pickupTime", value)} error={errors.pickupTime} />
+                <div className="space-y-1">
+                  <TimePicker id="pickup-time" label="Pickup time" value={values.pickupTime} minTime={MIN_PICKUP_TIME} onChange={(value) => update("pickupTime", value)} error={errors.pickupTime} />
+                  <p className="text-xs text-muted-foreground">Pickups are available from 7:30 am onwards.</p>
+                </div>
                 <TimePicker id="dropoff-time" label="Drop-off time" value={values.dropoffTime} onChange={(value) => update("dropoffTime", value)} error={errors.dropoffTime} />
               </div>
             ) : null}

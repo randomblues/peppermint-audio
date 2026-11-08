@@ -11,6 +11,7 @@ type TimePickerProps = {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  minTime?: string;
   error?: string;
 };
 
@@ -49,15 +50,24 @@ const halfHourOptions = Array.from({ length: 24 }, (_, index) => {
   return { value, label: `${hour}:${String(minute).padStart(2, "0")}` };
 });
 
-export function TimePicker({ id, label, value, onChange, error }: TimePickerProps) {
+export function TimePicker({ id, label, value, onChange, minTime, error }: TimePickerProps) {
   const timeParts = getTimeParts(value);
   const [emptyPeriod, setEmptyPeriod] = useState<Period>("AM");
   const [open, setOpen] = useState(false);
   const period = timeParts?.period ?? emptyPeriod;
-  const options = halfHourOptions.some((option) => option.value === timeParts?.time) || !timeParts
-    ? halfHourOptions
-    : [...halfHourOptions, { value: timeParts.time, label: formatTimeLabel(timeParts.time) }]
-      .sort((left, right) => left.value.localeCompare(right.value));
+  const availableOptions = halfHourOptions.filter((option) =>
+    !minTime || toStoredTime(option.value, period) >= minTime)
+    .map((option) => ({ ...option, disabled: false }));
+  const currentOption = timeParts && !availableOptions.some((option) => option.value === timeParts.time)
+    ? {
+      value: timeParts.time,
+      label: formatTimeLabel(timeParts.time),
+      disabled: Boolean(minTime && toStoredTime(timeParts.time, period) < minTime),
+    }
+    : null;
+  const options = currentOption
+    ? [...availableOptions, currentOption].sort((left, right) => left.value.localeCompare(right.value))
+    : availableOptions;
   const errorId = `${id}-error`;
 
   function handlePeriodChange(nextPeriod: Period) {
@@ -138,7 +148,7 @@ export function TimePicker({ id, label, value, onChange, error }: TimePickerProp
             >
               <option value="">Select time</option>
               {options.map((option) => (
-                <option key={option.value} value={option.value}>
+                <option key={option.value} value={option.value} disabled={option.disabled}>
                   {option.label}
                 </option>
               ))}
@@ -186,6 +196,7 @@ export function TimePicker({ id, label, value, onChange, error }: TimePickerProp
                 <button
                   key={option.value}
                   type="button"
+                  disabled={option.disabled}
                   aria-label={`${label} ${option.label} ${period}`}
                   aria-pressed={timeParts?.time === option.value}
                   className={cn(

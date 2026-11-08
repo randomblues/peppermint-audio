@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getMelbourneToday } from "@/lib/date-utils";
-import { rentalDays } from "@/lib/payment-flow";
+import { MIN_PICKUP_TIME, rentalDays } from "@/lib/payment-flow";
 
 export const bookingSchema = z.object({
   email: z.string().email("Please enter a valid email"),
@@ -21,7 +21,8 @@ export const bookingSchema = z.object({
     .refine((value) => value >= getMelbourneToday(), "Drop-off date must be today or later"),
   pickupTime: z
     .string()
-    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Please select a valid pickup time"),
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Please select a valid pickup time")
+    .refine((value) => value >= MIN_PICKUP_TIME, "Pickup time must be 7:30 am or later."),
   dropoffTime: z
     .string()
     .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Please select a valid drop-off time"),

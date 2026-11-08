@@ -21,6 +21,10 @@ describe("email template", () => {
     expect(escapeEmailHtml(`& < > " '`)).toBe("&amp; &lt; &gt; &quot; &#39;");
   });
 
+  it("supports a red danger panel for urgent alerts", () => {
+    expect(emailPanel("<p>Urgent</p>", "danger")).toContain("border:1px solid #e6a8a8;background:#fff0f0");
+  });
+
   it("can omit the large header title for invoice emails", () => {
     const html = emailLayout({
       eyebrow: "Tax invoice",

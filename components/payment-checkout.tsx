@@ -35,6 +35,12 @@ function formatMelbourneDate(date: string) {
   }).format(new Date(`${date}T00:00:00`)).replace(/ /g, "\u00a0");
 }
 
+function formatScheduledDepositTime(holdDate: string, pickupDate: string) {
+  return holdDate === pickupDate
+    ? "7:00 am Melbourne time on pickup day"
+    : `${formatMelbourneDate(holdDate)} at 7:00 am Melbourne time`;
+}
+
 type PaymentData = {
   customerName: string;
   email: string;
@@ -63,12 +69,15 @@ function isPaymentComplete(data: PaymentData) {
 function PaymentConfirmation({ data }: { data: PaymentData }) {
   const depositAuthorized = data.depositPaymentStatus === "authorized";
   const depositScheduled = ["scheduled", "authorizing"].includes(data.depositPaymentStatus);
+  const scheduledDepositTime = data.depositHoldDate
+    ? formatScheduledDepositTime(data.depositHoldDate, data.pickupDate)
+    : "before pickup";
   const message = data.securityDepositCents === 0
     ? "Payment complete. Your hire payment has been received. No security deposit is required."
     : depositAuthorized
       ? "Payment complete. Your hire payment is complete and your refundable security deposit has been authorised."
       : depositScheduled
-        ? "Your hire payment has been received. Your security deposit hold is scheduled before pickup; it has not been authorised yet."
+        ? `Your hire payment has been received. Your security deposit hold is scheduled for ${scheduledDepositTime}; it has not been authorised yet.`
         : "Payment complete. Your hire payment has been received.";
 
   return (
@@ -100,7 +109,9 @@ function PaymentConfirmation({ data }: { data: PaymentData }) {
 function HireSummary({ data, receipt = false }: { data: PaymentData; receipt?: boolean }) {
   const nights = rentalDays(data.pickupDate, data.dropoffDate);
   const itemCount = data.hireLineItems.reduce((total, item) => total + item.quantity, 0);
-  const immediateDeposit = Boolean(data.securityDepositCents > 0 && data.depositHoldDate && isImmediateDepositBooking(data.pickupDate));
+  const immediateDeposit = Boolean(data.securityDepositCents > 0 && data.depositHoldDate
+    && !["scheduled", "authorizing"].includes(data.depositPaymentStatus)
+    && isImmediateDepositBooking(data.pickupDate));
   const depositSecured = ["authorized", "captured", "released"].includes(data.depositPaymentStatus);
   const hirePaid = data.hirePaymentStatus === "paid";
   const totalDueCents = (hirePaid ? 0 : data.hireAmountCents)
@@ -114,7 +125,7 @@ function HireSummary({ data, receipt = false }: { data: PaymentData; receipt?: b
         : data.depositPaymentStatus === "captured"
           ? "Captured"
           : ["scheduled", "authorizing"].includes(data.depositPaymentStatus)
-            ? "Card hold scheduled before pickup"
+            ? "Card hold scheduled at 7am"
             : "Temporary card hold";
 
   return (
@@ -163,9 +174,16 @@ function HireSummary({ data, receipt = false }: { data: PaymentData; receipt?: b
 
 function DepositConfidencePanel({ data }: { data: PaymentData }) {
   if (data.securityDepositCents === 0) return null;
-  const showScheduledHoldDate = isScheduledHoldDate(data.depositHoldDate);
-  const immediateDeposit = Boolean(data.depositHoldDate && isImmediateDepositBooking(data.pickupDate));
+  const immediateDeposit = Boolean(data.depositHoldDate
+    && !["scheduled", "authorizing"].includes(data.depositPaymentStatus)
+    && isImmediateDepositBooking(data.pickupDate));
+  const scheduledDeposit = ["scheduled", "authorizing"].includes(data.depositPaymentStatus);
+  const showScheduledHoldDate = Boolean(data.depositHoldDate && (scheduledDeposit || isScheduledHoldDate(data.depositHoldDate)))
+    && !immediateDeposit;
   const depositAuthorized = data.depositPaymentStatus === "authorized";
+  const scheduledDepositTime = data.depositHoldDate
+    ? formatScheduledDepositTime(data.depositHoldDate, data.pickupDate)
+    : "before pickup";
   return (
     <details className="group overflow-hidden rounded-2xl border border-primary/20 bg-primary/[0.04] shadow-sm">
       <summary className="flex cursor-pointer list-none items-start gap-3 px-4 py-4 marker:hidden sm:px-5 [&::-webkit-details-marker]:hidden">
@@ -175,14 +193,14 @@ function DepositConfidencePanel({ data }: { data: PaymentData }) {
         <div className="min-w-0 flex-1">
           <h3 className="font-heading text-base font-semibold">How your security deposit works</h3>
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-            Your {formatAudCents(data.securityDepositCents)} security deposit is a temporary card authorisation {depositAuthorized ? "that has been placed and will be released after return." : showScheduledHoldDate ? `scheduled for ${formatMelbourneDate(data.depositHoldDate!)}.` : immediateDeposit ? "that will be placed as part of today's checkout." : "that will be released after return."}
+            Your {formatAudCents(data.securityDepositCents)} security deposit is a temporary card authorisation {depositAuthorized ? "that has been placed and will be released after return." : showScheduledHoldDate ? `scheduled for ${scheduledDepositTime}.` : immediateDeposit ? "that will be placed as part of today's checkout." : "that will be released after return."}
           </p>
         </div>
         <ChevronDown className="mt-1 size-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
       </summary>
       <div className="grid gap-4 border-t border-primary/10 px-4 py-4 sm:grid-cols-3 sm:px-5">
         {[
-          ["1", depositAuthorized ? "Card authorised" : showScheduledHoldDate ? "Held before pickup" : immediateDeposit ? "Authorised today" : "Card authorisation", depositAuthorized ? "The temporary hold has been placed. Your bank may show it as pending; it is not a purchase." : showScheduledHoldDate ? `We place the temporary hold on ${formatMelbourneDate(data.depositHoldDate!)}. Your bank may show it as pending; it is not a purchase.` : "The temporary hold will be placed during checkout. Your bank may show it as pending; it is not a purchase."],
+          ["1", depositAuthorized ? "Card authorised" : showScheduledHoldDate ? "Hold scheduled at 7am" : immediateDeposit ? "Authorised today" : "Card authorisation", depositAuthorized ? "The temporary hold has been placed. Your bank may show it as pending; it is not a purchase." : showScheduledHoldDate ? `We place the temporary hold at ${scheduledDepositTime}. Your bank may show it as pending; it is not a purchase.` : "The temporary hold will be placed during checkout. Your bank may show it as pending; it is not a purchase."],
           ["2", "Equipment returned", "We check the equipment back in against the agreed return time and condition."],
           ["3", "Released after check-in", "If everything is returned on time and complete, the full authorisation is released."],
         ].map(([step, title, detail]) => (
@@ -222,8 +240,12 @@ function PaymentForm({ data, token, onComplete }: { data: PaymentData; token: st
   const [consent, setConsent] = useState(Boolean(data.depositConsentRecorded));
   const [consentRecorded, setConsentRecorded] = useState(Boolean(data.depositConsentRecorded));
   const requiresDepositConsent = Boolean(data.depositHoldDate);
-  const immediateDeposit = Boolean(data.depositHoldDate && isImmediateDepositBooking(data.pickupDate));
-  const showScheduledHoldDate = isScheduledHoldDate(data.depositHoldDate);
+  const immediateDeposit = Boolean(data.depositHoldDate
+    && !["scheduled", "authorizing"].includes(data.depositPaymentStatus)
+    && isImmediateDepositBooking(data.pickupDate));
+  const scheduledDeposit = ["scheduled", "authorizing"].includes(data.depositPaymentStatus);
+  const showScheduledHoldDate = Boolean(data.depositHoldDate && (scheduledDeposit || isScheduledHoldDate(data.depositHoldDate)))
+    && !immediateDeposit;
   const currentData = {
     ...data,
     hirePaymentStatus: hirePaid ? "paid" : data.hirePaymentStatus,
@@ -337,10 +359,10 @@ function PaymentForm({ data, token, onComplete }: { data: PaymentData; token: st
           ? "Your hire payment is taken now. No security deposit is required for this booking."
           : hirePaid
           ? "Your hire payment has been received. Complete the security deposit hold above."
-          : showScheduledHoldDate
-            ? "Your hire payment is taken now. The security deposit hold is scheduled for one day before pickup."
-            : immediateDeposit
+          : immediateDeposit
               ? "Your hire payment will be charged and the temporary security deposit hold placed together during checkout."
+              : showScheduledHoldDate
+                ? `Your hire payment is taken now. The security deposit hold is scheduled for ${formatScheduledDepositTime(data.depositHoldDate!, data.pickupDate)}.`
               : "Your hire payment is taken now. Your refundable security deposit is released after the equipment is returned."}
       </p>
       <StripeTrustMark />

@@ -15,6 +15,7 @@ import { formatAudCents, MAX_STRIPE_HIRE_DAYS, paymentMethodForRental, rentalDay
 type PaymentBooking = {
   id: string;
   pickup_date: string;
+  deposit_hold_date?: string | null;
   dropoff_date?: string;
   status: string;
   hire_amount_cents?: number | null;
@@ -476,7 +477,7 @@ export function AdminPaymentPanel({ booking, onChanged, hireItemsDirty = false }
           {showExistingPaymentLink ? <div className="rounded-xl border bg-background p-3 text-sm shadow-sm"><div className="flex items-center justify-between gap-3"><p className="font-medium">Customer payment link</p><Badge variant="outline">Active</Badge></div><p className="mt-2 break-all rounded-lg bg-muted/50 p-2 text-xs text-muted-foreground">{existingPaymentUrl}</p><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => void copyLink()}><Copy className="size-3.5" />Copy link</Button><a href={existingPaymentUrl} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center rounded-lg border px-3 text-sm font-medium hover:bg-muted">Open link</a></div></div> : null}
         </section>
         {booking.deposit_payment_status === "authorized" ? <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-3"><p className="flex items-center gap-2 text-sm font-medium text-primary"><CheckCircle2 className="size-4" />Deposit is authorised, not captured</p><label className="space-y-1 text-sm font-medium">Damage amount to capture (AUD)<input aria-label="Damage amount to capture" inputMode="decimal" value={captureAmount} onChange={(event) => setCaptureAmount(event.target.value)} className="h-10 w-full rounded-lg border bg-background px-3 font-normal" /></label><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={processing} onClick={() => void manageDeposit("release")}><Unlock className="size-3.5" />Release deposit</Button><Button size="sm" variant="destructive" disabled={processing} onClick={() => void manageDeposit("capture")}>Capture damage amount</Button></div></div> : null}
-        {booking.deposit_payment_status === "scheduled" ? <p className="rounded-lg border bg-muted/30 p-3 text-sm">Deposit hold scheduled one day before pickup. A paid hire does not yet mean the deposit is secured.</p> : null}
+        {booking.deposit_payment_status === "scheduled" ? <p className="rounded-lg border bg-muted/30 p-3 text-sm">Deposit hold scheduled for {booking.deposit_hold_date ?? "pickup day"} at 7:00 am Melbourne time. A paid hire does not yet mean the deposit is secured.</p> : null}
         {booking.deposit_capture_before ? <p className="text-sm text-muted-foreground">Card hold expires: {new Date(booking.deposit_capture_before).toLocaleString("en-AU", { timeZone: "Australia/Melbourne" })} Melbourne time.</p> : null}
         {booking.deposit_error ? <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">{booking.deposit_error}</p> : null}
         {booking.payment_method === "bank_transfer" && booking.deposit_payment_status === "bank_transfer_received" ? (

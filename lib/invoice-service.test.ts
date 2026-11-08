@@ -114,7 +114,7 @@ describe("billing document email copy", () => {
       id: "booking-1", email: "test@example.com", first_name: "Test", last_name: "Customer", event_type: "Party",
       pickup_date: "2099-11-09", dropoff_date: "2099-11-10", hire_line_items: [catalogLineItemFromKey("package:standard-party-events")],
       hire_amount_cents: 16000, security_deposit_cents: 10000, gst_inclusive: gstInclusive,
-      payment_method: "stripe_card_hold", deposit_payment_status: "scheduled", deposit_hold_date: "2099-11-08",
+      payment_method: "stripe_card_hold", deposit_payment_status: "scheduled", deposit_hold_date: "2099-11-09",
       event_address: "Customer-provided event address",
     };
     const invoice = {
@@ -142,6 +142,7 @@ describe("billing document email copy", () => {
     expect(mocks.pdf).toHaveBeenLastCalledWith(expect.objectContaining({
       notes: expect.arrayContaining([
         expect.stringContaining("If paying by bank transfer, include the refundable security deposit in the transfer."),
+        expect.stringContaining("scheduled for 7:00 am Melbourne time on pickup day"),
       ]),
       paymentMethod: "Card payment or bank transfer",
       bankTransfer: expect.objectContaining({
@@ -188,6 +189,7 @@ describe("billing document email copy", () => {
       totalCents: 26000,
       notes: expect.arrayContaining([
         expect.stringContaining("If paying by bank transfer, include the refundable security deposit in the transfer."),
+        expect.stringContaining("temporary card hold placed as part of checkout"),
       ]),
     }));
   });
