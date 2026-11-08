@@ -18,7 +18,7 @@ const validPayload = {
   name: "Alex Example",
   email: "alex@example.com",
   phone: "0412345678",
-  eventDate: "2026-10-10",
+  eventDate: "2099-10-10",
   eventType: "Wedding",
   message: "We are planning a wedding and need sound for the reception.",
 };
@@ -73,7 +73,7 @@ describe("POST /api/enquiry", () => {
       from: "Peppermint Audio <from@example.com>",
       to: ["to@example.com"],
       replyTo: "alex@example.com",
-      subject: "New enquiry: Wedding on 2026-10-10",
+      subject: "New enquiry: Wedding on 2099-10-10",
       text: expect.not.stringContaining("Estimated guests"),
       html: expect.stringContaining("A new enquiry needs a reply"),
     });

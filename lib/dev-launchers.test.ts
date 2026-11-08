@@ -19,7 +19,7 @@ function fakeTools() {
   const lsof = path.join(bin, "lsof");
   const npm = path.join(bin, "npm");
   writeFileSync(lsof, "#!/bin/sh\nif [ -n \"${FAKE_LISTENER_PIDS:-}\" ]; then printf '%s\\n' \"$FAKE_LISTENER_PIDS\"; exit 0; fi\nexit 1\n");
-  writeFileSync(npm, "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$LAUNCH_CAPTURE\"\nprintf '%s\\n' \"${PORT:-}\" \"${LOCAL_STRIPE_WEBHOOKS:-}\" >> \"$LAUNCH_CAPTURE\"\nprintf 'fake server startup\\n'\n");
+  writeFileSync(npm, "#!/bin/sh\ncapture_tmp=\"${LAUNCH_CAPTURE}.tmp\"\nprintf '%s\\n' \"$@\" > \"$capture_tmp\"\nprintf '%s\\n' \"${PORT:-}\" \"${LOCAL_STRIPE_WEBHOOKS:-}\" >> \"$capture_tmp\"\nmv \"$capture_tmp\" \"$LAUNCH_CAPTURE\"\nprintf 'fake server startup\\n'\n");
   chmodSync(lsof, 0o755);
   chmodSync(npm, 0o755);
   return { directory, bin };

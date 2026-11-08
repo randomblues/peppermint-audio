@@ -46,13 +46,15 @@ test("converts real HEIC photo IDs before submitting the booking", async ({ page
     });
   });
   await page.goto("/booking");
-  for (let step = 0; step < 3; step++) {
+  for (let step = 0; step < 2; step++) {
     await page.getByRole("button", { name: "Next", exact: true }).click();
   }
   const fixture = path.join(process.cwd(), "tests/fixtures/synthetic-photo.heic");
   await page.locator("#photo-id-files").setInputFiles(fixture);
   await page.locator("#photo-id-files").setInputFiles(fixture);
   await expect(page.getByRole("button", { name: "Remove synthetic-photo.heic", exact: true })).toHaveCount(2);
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Review your hire and terms" })).toBeVisible();
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Submit a Booking Request", exact: true }).click();
   await expect(page.getByText("Thanks — we have received your request")).toBeVisible({ timeout: 20_000 });

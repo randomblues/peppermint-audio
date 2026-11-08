@@ -36,6 +36,7 @@ vi.mock("jszip", () => ({
   },
 }));
 vi.mock("resend", () => ({ Resend: mocks.Resend }));
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/send-booking-confirmation", () => ({
   sendBookingConfirmationEmail: mocks.sendBookingConfirmationEmail,
 }));
@@ -308,7 +309,8 @@ describe("admin booking routes", () => {
       payment_received_at: expect.any(String),
     }));
     expect(mocks.markInvoiceStatus).toHaveBeenCalledWith(expect.anything(), "b1", "paid", expect.any(String));
-    expect(mocks.sendBillingDocument).toHaveBeenCalledWith(expect.anything(), "b1", "payment_receipt");
+    expect(mocks.sendBillingDocument).toHaveBeenCalledOnce();
+    expect(mocks.sendBillingDocument.mock.calls[0]?.slice(1, 3)).toEqual(["b1", "payment_receipt"]);
     expect(mocks.sendBookingConfirmationEmail).toHaveBeenCalledOnce();
     expect(await response.json()).toMatchObject({ payment: { hire_payment_status: "bank_transfer_received" } });
   });
@@ -343,7 +345,8 @@ describe("admin booking routes", () => {
       error: expect.stringContaining(failure === "confirmation" ? "confirmation email failed" : "payment receipt delivery failed"),
     });
     expect(mocks.sendBookingConfirmationEmail).toHaveBeenCalledOnce();
-    expect(mocks.sendBillingDocument).toHaveBeenCalledWith(expect.anything(), "b1", "payment_receipt");
+    expect(mocks.sendBillingDocument).toHaveBeenCalledOnce();
+    expect(mocks.sendBillingDocument.mock.calls[0]?.slice(1, 3)).toEqual(["b1", "payment_receipt"]);
   });
 
   it("allows confirmation for cash-on-pickup bookings with payment still due", async () => {
