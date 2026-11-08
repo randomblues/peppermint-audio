@@ -96,7 +96,7 @@ const packageGuides = [
 
 export default function GetStartedPage() {
   return (
-    <main className="mx-auto w-full max-w-4xl px-4 py-14 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-4xl px-4 py-14 sm:px-6 lg:px-8">
       <header className="max-w-2xl">
         <Badge variant="secondary">Peppermint Audio</Badge>
         <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">
@@ -251,6 +251,6 @@ export default function GetStartedPage() {
         If something does not match your equipment or a cable is missing, stop and
         contact Peppermint Audio before powering up.
       </p>
-    </main>
+    </div>
   );
 }

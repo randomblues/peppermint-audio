@@ -317,7 +317,7 @@ export function AdminConsole() {
       {mobileNav && <button aria-label="Close navigation" className="fixed inset-0 z-20 bg-black/20 md:hidden" onClick={() => setMobileNav(false)} />}
       <div className="md:pl-64">
         <header className="admin-console-topbar sticky top-0 z-10 border-b bg-background/95 backdrop-blur"><div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-8"><Button aria-label="Open navigation" variant="ghost" size="icon" className="shrink-0 md:hidden" onClick={() => setMobileNav(true)}><Menu /></Button><div className="hidden min-w-0 md:block"><p className="text-sm font-medium">{sectionHeading}</p><p className="text-xs text-muted-foreground">{sectionDescription}</p></div><div className="flex shrink-0 items-center gap-3"><span className="hidden text-xs text-muted-foreground sm:inline">{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" })}` : "Not updated yet"}</span><Button variant="outline" size="sm" className="gap-2" onClick={() => void load()} disabled={loading}><RefreshCw className={loading ? "size-3.5 animate-spin" : "size-3.5"} />Refresh</Button><Button aria-label="Sign out" variant="ghost" size="icon" className="md:hidden" onClick={() => void signOut()}><LogOut /></Button></div></div></header>
-        <main className="admin-console-main mx-auto w-full max-w-6xl space-y-7 p-4 sm:p-8">
+        <div className="admin-console-main mx-auto w-full max-w-6xl space-y-7 p-4 sm:p-8">
           {message && messageType === "success" && <p role="status" className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm text-primary">{message}</p>}
           {section === "analytics" ? (
             <AdminBusinessAnalytics bookings={bookings} loading={loading} error={error} onRetry={() => void load()} />
@@ -355,7 +355,7 @@ export function AdminConsole() {
               </div>
             </section>
           )}
-        </main>
+        </div>
       </div>
       {selected && <BookingDetail booking={selected} onClose={() => setSelected(null)} onUpdate={update} onPhoto={signedLink} onDelete={deleteBooking} onSendEmail={sendEmail} onPaymentUpdated={paymentUpdated} />}
     </div>
@@ -663,7 +663,7 @@ function TaxReportPage() {
        <button type="button" role="tab" aria-selected={tool === "tax"} onClick={() => setTool("tax")} className={`rounded-md px-3 py-2 text-sm font-medium ${tool === "tax" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}>Tax</button>
      </div>
      {tool === "tax" ? <IncomeTaxCalculator /> : <><Card>
-       <CardContent className="grid gap-4 p-4 lg:grid-cols-[1fr_1fr_1.4fr_auto] lg:items-end">
+       <CardContent className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)_auto] xl:items-end">
          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground"><span>From</span><input aria-label="GST report from date" type="date" value={from} onChange={(event) => setFrom(event.target.value)} className="h-10 rounded-lg border bg-background px-3 text-sm font-normal text-foreground" /></label>
          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground"><span>To</span><input aria-label="GST report to date" type="date" value={to} onChange={(event) => setTo(event.target.value)} className="h-10 rounded-lg border bg-background px-3 text-sm font-normal text-foreground" /></label>
          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground"><span>Report basis</span><select aria-label="GST report basis" value={basis} onChange={(event) => setBasis(event.target.value as "paid" | "issued")} className="h-10 rounded-lg border bg-background px-3 text-sm font-normal text-foreground"><option value="paid">Payments received (cash basis)</option><option value="issued">Invoices issued (accrual basis)</option></select></label>

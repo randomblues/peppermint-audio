@@ -42,6 +42,7 @@ export default async function EquipmentDetailPage({ params }: EquipmentDetailPag
     <Section
       eyebrow="Equipment hire"
       title={item.name}
+      headingAs="h1"
       description="Review the details, choose the setup you need, and request this hire for your event."
     >
       <Button variant="ghost" nativeButton={false} render={<Link href="/equipment" />} className="mb-4 px-0">

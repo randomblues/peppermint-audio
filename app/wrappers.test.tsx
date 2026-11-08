@@ -6,6 +6,8 @@ import AdminLoginPage from "./admin/login/page";
 import AdminPage from "./admin/page";
 import { metadata as cartMetadata } from "./cart/page";
 import EquipmentDetailPage, { generateMetadata as generateEquipmentMetadata } from "./equipment/[slug]/page";
+import PaymentCancelledPage from "./payment/cancelled/page";
+import PaymentSuccessPage from "./payment/success/page";
 import { metadata as packagesMetadata } from "./packages/page";
 import robots from "./robots";
 import sitemap from "./sitemap";
@@ -50,6 +52,7 @@ vi.mock("@/components/admin-console", () => ({
 describe("app wrappers and metadata", () => {
   it.each(equipmentCatalog)("shows the correct popularity and copy on the detail page for $slug", async (item) => {
     render(await EquipmentDetailPage({ params: Promise.resolve({ slug: item.slug }) }));
+    expect(screen.getByRole("heading", { level: 1, name: item.name })).toBeInTheDocument();
     expect(screen.getByText(item.description)).toBeInTheDocument();
     if (item.popular) {
       expect(screen.getByText("Popular")).toBeInTheDocument();
@@ -104,6 +107,7 @@ describe("app wrappers and metadata", () => {
     expect(screen.getByTestId("navbar")).toBeInTheDocument();
     expect(screen.getByTestId("footer")).toBeInTheDocument();
     expect(screen.getByTestId("mobile-contact-bar")).toBeInTheDocument();
+    expect(screen.getAllByRole("main")).toHaveLength(1);
 
     const structuredData = document.querySelector('script[type="application/ld+json"]');
     expect(structuredData).not.toBeNull();
@@ -114,6 +118,15 @@ describe("app wrappers and metadata", () => {
       telephone: business.phone,
       email: business.email,
     });
+  });
+
+  it.each([
+    ["payment success", PaymentSuccessPage, "Payment step received"],
+    ["payment cancellation", PaymentCancelledPage, "Payment not completed"],
+  ])("provides a primary heading on the %s page", (_name, Page, heading) => {
+    render(<Page />);
+
+    expect(screen.getByRole("heading", { level: 1, name: heading })).toBeInTheDocument();
   });
 
   it("composes the admin login route with the login component", () => {

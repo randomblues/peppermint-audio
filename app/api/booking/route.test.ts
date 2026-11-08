@@ -138,6 +138,18 @@ describe("POST /api/booking", () => {
     expect(createAdminClient).not.toHaveBeenCalled();
   });
 
+  it("returns a client error when multipart form data cannot be parsed", async () => {
+    const request = {
+      formData: vi.fn().mockRejectedValue(new TypeError("Invalid multipart body")),
+    } as unknown as Request;
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Please submit a valid booking request and try again." });
+    expect(createAdminClient).not.toHaveBeenCalled();
+  });
+
   it("persists canonical multi-night totals regardless of submitted catalogue prices", async () => {
     const response = await POST(bookingRequest({
       ...validFields,

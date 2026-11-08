@@ -23,7 +23,12 @@ function formatEmailDate(value: string) {
 export async function POST(request: Request) {
   const { apiKey: resendApiKey, from: fromEmail, to: toEmail } = emailConfiguration();
   try {
-    const formData = await request.formData();
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch {
+      return NextResponse.json({ error: "Please submit a valid booking request and try again." }, { status: 400 });
+    }
     const payload = Object.fromEntries(Array.from(formData.entries()).filter(([, value]) => typeof value === "string"));
     const parsed = bookingSchema.safeParse(payload);
     const files = formData.getAll("idFiles").filter((value): value is File => value instanceof File);

@@ -82,7 +82,34 @@ describe("admin inventory route", () => {
       p_name: "Smoke machine",
       p_category: "Effects",
       p_opening_quantity: 1,
+      p_mappings: [{
+        catalog_key: "package:standard-party-events",
+        units_per_line_item: 1,
+      }],
     }));
+  });
+
+  it("replaces product mappings using the database function's field names", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    mocks.requireAdminJson.mockResolvedValue({
+      session: { admin: { rpc } },
+      body: {
+        action: "replace_mappings",
+        productId: "7b6e5e2e-6bc7-4c7f-a5e0-34d065f80f84",
+        mappings: [{ catalogKey: "package:standard-party-events", unitsPerLineItem: 2 }],
+      },
+    });
+
+    const response = await POST(new Request("http://localhost/api/admin/inventory", { method: "POST" }));
+
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("replace_inventory_product_mappings", {
+      p_product_id: "7b6e5e2e-6bc7-4c7f-a5e0-34d065f80f84",
+      p_mappings: [{
+        catalog_key: "package:standard-party-events",
+        units_per_line_item: 2,
+      }],
+    });
   });
 
   it("rejects unlisted catalog keys and GST greater than purchase cost", async () => {

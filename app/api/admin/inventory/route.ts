@@ -51,7 +51,10 @@ export async function POST(request: Request) {
       p_name: parsed.data.name,
       p_category: parsed.data.category,
       p_opening_quantity: parsed.data.openingQuantity,
-      p_mappings: parsed.data.mappings,
+      p_mappings: parsed.data.mappings.map(({ catalogKey, unitsPerLineItem }) => ({
+        catalog_key: catalogKey,
+        units_per_line_item: unitsPerLineItem,
+      })),
     });
     if (error) return NextResponse.json({ error: `Inventory product could not be created: ${error.message}` }, { status: 500 });
     return NextResponse.json({ ok: true, productId: data });
@@ -65,7 +68,10 @@ export async function POST(request: Request) {
     }
     const { error } = await session.admin.rpc("replace_inventory_product_mappings", {
       p_product_id: productId,
-      p_mappings: parsed.data,
+      p_mappings: parsed.data.map(({ catalogKey, unitsPerLineItem }) => ({
+        catalog_key: catalogKey,
+        units_per_line_item: unitsPerLineItem,
+      })),
     });
     if (error) return NextResponse.json({ error: `Product mappings could not be saved: ${error.message}` }, { status: 500 });
     return NextResponse.json({ ok: true });

@@ -31,5 +31,5 @@ export function AdminLogin() {
       setError("The admin login service is unavailable.");
     }
   }
-  return <main className="mx-auto flex min-h-[70vh] max-w-md items-center px-6"><h1 className="sr-only">Admin login</h1><Card className="w-full"><CardHeader><CardTitle>Admin login</CardTitle></CardHeader><CardContent><form onSubmit={submit} className="space-y-4"><label className="block space-y-1.5 text-sm">Email<Input name="email" type="email" required /></label><label className="block space-y-1.5 text-sm">Password<Input name="password" type="password" required /></label>{error && <p className="text-sm text-destructive">{error}</p>}<Button type="submit">Sign in</Button></form></CardContent></Card></main>;
+  return <div className="mx-auto flex min-h-[70vh] max-w-md items-center px-6"><h1 className="sr-only">Admin login</h1><Card className="w-full"><CardHeader><CardTitle>Admin login</CardTitle></CardHeader><CardContent><form onSubmit={submit} className="space-y-4"><label className="block space-y-1.5 text-sm">Email<Input name="email" type="email" required /></label><label className="block space-y-1.5 text-sm">Password<Input name="password" type="password" required /></label>{error && <p className="text-sm text-destructive">{error}</p>}<Button type="submit">Sign in</Button></form></CardContent></Card></div>;
 }

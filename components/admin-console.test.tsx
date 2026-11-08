@@ -526,6 +526,11 @@ describe("AdminConsole", () => {
     await screen.findByText("Alex Smith");
     fireEvent.click(screen.getByRole("link", { name: "Tax" }));
     expect(await screen.findByRole("heading", { name: "Tax" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.queryByRole("main")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Run report" }).parentElement).toHaveClass(
+      "xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)_auto]",
+    );
     fireEvent.click(screen.getByRole("tab", { name: "Tax" }));
     fireEvent.change(screen.getByLabelText("Gross full-time salary and wages"), { target: { value: "50000" } });
     fireEvent.change(screen.getByLabelText("Business income"), { target: { value: "10000" } });

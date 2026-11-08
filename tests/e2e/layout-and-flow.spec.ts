@@ -5,12 +5,15 @@ const routeChecks = [
   "/",
   "/packages",
   "/equipment",
+  "/equipment/bose-s1-pro",
   "/cart",
   "/booking",
   "/contact",
   "/how-it-works",
   "/faq",
   "/get-started",
+  "/payment/success",
+  "/payment/cancelled",
   "/admin/login",
 ];
 
@@ -32,6 +35,8 @@ test.describe("layout and screen integrity", () => {
       const response = await page.goto(route, { waitUntil: "domcontentloaded" });
       expect(response?.status()).toBe(200);
       await expect(page.locator("body")).toBeVisible();
+      await expect(page.getByRole("main")).toHaveCount(1);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
 
       const metrics = await findHorizontalOverflow(page);
       expect(
