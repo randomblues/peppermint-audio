@@ -18,14 +18,27 @@ let booking: DeferredDepositBooking;
 let update: ReturnType<typeof vi.fn>;
 
 function admin(failWrites = false) {
-  let wrote = false;
+  let updates: object | null = null;
+  let filters: [string, unknown][] = [];
   const query = {
-    select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(),
-    maybeSingle: vi.fn(async () => wrote && failWrites ? { data: null, error: null } : { data: { ...booking }, error: null }),
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn((key: string, value: unknown) => { filters.push([key, value]); return query; }),
+    is: vi.fn((key: string, value: unknown) => { filters.push([key, value]); return query; }),
+    maybeSingle: vi.fn(async () => {
+      const matches = filters.every(([key, value]) => booking[key as keyof DeferredDepositBooking] === value);
+      filters = [];
+      if (updates) {
+        const values = updates;
+        updates = null;
+        if (failWrites || !matches) return { data: null, error: null };
+        Object.assign(booking, values);
+        return { data: { id: booking.id }, error: null };
+      }
+      return { data: matches ? { ...booking } : null, error: null };
+    }),
     update: vi.fn((values: object) => {
-      wrote = true;
+      updates = values;
       update(values);
-      if (!failWrites) Object.assign(booking, values);
       return query;
     }),
     then: (resolve: (value: object) => unknown) => Promise.resolve({ error: null }).then(resolve),
@@ -52,7 +65,7 @@ beforeEach(() => {
     stripe_customer_id: "cus_1", stripe_hire_payment_intent_id: "pi_hire", stripe_deposit_payment_intent_id: null,
     deposit_hold_date: "2026-10-09", deposit_consent_at: "2026-09-01T00:00:00Z",
     deposit_payment_status: "scheduled", deposit_capture_before: null, deposit_error: null,
-    deposit_attention_sent_at: null, payment_token: "secure-token",
+    deposit_attention_sent_at: null, deposit_attention_claimed_at: null, payment_token: "secure-token",
   };
   mocks.retrieve.mockResolvedValue({
     id: "pi_hire", status: "succeeded", customer: "cus_1", payment_method: "pm_saved",
@@ -202,10 +215,34 @@ describe("deferred deposit holds", () => {
     expect(mocks.send).toHaveBeenCalledTimes(2);
   });
 
+  it("sends and records only one customer alert when cron and webhook race", async () => {
+    booking.deposit_payment_status = "failed";
+    const sharedAdmin = admin();
+    const staleBooking = { ...booking };
+    await Promise.all([
+      notifyDepositAttention(sharedAdmin, staleBooking),
+      notifyDepositAttention(sharedAdmin, staleBooking),
+    ]);
+    expect(mocks.send).toHaveBeenCalledTimes(2);
+    expect(mocks.record).toHaveBeenCalledTimes(1);
+    expect(booking.deposit_attention_sent_at).not.toBeNull();
+    expect(booking.deposit_attention_claimed_at).toBeNull();
+  });
+
+  it("reclaims a notification claim left by a terminated job", async () => {
+    booking.deposit_payment_status = "failed";
+    booking.deposit_attention_claimed_at = new Date(Date.now() - 16 * 60 * 1000).toISOString();
+    await notifyDepositAttention(admin(), booking);
+    expect(mocks.send).toHaveBeenCalledTimes(2);
+    expect(booking.deposit_attention_sent_at).not.toBeNull();
+    expect(booking.deposit_attention_claimed_at).toBeNull();
+  });
+
   it("does not mark unsuccessful email delivery as notified", async () => {
     booking.deposit_payment_status = "failed";
     mocks.send.mockResolvedValue({ error: { message: "Email unavailable" } });
     await expect(notifyDepositAttention(admin(), booking)).rejects.toThrow("Email unavailable");
     expect(booking.deposit_attention_sent_at).toBeNull();
+    expect(booking.deposit_attention_claimed_at).toBeNull();
   });
 });

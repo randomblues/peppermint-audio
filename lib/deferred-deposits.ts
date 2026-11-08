@@ -29,6 +29,7 @@ export type DeferredDepositBooking = {
   deposit_capture_before: string | null;
   deposit_error: string | null;
   deposit_attention_sent_at: string | null;
+  deposit_attention_claimed_at: string | null;
   payment_token: string | null;
 };
 
@@ -170,35 +171,85 @@ export async function attemptDeferredDeposit(admin: Admin, bookingId: string, no
   return syncDeferredDeposit(admin, booking, intent);
 }
 
+const DEPOSIT_ATTENTION_CLAIM_TTL_MS = 15 * 60 * 1000;
+
+async function claimDepositAttention(admin: Admin, booking: DeferredDepositBooking) {
+  if (booking.deposit_attention_sent_at) return null;
+
+  const now = new Date();
+  const currentClaim = booking.deposit_attention_claimed_at;
+  if (currentClaim && Date.parse(currentClaim) > now.getTime() - DEPOSIT_ATTENTION_CLAIM_TTL_MS) return null;
+
+  const claimAt = now.toISOString();
+  let query = admin.from("bookings").update({ deposit_attention_claimed_at: claimAt })
+    .eq("id", booking.id).is("deposit_attention_sent_at", null);
+  query = currentClaim
+    ? query.eq("deposit_attention_claimed_at", currentClaim)
+    : query.is("deposit_attention_claimed_at", null);
+  const result = await query.select("id").maybeSingle();
+  if (result.error) throw new Error(`Deposit notification claim failed: ${result.error.message}`);
+  return result.data ? claimAt : null;
+}
+
+async function finishDepositAttention(admin: Admin, bookingId: string, claimAt: string) {
+  const result = await admin.from("bookings")
+    .update({ deposit_attention_sent_at: new Date().toISOString(), deposit_attention_claimed_at: null })
+    .eq("id", bookingId).eq("deposit_attention_claimed_at", claimAt)
+    .is("deposit_attention_sent_at", null).select("id").maybeSingle();
+  if (result.error || !result.data) {
+    throw new Error(`Deposit notification status could not be saved: ${result.error?.message ?? "notification claim was lost"}`);
+  }
+}
+
+async function releaseDepositAttentionClaim(admin: Admin, bookingId: string, claimAt: string) {
+  const result = await admin.from("bookings").update({ deposit_attention_claimed_at: null })
+    .eq("id", bookingId).eq("deposit_attention_claimed_at", claimAt).select("id").maybeSingle();
+  if (result.error || !result.data) {
+    throw new Error(`Deposit notification claim could not be released: ${result.error?.message ?? "notification claim was lost"}`);
+  }
+}
+
 export async function notifyDepositAttention(admin: Admin, booking: DeferredDepositBooking) {
   if (!["submitted", "confirmed"].includes(booking.status)) return;
   if (!["failed", "action_required", "hold_too_short", "expired"].includes(booking.deposit_payment_status)
     || booking.deposit_attention_sent_at) return;
-  const { apiKey, from, to } = emailConfiguration();
-  if (!apiKey || !from || !to) throw new Error("Deposit notification email service is not configured.");
-  const origin = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://peppermint-audio.vercel.app").replace(/\/$/, "");
-  const actionable = ["failed", "action_required"].includes(booking.deposit_payment_status) && booking.payment_token;
-  const message = actionable
-    ? `Please complete your ${formatAudCents(booking.security_deposit_cents)} security-deposit hold before pickup using your secure payment link. Your hire payment has already been received.`
-    : "Please contact Peppermint Audio before pickup to arrange your security deposit. Your hire payment has already been received.";
-  const url = actionable ? `${origin}/pay/${encodeURIComponent(booking.payment_token!)}` : null;
-  const resend = new Resend(apiKey);
-  const key = `${booking.id}-${booking.stripe_deposit_payment_intent_id}-${booking.deposit_payment_status}`;
-  const internal = await resend.emails.send({
-    from, to: [to], subject: `Deposit needs attention: ${booking.id}`,
-    text: `Booking: ${booking.id}\nPickup: ${booking.pickup_date}\nDeposit status: ${booking.deposit_payment_status}\n${booking.deposit_error ?? ""}\nDo not hand over equipment without securing the deposit.`,
-  }, { idempotencyKey: `deposit-admin-${key}` });
-  if (internal.error) throw new Error(`Deposit admin alert failed: ${internal.error.message}`);
-  const customer = await resend.emails.send({
-    from, to: [booking.email], subject: "Your security deposit needs attention",
-    text: `Hi ${booking.first_name},\n\n${message}${url ? `\n${url}` : ""}`,
-    html: emailLayout({
-      eyebrow: "Security deposit", title: "Please arrange your deposit before pickup",
-      intro: `Hi ${escapeEmailHtml(booking.first_name)}, ${escapeEmailHtml(message)}`,
-      content: url ? emailPanel(`<a href="${escapeEmailHtml(url)}">Complete your security-deposit hold</a>`, "accent") : "",
-    }),
-  }, { idempotencyKey: `deposit-customer-${key}` });
-  if (customer.error) throw new Error(`Deposit customer email failed: ${customer.error.message}`);
-  await recordCustomerEmail(admin, { bookingId: booking.id, recipientEmail: booking.email, emailType: "custom", providerMessageId: customer.data?.id });
-  await saveDeposit(admin, booking, { deposit_attention_sent_at: new Date().toISOString() });
+  // Compare-and-swap keeps the cron and Stripe webhook from sending the same alert concurrently.
+  const claimAt = await claimDepositAttention(admin, booking);
+  if (!claimAt) return;
+  try {
+    const { apiKey, from, to } = emailConfiguration();
+    if (!apiKey || !from || !to) throw new Error("Deposit notification email service is not configured.");
+    const origin = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://peppermint-audio.vercel.app").replace(/\/$/, "");
+    const actionable = ["failed", "action_required"].includes(booking.deposit_payment_status) && booking.payment_token;
+    const message = actionable
+      ? `Please complete your ${formatAudCents(booking.security_deposit_cents)} security-deposit hold before pickup using your secure payment link. Your hire payment has already been received.`
+      : "Please contact Peppermint Audio before pickup to arrange your security deposit. Your hire payment has already been received.";
+    const url = actionable ? `${origin}/pay/${encodeURIComponent(booking.payment_token!)}` : null;
+    const resend = new Resend(apiKey);
+    const key = `${booking.id}-${booking.stripe_deposit_payment_intent_id}-${booking.deposit_payment_status}`;
+    const internal = await resend.emails.send({
+      from, to: [to], subject: `Deposit needs attention: ${booking.id}`,
+      text: `Booking: ${booking.id}\nPickup: ${booking.pickup_date}\nDeposit status: ${booking.deposit_payment_status}\n${booking.deposit_error ?? ""}\nDo not hand over equipment without securing the deposit.`,
+    }, { idempotencyKey: `deposit-admin-${key}` });
+    if (internal.error) throw new Error(`Deposit admin alert failed: ${internal.error.message}`);
+    const customer = await resend.emails.send({
+      from, to: [booking.email], subject: "Your security deposit needs attention",
+      text: `Hi ${booking.first_name},\n\n${message}${url ? `\n${url}` : ""}`,
+      html: emailLayout({
+        eyebrow: "Security deposit", title: "Please arrange your deposit before pickup",
+        intro: `Hi ${escapeEmailHtml(booking.first_name)}, ${escapeEmailHtml(message)}`,
+        content: url ? emailPanel(`<a href="${escapeEmailHtml(url)}">Complete your security-deposit hold</a>`, "accent") : "",
+      }),
+    }, { idempotencyKey: `deposit-customer-${key}` });
+    if (customer.error) throw new Error(`Deposit customer email failed: ${customer.error.message}`);
+    await recordCustomerEmail(admin, { bookingId: booking.id, recipientEmail: booking.email, emailType: "custom", providerMessageId: customer.data?.id });
+    await finishDepositAttention(admin, booking.id, claimAt);
+  } catch (cause) {
+    try {
+      await releaseDepositAttentionClaim(admin, booking.id, claimAt);
+    } catch (releaseCause) {
+      throw new AggregateError([cause, releaseCause], "Deposit notification failed and its claim could not be released.");
+    }
+    throw cause;
+  }
 }
