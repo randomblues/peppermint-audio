@@ -172,11 +172,12 @@ describe("deferred deposit holds", () => {
     expect(mocks.create).not.toHaveBeenCalled();
   });
 
-  it("waits until 7am Melbourne time before attempting a scheduled hold", async () => {
-    const beforeSeven = new Date("2026-10-09T19:00:00Z"); // 6am on the pickup date in Melbourne.
-    await attemptDeferredDeposit(admin(), booking.id, beforeSeven);
+  it("waits until 6am Melbourne time before attempting a scheduled hold", async () => {
+    const beforeSix = new Date("2026-10-09T18:00:00Z"); // 5am on the pickup date in Melbourne.
+    await attemptDeferredDeposit(admin(), booking.id, beforeSix);
     expect(mocks.create).not.toHaveBeenCalled();
     expect(booking.deposit_payment_status).toBe("scheduled");
+    expect(await attemptDeferredDeposit(admin(), booking.id, new Date("2026-10-09T19:00:00Z"))).toBe("authorized");
   });
 
   it.each([null, { payment_method_details: { card: { capture_before: Date.parse("2026-10-11T00:00:00Z") / 1000 } } }])("cancels missing or insufficient expiry rather than claiming a secured deposit", async latest_charge => {

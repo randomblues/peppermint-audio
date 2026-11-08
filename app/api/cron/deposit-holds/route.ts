@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase";
 import { attemptDeferredDeposit, notifyDepositAttention, readDepositBooking, syncDeferredDeposit } from "@/lib/deferred-deposits";
 import { getMelbourneTomorrow } from "@/lib/pickup-reminders";
-import { melbourneHour } from "@/lib/payment-flow";
 import { getStripe } from "@/lib/stripe";
 import { sendBillingDocument } from "@/lib/invoice-service";
 
@@ -14,9 +13,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const now = new Date();
-  if (melbourneHour(now) !== 7) {
-    return NextResponse.json({ skipped: true, reason: "Deposit holds run at 7:00 am Melbourne time." });
-  }
   try {
     const admin = createAdminClient();
     const result = await admin.from("bookings").select("id")

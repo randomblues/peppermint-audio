@@ -106,14 +106,14 @@ describe("GET /api/cron/pickup-reminders", () => {
     expect(createAdminClient).not.toHaveBeenCalled();
   });
 
-  it("skips the non-noon daylight-saving cron invocation", async () => {
-    vi.setSystemTime(new Date("2026-11-08T02:00:00Z")); // 1pm in Melbourne during daylight saving.
+  it("runs the single UTC trigger at 11am Melbourne time during standard time", async () => {
+    vi.setSystemTime(new Date("2026-05-08T01:00:00Z"));
     const response = await GET(request());
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ skipped: true });
-    expect(createAdminClient).not.toHaveBeenCalled();
-    expect(send).not.toHaveBeenCalled();
+    expect(await response.json()).toMatchObject({ pickupDate: "2026-09-29", sent: 2 });
+    expect(createAdminClient).toHaveBeenCalledOnce();
+    expect(send).toHaveBeenCalledTimes(2);
   });
 
   it("queries tomorrow's non-cancelled, unreminded bookings", async () => {

@@ -323,15 +323,14 @@ For pickup today or tomorrow in Melbourne, checkout also places the temporary
 deposit hold, using a separate payment method for each PaymentIntent so a
 single-use card method is not reused. For later pickup, the customer explicitly
 consents to saving their card with Stripe; the deposit hold is attempted at
-7:00 am Melbourne time on pickup day. New pickup times must be 7:30 am or later.
+6:00 am AEST or 7:00 am AEDT on pickup day. New pickup times must be 7:30 am or later.
 The hire-payment webhook also resumes due holds after the scheduled run.
 Four-night and longer hires use bank transfer or cash on pickup.
 An explicitly configured zero deposit creates no hold and shows no deposit-hold
 instructions. A failed deposit can be retried without charging the paid hire again.
 
-`/api/cron/deposit-holds` is scheduled at 20:00 and 21:00 UTC and guarded to run
-only at 07:00 Melbourne time, covering daylight-saving changes. It is protected
-by `CRON_SECRET`, resumes saved intents rather than creating duplicate holds,
+`/api/cron/deposit-holds` runs once daily at 20:00 UTC (06:00 AEST / 07:00 AEDT).
+It is protected by `CRON_SECRET`, resumes saved intents rather than creating duplicate holds,
 checks the actual card `capture_before` against return plus check-in time, and
 sends customer/admin attention emails on decline, required authentication, or an
 insufficient/expired hold. An insufficient hold is cancelled; arrange an
@@ -360,7 +359,7 @@ external check.
 
 ## Pickup reminders
 
-Reminders are sent at 12:00 pm Melbourne time on the day before pickup. Vercel invokes the route at 01:00 and 02:00 UTC; a Melbourne-time guard lets only the noon invocation send across daylight-saving changes.
+Reminders are sent around noon Melbourne time on the day before pickup. Vercel invokes the route once daily at 01:00 UTC (11:00 am AEST / 12:00 pm AEDT).
 
 `/api/cron/pickup-reminders` runs once daily through Vercel Cron and emails customers with a pickup scheduled for the next day in Melbourne. Set `CRON_SECRET` to a long random value in Vercel project environment variables; Vercel sends it as a Bearer token. The route uses the server-only Supabase service role and Resend credentials. Apply the booking migration before enabling the cron.
 

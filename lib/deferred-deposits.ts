@@ -119,7 +119,7 @@ export async function attemptDeferredDeposit(admin: Admin, bookingId: string, no
     await saveDeposit(admin, booking, { deposit_payment_status: "expired", deposit_error: "The scheduled deposit hold was missed before pickup. Arrange the deposit manually; no late automatic hold was placed." });
     return;
   }
-  if (booking.deposit_hold_date === today && melbourneHour(now) < 7) return;
+  if (booking.deposit_hold_date === today && melbourneHour(now) < 6) return;
   if (!booking.deposit_consent_at) throw new Error("Deposit card-saving consent has not been recorded.");
   const days = rentalDays(booking.pickup_date, booking.dropoff_date);
   if (days === null || days > MAX_STRIPE_HIRE_DAYS) throw new Error("This hire is not eligible for an automatic deposit hold.");

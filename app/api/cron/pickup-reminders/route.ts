@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { EmailTransport as Resend, emailConfiguration } from "@/lib/email-transport";
 import { buildPickupReminderEmail, getMelbourneTomorrow, type PickupReminderBooking } from "@/lib/pickup-reminders";
-import { melbourneHour } from "@/lib/payment-flow";
 import { createAdminClient } from "@/lib/supabase";
 import { recordCustomerEmail } from "@/lib/email-log";
 
@@ -17,9 +16,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const now = new Date();
-  if (melbourneHour(now) !== 12) {
-    return NextResponse.json({ skipped: true, reason: "Pickup reminders run at 12:00 pm Melbourne time." });
-  }
   const { apiKey, from } = emailConfiguration();
   if (!apiKey || !from) return NextResponse.json({ error: "Email service is not configured." }, { status: 500 });
 
