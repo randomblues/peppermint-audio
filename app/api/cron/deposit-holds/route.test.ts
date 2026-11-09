@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  admin: vi.fn(), attempt: vi.fn(), read: vi.fn(), sync: vi.fn(), notify: vi.fn(), retrieve: vi.fn(), document: vi.fn(),
+  admin: vi.fn(), attempt: vi.fn(), read: vi.fn(), sync: vi.fn(), notify: vi.fn(), retrieve: vi.fn(), document: vi.fn(), pickupSms: vi.fn(),
 }));
 vi.mock("@/lib/supabase", () => ({ createAdminClient: mocks.admin }));
 vi.mock("@/lib/deferred-deposits", () => ({
@@ -10,6 +10,7 @@ vi.mock("@/lib/deferred-deposits", () => ({
 }));
 vi.mock("@/lib/stripe", () => ({ getStripe: () => ({ paymentIntents: { retrieve: mocks.retrieve } }) }));
 vi.mock("@/lib/invoice-service", () => ({ sendBillingDocument: mocks.document }));
+vi.mock("@/lib/booking-sms-cron", () => ({ sendDuePickupReminderSms: mocks.pickupSms }));
 
 import { GET } from "./route";
 
@@ -25,6 +26,7 @@ beforeEach(() => {
   mocks.attempt.mockResolvedValue("authorized");
   mocks.read.mockResolvedValue({ id: "booking-1", deposit_payment_status: "authorized", stripe_deposit_payment_intent_id: "pi_deposit" });
   mocks.sync.mockResolvedValue("authorized");
+  mocks.pickupSms.mockResolvedValue(undefined);
 });
 
 describe("deposit-hold cron", () => {
@@ -47,6 +49,7 @@ describe("deposit-hold cron", () => {
     expect(mocks.attempt).toHaveBeenCalledWith(expect.anything(), "booking-1", expect.any(Date));
     expect(mocks.retrieve).toHaveBeenCalledWith("pi_deposit", { expand: ["latest_charge"] });
     expect(mocks.document).toHaveBeenCalledWith(expect.anything(), "booking-1", "deposit_authorisation");
+    expect(mocks.pickupSms).toHaveBeenCalledWith("booking-1");
   });
 
   it("returns a failure rather than a success-shaped cron result when a hold fails operationally", async () => {
@@ -54,5 +57,12 @@ describe("deposit-hold cron", () => {
     const response = await GET(new Request("http://localhost/api/cron/deposit-holds", { headers: { authorization: "Bearer test-cron-secret" } }));
     expect(response.status).toBe(502);
     expect((await response.json()).failures).toEqual([{ id: "booking-1", error: "Stripe unavailable" }]);
+  });
+
+  it("reports pickup notification errors without changing the saved deposit state", async () => {
+    mocks.pickupSms.mockRejectedValueOnce(new Error("Pickup SMS unavailable"));
+    const response = await GET(new Request("http://localhost/api/cron/deposit-holds", { headers: { authorization: ["Bearer", "test-cron-secret"].join(" ") } }));
+    expect(response.status).toBe(502);
+    expect((await response.json()).failures).toEqual([{ id: "booking-1", error: "Pickup SMS unavailable" }]);
   });
 });

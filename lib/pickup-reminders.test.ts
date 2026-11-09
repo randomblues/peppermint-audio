@@ -54,6 +54,9 @@ describe("pickup reminders", () => {
     expect(email.html).toContain("Additional requirements");
     expect(email.html).toContain("Need &lt;extra&gt; cable");
     expect(email.text).toContain("Please note:");
+    const residenceNotice = "Peppermint Audio is a small business operating from a private residence. Please respect the property and call upon arrival.";
+    expect(email.text).toContain(residenceNotice);
+    expect(email.html).toContain(residenceNotice);
     expect(email.text).toContain("pickup is tomorrow, 29 September 2026 at 10:00");
     expect(email.text).toContain("Hire items:");
     expect(email.text).toContain("Wireless Microphone");

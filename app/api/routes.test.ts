@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => {
     zipGenerate: vi.fn(),
     send,
     sendBookingConfirmationEmail: vi.fn(),
+    sendBookingConfirmationSms: vi.fn(),
     recordCustomerEmail: vi.fn(),
     removeCustomerEmailAttachments: vi.fn(),
     releaseCancelledDeferredDeposit: vi.fn(),
@@ -28,6 +29,7 @@ vi.mock("@/lib/supabase", () => ({
 vi.mock("@/lib/google-calendar", () => ({
   exchangeGoogleCalendarCode: mocks.exchangeGoogleCalendarCode,
   getGoogleCalendarAuthorizationUrl: mocks.getGoogleCalendarAuthorizationUrl,
+  isGoogleCalendarEnabled: () => false,
 }));
 vi.mock("jszip", () => ({
   default: class MockJSZip {
@@ -39,6 +41,9 @@ vi.mock("resend", () => ({ Resend: mocks.Resend }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/send-booking-confirmation", () => ({
   sendBookingConfirmationEmail: mocks.sendBookingConfirmationEmail,
+}));
+vi.mock("@/lib/send-booking-sms", () => ({
+  sendBookingConfirmationSms: mocks.sendBookingConfirmationSms,
 }));
 vi.mock("@/lib/email-log", () => ({
   recordCustomerEmail: mocks.recordCustomerEmail,
@@ -77,6 +82,7 @@ describe("admin booking routes", () => {
     vi.clearAllMocks();
     mocks.requireAdmin.mockResolvedValue(adminSession());
     mocks.sendBookingConfirmationEmail.mockResolvedValue("email-1");
+    mocks.sendBookingConfirmationSms.mockResolvedValue({ id: "sms-1" });
     mocks.removeCustomerEmailAttachments.mockResolvedValue(undefined);
     mocks.send.mockResolvedValue({ data: { id: "custom-1" }, error: null });
   });
@@ -109,6 +115,19 @@ describe("admin booking routes", () => {
     mocks.requireAdmin.mockResolvedValue(adminSession({ from: vi.fn().mockReturnValue(query) }));
     await getBookings(request("/api/admin/bookings?search=Jane%2C_%25"));
     expect(query.or).toHaveBeenCalledWith("email.ilike.%Jane\\,\\_\\%%,first_name.ilike.%Jane\\,\\_\\%%,last_name.ilike.%Jane\\,\\_\\%%,event_type.ilike.%Jane\\,\\_\\%%");
+  });
+
+  it("includes only the admin-facing SMS fields in booking history", async () => {
+    const sms = { id: "sms-one", sms_type: "confirmation", status: "accepted", body: "Confirmed", recorded_at: "2026-11-09T00:00:00Z" };
+    const query = {
+      select: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(), in: vi.fn().mockReturnThis(),
+      or: vi.fn().mockResolvedValue({ data: [{ id: "b1", sms_logs: [sms] }], error: null }),
+    };
+    mocks.requireAdmin.mockResolvedValue(adminSession({ from: vi.fn().mockReturnValue(query) }));
+    const response = await getBookings(request("/api/admin/bookings?search=Alex"));
+    expect(response.status).toBe(200);
+    expect((await response.json()).bookings[0].sms_logs).toEqual([sms]);
+    expect(query.select).toHaveBeenCalledWith("*,sms_logs:booking_sms_log(id,recipient_mobile,sms_type,body,status,provider_message_id,error,recorded_at)");
   });
 
   it("loads every page for analytics and batches email lookups", async () => {

@@ -101,6 +101,12 @@ export function BookingForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [phoneVerificationToken, setPhoneVerificationToken] = useState("");
+  const [verifiedMobile, setVerifiedMobile] = useState("");
+  const [phoneVerificationCode, setPhoneVerificationCode] = useState("");
+  const [phoneVerificationError, setPhoneVerificationError] = useState("");
+  const [isSendingPhoneCode, setIsSendingPhoneCode] = useState(false);
+  const [isVerifyingPhoneCode, setIsVerifyingPhoneCode] = useState(false);
   const [submitted, setSubmitted] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [finalStepSubmitAttempted, setFinalStepSubmitAttempted] = useState(false);
@@ -136,6 +142,12 @@ export function BookingForm() {
 
   function update(name: keyof typeof initialValues, value: string) {
     setValues((current) => ({ ...current, [name]: value }));
+    if (name === "mobile") {
+      setPhoneVerificationToken("");
+      setVerifiedMobile("");
+      setPhoneVerificationCode("");
+      setPhoneVerificationError("");
+    }
     if (name === "termsAccepted") {
       setTermsTouched(true);
     }
@@ -198,6 +210,10 @@ export function BookingForm() {
 
   function goToNextStep() {
     if (!validateCurrentStep()) return;
+    if (currentStep === 0 && verifiedMobile !== values.mobile) {
+      setPhoneVerificationError("Verify your mobile number before continuing.");
+      return;
+    }
     setCurrentStep((step) => {
       const nextStep = Math.min(step + 1, bookingSteps.length - 1);
       if (nextStep === 3) {
@@ -213,18 +229,75 @@ export function BookingForm() {
     });
   }
 
+  async function sendPhoneVerificationCode() {
+    setPhoneVerificationError("");
+    setPhoneVerificationToken("");
+    setVerifiedMobile("");
+    setIsSendingPhoneCode(true);
+    try {
+      const response = await fetch("/api/phone-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "send", mobile: values.mobile }),
+      });
+      const payload = await response.json().catch(() => null) as { error?: string; challengeToken?: string } | null;
+      if (!response.ok || !payload?.challengeToken) {
+        throw new Error(payload?.error ?? "Could not send a verification code.");
+      }
+      setPhoneVerificationToken(payload.challengeToken);
+      setPhoneVerificationCode("");
+    } catch (error) {
+      setPhoneVerificationError(error instanceof Error ? error.message : "Could not send a verification code.");
+    } finally {
+      setIsSendingPhoneCode(false);
+    }
+  }
+
+  async function verifyPhoneNumber() {
+    if (!phoneVerificationToken) return;
+    setPhoneVerificationError("");
+    setIsVerifyingPhoneCode(true);
+    try {
+      const response = await fetch("/api/phone-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "verify",
+          mobile: values.mobile,
+          challengeToken: phoneVerificationToken,
+          code: phoneVerificationCode,
+        }),
+      });
+      const payload = await response.json().catch(() => null) as { error?: string; verified?: boolean } | null;
+      if (!response.ok || !payload?.verified) {
+        throw new Error(payload?.error ?? "Could not verify this mobile number.");
+      }
+      setVerifiedMobile(values.mobile);
+    } catch (error) {
+      setPhoneVerificationError(error instanceof Error ? error.message : "Could not verify this mobile number.");
+    } finally {
+      setIsVerifyingPhoneCode(false);
+    }
+  }
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (currentStep !== bookingSteps.length - 1) return;
     setFinalStepSubmitAttempted(true);
     const requestValues = { ...values, hireLineItems: JSON.stringify(lineItems) };
     if (!validate(requestValues)) return;
+    if (!phoneVerificationToken || verifiedMobile !== values.mobile) {
+      setPhoneVerificationError("Verify your mobile number before submitting the booking.");
+      setCurrentStep(0);
+      return;
+    }
     setIsSubmitting(true);
     setServerError("");
     const formData = new FormData();
     Object.entries(requestValues).forEach(([name, value]) => {
       if (name !== "idFiles") formData.append(name, String(value));
     });
+    formData.append("phoneVerificationToken", phoneVerificationToken);
     try {
       for (const file of values.idFiles) formData.append("idFiles", await preparePhotoId(file));
       const response = await fetch("/api/booking", { method: "POST", body: formData });
@@ -238,6 +311,11 @@ export function BookingForm() {
       window.localStorage.removeItem(draftKey);
     } catch (error) {
       setServerError(error instanceof Error ? error.message : "Could not submit your booking request. Please try again.");
+      setPhoneVerificationToken("");
+      setVerifiedMobile("");
+      setPhoneVerificationCode("");
+      setPhoneVerificationError("Please verify your mobile number again before retrying.");
+      setCurrentStep(0);
     } finally {
       setIsSubmitting(false);
     }
@@ -334,6 +412,38 @@ export function BookingForm() {
                 <Field label="Last name" name="lastName" value={values.lastName} onChange={(value) => update("lastName", value)} error={errors.lastName} />
                 <Field label="Email" name="email" type="email" value={values.email} onChange={(value) => update("email", value)} error={errors.email} />
                 <Field label="Mobile number" name="mobile" value={values.mobile} onChange={(value) => update("mobile", value)} error={errors.mobile} />
+                <div className="space-y-2 sm:col-span-2">
+                  {verifiedMobile === values.mobile ? (
+                    <p role="status" className="text-sm text-primary">Mobile number verified.</p>
+                  ) : (
+                    <>
+                      <Button type="button" variant="outline" onClick={sendPhoneVerificationCode} disabled={isSendingPhoneCode || !values.mobile.trim()}>
+                        {isSendingPhoneCode ? "Sending code..." : phoneVerificationToken ? "Send another code" : "Send verification code"}
+                      </Button>
+                      {phoneVerificationToken ? (
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <div className="space-y-1">
+                            <Label htmlFor="phoneVerificationCode">Verification code</Label>
+                            <Input
+                              id="phoneVerificationCode"
+                              type="text"
+                              inputMode="numeric"
+                              autoComplete="one-time-code"
+                              maxLength={6}
+                              value={phoneVerificationCode}
+                              onChange={(event) => setPhoneVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                            />
+                          </div>
+                          <Button type="button" variant="outline" onClick={verifyPhoneNumber} disabled={isVerifyingPhoneCode || phoneVerificationCode.length !== 6} className="self-end">
+                            {isVerifyingPhoneCode ? "Verifying..." : "Verify number"}
+                          </Button>
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                  {phoneVerificationError ? <p role="alert" className="text-xs text-destructive">{phoneVerificationError}</p> : null}
+                  <p className="text-xs text-muted-foreground">We’ll text a code to confirm you can receive messages at this number.</p>
+                </div>
               </div>
             ) : null}
 

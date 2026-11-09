@@ -1,4 +1,5 @@
 import { google } from "googleapis";
+import { createHash } from "node:crypto";
 import type { BookingLineItem } from "@/lib/booking-line-items";
 
 export type BookingCalendarDetails = {
@@ -60,12 +61,12 @@ function addOneDay(dateValue: string) {
   return date.toISOString().slice(0, 10);
 }
 
-export async function createBookingCalendarEvent(details: BookingCalendarDetails) {
+export async function createBookingCalendarEvent(details: BookingCalendarDetails, options?: { bookingId: string }) {
   if (!isGoogleCalendarEnabled()) return null;
 
-  const refreshToken = process.env.GOOGLE_CALENDAR_REFRESH_TOKEN;
+  const refreshToken = process.env.GOOGLE_CALENDAR_REFRESH_TOKEN?.trim();
   if (!refreshToken) {
-    return null;
+    throw new Error("Google Calendar is enabled but not connected. Reconnect Google Calendar and configure its refresh token.");
   }
 
   const client = getOAuthClient();
@@ -74,13 +75,14 @@ export async function createBookingCalendarEvent(details: BookingCalendarDetails
   const calendarId = process.env.GOOGLE_CALENDAR_ID ?? "primary";
 
   const start = details.pickupTime
-    ? { dateTime: `${details.pickupDate}T${details.pickupTime}:00`, timeZone: "Australia/Melbourne" }
+    ? { dateTime: `${details.pickupDate}T${details.pickupTime.length === 5 ? `${details.pickupTime}:00` : details.pickupTime}`, timeZone: "Australia/Melbourne" }
     : { date: details.pickupDate };
   const end = details.dropoffTime
-    ? { dateTime: `${details.dropoffDate}T${details.dropoffTime}:00`, timeZone: "Australia/Melbourne" }
+    ? { dateTime: `${details.dropoffDate}T${details.dropoffTime.length === 5 ? `${details.dropoffTime}:00` : details.dropoffTime}`, timeZone: "Australia/Melbourne" }
     : { date: addOneDay(details.dropoffDate) };
 
-  const response = await calendar.events.insert({
+  const eventId = options ? createHash("sha256").update(`booking:${options.bookingId}`).digest("hex") : undefined;
+  const event = {
     calendarId,
     requestBody: {
       summary: `PA Hire - ${details.eventType} - ${details.firstName} ${details.lastName}`,
@@ -100,7 +102,18 @@ export async function createBookingCalendarEvent(details: BookingCalendarDetails
       end,
       reminders: { useDefault: true },
     },
-  });
+  };
+  let response;
+  try {
+    response = await calendar.events.insert({
+      ...event,
+      requestBody: { ...event.requestBody, ...(eventId ? { id: eventId } : {}) },
+    });
+  } catch (error) {
+    if (!eventId || !(error && typeof error === "object" && "code" in error && error.code === 409)) throw error;
+    response = await calendar.events.update({ ...event, eventId });
+  }
 
-  return response.data.htmlLink ?? null;
+  if (!response.data.htmlLink) throw new Error("Google Calendar did not return an event link.");
+  return response.data.htmlLink;
 }

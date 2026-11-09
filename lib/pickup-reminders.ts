@@ -2,6 +2,10 @@ import { emailFooterText } from "@/lib/email-footer";
 import { emailDetailsTable, emailLayout, emailPanel, escapeEmailHtml } from "@/lib/email-template";
 import { lineItemsForBooking, type BookingLineItem } from "@/lib/booking-line-items";
 
+export function getPickupResidenceNotice(contactMethod: "call" | "message" | "message or call" = "call") {
+  return `Peppermint Audio is a small business operating from a private residence. Please respect the property and ${contactMethod} upon arrival.`;
+}
+
 export type PickupReminderBooking = {
   email: string;
   first_name: string;
@@ -73,7 +77,7 @@ export function buildPickupReminderEmail(booking: PickupReminderBooking, options
     `Pickup address: 181 Nicholson St, Abbotsford VIC 3067`,
     "Please message or call Peppermint Audio on 0452 316 823 30 minutes before arriving.",
     "",
-    "Please note: Peppermint Audio is a small business operating from a private residence. Please respect the property and call upon arrival.",
+    `Please note: ${getPickupResidenceNotice()}`,
     "",
     "Transport and handling:",
     ...transportText,
@@ -100,7 +104,7 @@ export function buildPickupReminderEmail(booking: PickupReminderBooking, options
         { label: "Phone", value: "0452 316 823" },
       ]), "accent")}
       ${emailPanel(`<p style="margin:0;color:#574412;font-size:14px;line-height:1.6"><strong>Please message or call 30 minutes before arriving.</strong></p>`, "warning")}
-      ${emailPanel(`<p style="margin:0;color:#405148;font-size:14px;line-height:1.6"><strong>Please note:</strong> Peppermint Audio is a small business operating from a private residence. Please respect the property and call upon arrival.</p>`, "soft")}
+      ${emailPanel(`<p style="margin:0;color:#405148;font-size:14px;line-height:1.6"><strong>Please note:</strong> ${escapeEmailHtml(getPickupResidenceNotice())}</p>`, "soft")}
       ${emailPanel(`<p style="margin:0;color:#1d2823;font-size:15px;font-weight:700">Hire items</p>${hireItemsList}`, "soft")}
       ${emailPanel(`<p style="margin:0;color:#1d2823;font-size:15px;font-weight:700">Transport and handling</p>${transportList}`, "soft")}
       ${additionalPanel}

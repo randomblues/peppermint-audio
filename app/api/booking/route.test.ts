@@ -28,6 +28,7 @@ vi.mock("@/lib/supabase", () => ({
 
 import { POST } from "./route";
 import { bookingReferenceForId } from "@/lib/booking-reference";
+import { phoneVerificationTokenHash } from "@/lib/phone-verification";
 
 const validFields = {
   email: "alex@example.com",
@@ -58,6 +59,7 @@ const validFields = {
   }]),
   additionalDetails: "Please include setup guidance.",
   termsAccepted: "accepted",
+  phoneVerificationToken: "v".repeat(43),
 };
 
 let insertMock: ReturnType<typeof vi.fn>;
@@ -86,14 +88,16 @@ function configureAdmin({ insertError = null, uploadError = null, updateError = 
   const insert = vi.fn().mockResolvedValue({ error: insertError });
   const upload = vi.fn().mockResolvedValue({ error: uploadError });
   const remove = vi.fn().mockResolvedValue({ error: null });
+  const rpc = vi.fn().mockResolvedValue({ data: true, error: null });
   createAdminClient.mockReturnValue({
     storage: { from: vi.fn(() => ({ upload, remove })) },
+    rpc,
     from: vi.fn((table: string) => table === "bookings"
       ? { insert, update: updateValues }
       : {}),
   });
   insertMock = insert;
-  return { insert, upload, remove, update, updateValues };
+  return { insert, upload, remove, update, updateValues, rpc };
 }
 
 describe("POST /api/booking", () => {
@@ -104,6 +108,7 @@ describe("POST /api/booking", () => {
     vi.stubEnv("RESEND_API_KEY", "re_test");
     vi.stubEnv("ENQUIRY_FROM_EMAIL", "Peppermint Audio <from@example.com>");
     vi.stubEnv("ENQUIRY_TO_EMAIL", "to@example.com");
+    vi.stubEnv("SMS_OTP_HASH_SECRET", "test-secret");
     calendar.mockResolvedValue("https://calendar.google.com/event");
     send.mockResolvedValue({ data: { id: "email-id" }, error: null });
     configureAdmin();
@@ -136,6 +141,41 @@ describe("POST /api/booking", () => {
 
     expect(response.status).toBe(400);
     expect(createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it("requires a verified phone challenge before creating a booking", async () => {
+    const response = await POST(bookingRequest({
+      ...validFields,
+      phoneVerificationToken: "",
+    }));
+
+    expect(response.status).toBe(400);
+    expect(createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it("consumes the one-time phone verification token before accepting a booking", async () => {
+    const { rpc } = configureAdmin();
+
+    const response = await POST(bookingRequest());
+
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("consume_booking_phone_verification", {
+      p_token_hash: phoneVerificationTokenHash("test-secret", validFields.phoneVerificationToken),
+      p_phone: "61412345678",
+    });
+  });
+
+  it("rejects a phone challenge that is not verified for the submitted number", async () => {
+    const { rpc } = configureAdmin();
+    rpc.mockResolvedValueOnce({ data: false, error: null });
+
+    const response = await POST(bookingRequest());
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: "Please verify your mobile number again before submitting the booking.",
+    });
+    expect(insertMock).not.toHaveBeenCalled();
   });
 
   it("returns a client error when multipart form data cannot be parsed", async () => {
@@ -211,9 +251,7 @@ describe("POST /api/booking", () => {
     const insertedBooking = insertMock.mock.calls[0]?.[0];
     expect(insertedBooking?.status).toBe("submitted");
     expect(insertedBooking).toMatchObject({ pickup_time: "10:00", dropoff_time: "17:00" });
-    expect(calendar).toHaveBeenCalledWith(expect.objectContaining({
-      hireLineItems: expect.arrayContaining([expect.objectContaining({ name: "Wireless Microphone" })]),
-    }));
+    expect(calendar).not.toHaveBeenCalled();
     expect(send).toHaveBeenCalledTimes(2);
     expect(send).toHaveBeenCalledWith(expect.objectContaining({ to: ["to@example.com"], attachments: expect.any(Array) }));
     expect(send).toHaveBeenCalledWith(expect.objectContaining({
@@ -278,20 +316,20 @@ describe("POST /api/booking", () => {
     expect(remove).toHaveBeenCalledOnce();
   });
 
-  it("still sends both emails when the calendar outcome write fails", async () => {
-    const { update, updateValues } = configureAdmin();
-    update.mockResolvedValueOnce({ error: { message: "calendar write failed" } });
+  it("tracks request emails without creating or changing a calendar event", async () => {
+    const { updateValues } = configureAdmin();
     const response = await POST(bookingRequest());
     expect(response.status).toBe(200);
     await afterCallback.mock.calls[0][0]();
     expect(send).toHaveBeenCalledTimes(2);
     expect(updateValues).toHaveBeenLastCalledWith(expect.objectContaining({
       internal_email_sent: true, customer_email_sent: true,
-      calendar_event_link: "https://calendar.google.com/event",
     }));
+    expect(updateValues).not.toHaveBeenCalledWith(expect.objectContaining({ calendar_event_link: expect.anything() }));
+    expect(calendar).not.toHaveBeenCalled();
   });
 
-  it("records calendar failures and still sends email", async () => {
+  it("does not depend on Google Calendar availability to receive a request", async () => {
     calendar.mockRejectedValue(new Error("calendar down"));
 
     const response = await POST(bookingRequest());
@@ -299,7 +337,7 @@ describe("POST /api/booking", () => {
 
     expect(response.status).toBe(200);
     expect(send).toHaveBeenCalledTimes(2);
-    expect(calendar).toHaveBeenCalledOnce();
+    expect(calendar).not.toHaveBeenCalled();
   });
 
   it("records email failures and rejects deferred processing", async () => {

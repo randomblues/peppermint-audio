@@ -3,13 +3,14 @@ import { EmailTransport as Resend, emailConfiguration } from "@/lib/email-transp
 import { emailFooterText } from "@/lib/email-footer";
 import { emailDetailsTable, emailLayout, emailPanel } from "@/lib/email-template";
 import { recordCustomerEmail } from "@/lib/email-log";
-import { createBookingCalendarEvent } from "@/lib/google-calendar";
 import { bookingReferenceForId } from "@/lib/booking-reference";
 import { bookingHireTotalCents, parseBookingLineItems, summarizeBookingLineItems } from "@/lib/booking-line-items";
 import { formatAudCents, rentalDays } from "@/lib/payment-flow";
 import { createAdminClient, PHOTO_ID_BUCKET } from "@/lib/supabase";
 import { bookingSchema } from "@/lib/validation/booking";
 import { maxPhotoIdUploadSize } from "@/lib/prepare-photo-id";
+import { phoneVerificationTokenHash } from "@/lib/phone-verification";
+import { normalizeAustralianMobileNumber } from "@/lib/sms-mobile-number";
 
 function formatEmailDate(value: string) {
   return new Intl.DateTimeFormat("en-AU", {
@@ -35,8 +36,17 @@ export async function POST(request: Request) {
     if (!parsed.success || files.length !== 2 || files.some((file) => file.size === 0 || file.size > maxPhotoIdUploadSize)) {
       return NextResponse.json({ error: "Please check all booking details and upload the front and back of your photo ID." }, { status: 400 });
     }
+    const phoneVerificationToken = formData.get("phoneVerificationToken");
+    const verifiedPhone = normalizeAustralianMobileNumber(parsed.data.mobile);
+    if (typeof phoneVerificationToken !== "string" || phoneVerificationToken.length < 40 || !verifiedPhone) {
+      return NextResponse.json({ error: "Please verify your Australian mobile number before submitting the booking." }, { status: 400 });
+    }
     if (!resendApiKey || !fromEmail || !toEmail) {
       return NextResponse.json({ error: "Email service is not configured yet." }, { status: 500 });
+    }
+    const verificationSecret = process.env.SMS_OTP_HASH_SECRET;
+    if (!verificationSecret) {
+      return NextResponse.json({ error: "Phone verification is not configured." }, { status: 500 });
     }
     const data = parsed.data;
     let hireLineItemsPayload: unknown;
@@ -55,6 +65,17 @@ export async function POST(request: Request) {
     const hireItemsSummary = summarizeBookingLineItems(hireLineItems);
     const additionalDetails = data.additionalDetails.trim();
     const admin = createAdminClient();
+    const verification = await admin.rpc("consume_booking_phone_verification", {
+      p_token_hash: phoneVerificationTokenHash(verificationSecret, phoneVerificationToken),
+      p_phone: verifiedPhone,
+    });
+    if (verification.error) {
+      console.error("Booking phone verification could not be checked:", verification.error);
+      return NextResponse.json({ error: "Phone verification could not be checked. Please verify your number again." }, { status: 500 });
+    }
+    if (!verification.data) {
+      return NextResponse.json({ error: "Please verify your mobile number again before submitting the booking." }, { status: 400 });
+    }
     const bookingId = crypto.randomUUID();
     const objectPaths: string[] = [];
     try {
@@ -90,19 +111,6 @@ export async function POST(request: Request) {
     };
 
     after(async () => {
-      let calendarEventLink: string | null = null;
-      let calendarError: string | null = null;
-      try {
-        calendarEventLink = await createBookingCalendarEvent({ ...data, hireLineItems });
-      } catch (error) {
-        calendarError = error instanceof Error ? error.message : "Unknown Google Calendar error";
-        console.error("Google Calendar event creation failed:", error);
-      }
-      try {
-        await updateBooking({ calendar_event_link: calendarEventLink, calendar_error: calendarError });
-      } catch (error) {
-        console.error("Calendar outcome persistence failed; continuing booking emails:", error);
-      }
       const text = [
       "New audio equipment booking", `Booking Reference: ${bookingReference}`, `Name: ${data.firstName} ${data.lastName}`, `Email: ${data.email}`, `Mobile: ${data.mobile}`,
       `Event type: ${data.eventType}`, `Event address: ${data.eventAddress}`,
@@ -110,8 +118,6 @@ export async function POST(request: Request) {
       `Hire items: ${hireItemsSummary || "None specified"}`, `Hire duration: ${nights} night(s)`, `Estimated hire total: ${formatAudCents(hireAmountCents)}`, "",
       "Additional details:", data.additionalDetails || "None provided", "",
       "Terms: Customer confirmed they have read and agree to the PA Equipment Hire Terms & Conditions.",
-      calendarEventLink ? `Google Calendar event: ${calendarEventLink}` : "",
-      calendarError ? `Google Calendar event was not created: ${calendarError}` : "",
       "",
       emailFooterText,
       ].join("\n");
@@ -170,7 +176,6 @@ export async function POST(request: Request) {
         emails = await Promise.all([internalEmail, customerEmail]);
       } catch (error) {
         await updateBooking({
-          calendar_event_link: calendarEventLink, calendar_error: calendarError,
           internal_email_sent: false, customer_email_sent: false,
         });
         throw new Error(`Booking email failed: ${error instanceof Error ? error.message : "Unknown email error"}`);
@@ -190,7 +195,6 @@ export async function POST(request: Request) {
         }
       }
       await updateBooking({
-        calendar_event_link: calendarEventLink, calendar_error: calendarError,
         internal_email_sent: !internalEmailError, customer_email_sent: !customerEmailError,
       });
       if (internalEmailError || customerEmailError) {

@@ -5,6 +5,7 @@ import { markInvoiceStatus, sendBillingDocument } from "@/lib/invoice-service";
 import { getStripe } from "@/lib/stripe";
 import { attemptDeferredDeposit, notifyDepositAttention, readDepositBooking, syncDeferredDeposit } from "@/lib/deferred-deposits";
 import { confirmPaidStripeBooking } from "@/lib/booking-confirmation";
+import { sendDuePickupReminderSms } from "@/lib/booking-sms-cron";
 
 async function updatePayment(bookingId: string, updates: Record<string, unknown>) {
   const admin = createAdminClient();
@@ -29,6 +30,11 @@ export async function POST(request: Request) {
   try {
     if (event.type.startsWith("payment_intent.")) {
       const intent = event.data.object as Stripe.PaymentIntent;
+      if (intent.metadata.paymentType === "deposit" && intent.metadata.deferredDeposit !== "true"
+        && intent.metadata.bookingId && ["payment_intent.amount_capturable_updated", "payment_intent.succeeded"].includes(event.type)) {
+        const booking = await readDepositBooking(createAdminClient(), intent.metadata.bookingId);
+        if (!booking || booking.stripe_deposit_payment_intent_id !== intent.id) return Response.json({ received: true });
+      }
       if (intent.metadata.paymentType === "hire"
         && intent.metadata.bookingId) {
         const booking = await readDepositBooking(createAdminClient(), intent.metadata.bookingId);
@@ -49,6 +55,7 @@ export async function POST(request: Request) {
         if (status === "released") await sendBillingDocument(admin, booking.id, "deposit_release");
         const updated = await readDepositBooking(admin, booking.id);
         if (updated) await notifyDepositAttention(admin, updated);
+        if (status === "authorized" || status === "captured") await sendDuePickupReminderSms(booking.id);
         return Response.json({ received: true });
       }
     }
@@ -67,12 +74,19 @@ export async function POST(request: Request) {
           hire_payment_status: session.payment_status === "paid" ? "paid" : "processing",
           stripe_hire_payment_intent_id: intentId,
         });
-        if (session.payment_status === "paid") await confirmPaidStripeBooking(createAdminClient(), bookingId);
+        if (session.payment_status === "paid") {
+          await confirmPaidStripeBooking(createAdminClient(), bookingId);
+          await sendDuePickupReminderSms(bookingId);
+        }
       } else if (bookingId && paymentType === "deposit") {
+        const intentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id;
+        const booking = await readDepositBooking(createAdminClient(), bookingId);
+        if (!booking || !intentId || booking.stripe_deposit_payment_intent_id !== intentId) return Response.json({ received: true });
         await updatePayment(bookingId, {
           deposit_payment_status: "authorized",
-          stripe_deposit_payment_intent_id: typeof session.payment_intent === "string" ? session.payment_intent : null,
+          stripe_deposit_payment_intent_id: intentId,
         });
+        await sendDuePickupReminderSms(bookingId);
       }
     } else if (event.type === "payment_intent.amount_capturable_updated") {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
@@ -83,6 +97,7 @@ export async function POST(request: Request) {
           stripe_deposit_payment_intent_id: paymentIntent.id,
         });
         await sendBillingDocument(createAdminClient(), bookingId, "deposit_authorisation");
+        await sendDuePickupReminderSms(bookingId);
       }
     } else if (event.type === "payment_intent.succeeded") {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
@@ -94,6 +109,7 @@ export async function POST(request: Request) {
           confirmPaidStripeBooking(createAdminClient(), bookingId),
           (async () => {
             await attemptDeferredDeposit(createAdminClient(), bookingId);
+            await sendDuePickupReminderSms(bookingId);
             const depositBooking = await readDepositBooking(createAdminClient(), bookingId);
             if (depositBooking) await notifyDepositAttention(createAdminClient(), depositBooking);
             await sendBillingDocument(createAdminClient(), bookingId, "payment_receipt");
@@ -110,6 +126,7 @@ export async function POST(request: Request) {
           deposit_captured_at: new Date().toISOString(),
         });
         await sendBillingDocument(createAdminClient(), bookingId, "deposit_capture");
+        await sendDuePickupReminderSms(bookingId);
       }
     } else if (event.type === "payment_intent.canceled") {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
@@ -127,10 +144,14 @@ export async function POST(request: Request) {
           stripe_hire_payment_intent_id: paymentIntent.id,
         });
       } else if (bookingId && paymentIntent.metadata.paymentType === "deposit") {
-        await updatePayment(bookingId, {
-          deposit_payment_status: "failed",
-          stripe_deposit_payment_intent_id: paymentIntent.id,
-        });
+        const admin = createAdminClient();
+        const booking = await readDepositBooking(admin, bookingId);
+        if (!booking || booking.stripe_deposit_payment_intent_id !== paymentIntent.id) return Response.json({ received: true });
+        const current = await getStripe().paymentIntents.retrieve(paymentIntent.id, { expand: ["latest_charge"] });
+        if (!["requires_payment_method", "requires_action"].includes(current.status)) return Response.json({ received: true });
+        await syncDeferredDeposit(admin, booking, current);
+        const updated = await readDepositBooking(admin, bookingId);
+        if (updated) await notifyDepositAttention(admin, updated);
       }
     }
   } catch (error) {

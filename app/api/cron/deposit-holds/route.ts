@@ -5,6 +5,7 @@ import { attemptDeferredDeposit, notifyDepositAttention, readDepositBooking, syn
 import { getMelbourneTomorrow } from "@/lib/pickup-reminders";
 import { getStripe } from "@/lib/stripe";
 import { sendBillingDocument } from "@/lib/invoice-service";
+import { sendDuePickupReminderSms } from "@/lib/booking-sms-cron";
 
 export const runtime = "nodejs";
 
@@ -33,6 +34,9 @@ export async function GET(request: Request) {
           booking = await readDepositBooking(admin, id);
         }
         if (booking) await notifyDepositAttention(admin, booking);
+        if (booking?.deposit_payment_status === "authorized" || booking?.deposit_payment_status === "captured") {
+          await sendDuePickupReminderSms(id);
+        }
       } catch (cause) {
         const error = cause instanceof Error ? cause.message : "Deposit job failed.";
         console.error(`Deposit job failed for ${id}:`, cause);

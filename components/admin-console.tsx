@@ -9,7 +9,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import {
   Archive, BarChart3, Boxes, ChevronDown, ChevronLeft, ChevronRight, Download, FileSpreadsheet,
   CalendarDays, ExternalLink, Hash, LayoutDashboard, LogOut, Mail, Menu, RefreshCw,
-  ShieldCheck, UserRound, X,
+  MessageSquare, ShieldCheck, UserRound, X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ import { AdminInventory } from "@/components/admin-inventory";
 import { AdminErrorDialog } from "@/components/admin-error-dialog";
 import { PdfAttachmentPreview } from "@/components/pdf-attachment-preview";
 import type { BookingLineItem } from "@/lib/booking-line-items";
+import type { BookingSmsLog } from "@/lib/sms-log";
 
 type Booking = Record<string, unknown> & {
   id: string; first_name: string; last_name: string; event_type: string;
@@ -41,6 +42,7 @@ type Booking = Record<string, unknown> & {
   deposit_captured_cents?: number | null;
   bank_transfer_option?: BankTransferOption | null;
   email_logs?: Array<{ id: string; recipient_email: string; email_type: string; provider_message_id?: string | null; sent_at: string }>;
+  sms_logs?: BookingSmsLog[];
 };
 const statuses = bookingStatuses;
 const statusLabel = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
@@ -65,6 +67,7 @@ const emailTypeLabel = (value: string) => ({
   deposit_capture: "Deposit charge receipt",
   enquiry: "Enquiry",
 }[value] ?? value);
+const smsTypeLabel = (value: BookingSmsLog["sms_type"]) => value === "dropoff_reminder" ? "Drop-off reminder" : value === "deposit_attention" ? "Security deposit alert" : emailTypeLabel(value);
 const formatSentAt = (value: string) => new Intl.DateTimeFormat("en-AU", {
   dateStyle: "medium",
   timeStyle: "short",
@@ -363,7 +366,10 @@ export function AdminConsole() {
 }
 
 function CommunicationsSection({ booking, onSendEmail }: { booking: Booking; onSendEmail: () => void }) {
-  const logs = (booking.email_logs ?? []).slice().sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime());
+  const logs = [
+    ...(booking.email_logs ?? []).map((log) => ({ channel: "email" as const, log, at: log.sent_at })),
+    ...(booking.sms_logs ?? []).map((log) => ({ channel: "sms" as const, log, at: log.recorded_at })),
+  ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
   const [expanded, setExpanded] = useState(false);
   const [previewingLog, setPreviewingLog] = useState<NonNullable<Booking["email_logs"]>[number] | null>(null);
   const contentId = `booking-communications-${booking.id}`;
@@ -381,7 +387,7 @@ function CommunicationsSection({ booking, onSendEmail }: { booking: Booking; onS
           <span className="rounded-lg bg-primary/10 p-2 text-primary"><Mail className="size-4" /></span>
           <span className="min-w-0">
             <span className="block font-semibold">Communications</span>
-            <span className="mt-1 block text-sm text-muted-foreground">Email history and messages for this booking.</span>
+            <span className="mt-1 block text-sm text-muted-foreground">Email and SMS history for this booking.</span>
           </span>
         </span>
         <span className="flex shrink-0 items-center gap-2">
@@ -396,23 +402,38 @@ function CommunicationsSection({ booking, onSendEmail }: { booking: Booking; onS
           <>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h4 className="font-semibold">Email history</h4>
-                <p className="mt-1 text-sm text-muted-foreground">Customer emails sent in the last 30 days.</p>
+                <h4 className="font-semibold">Communication history</h4>
+                <p className="mt-1 text-sm text-muted-foreground">Customer emails and outgoing booking SMS from the last 30 days. SMS acceptance is not delivery confirmation. Replies are in Mobile Message.</p>
               </div>
               <Button className="gap-2" onClick={onSendEmail}><Mail className="size-4" />Send Email</Button>
             </div>
             {logs.length ? (
-              <ol className="relative space-y-3 before:absolute before:bottom-5 before:left-[17px] before:top-5 before:w-px before:bg-border">
-                {logs.map((log) => (
-                  <li key={log.id} className="relative flex gap-3">
-                    <div className="z-10 mt-3 flex size-9 shrink-0 items-center justify-center rounded-full border bg-background text-primary shadow-sm"><Mail className="size-4" /></div>
-                    <button type="button" onClick={() => setPreviewingLog(log)} aria-label={`View ${emailTypeLabel(log.email_type)} sent email`} className="min-w-0 flex-1 rounded-xl border bg-card p-4 text-left shadow-sm transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <ol aria-label="Communication history" className="relative space-y-3 before:absolute before:bottom-5 before:left-[17px] before:top-5 before:w-px before:bg-border">
+                {logs.map((entry) => entry.channel === "sms" ? (
+                  <li key={`sms-${entry.log.id}`} className="relative flex min-w-0 gap-3">
+                    <div className="z-10 mt-3 flex size-9 shrink-0 items-center justify-center rounded-full border bg-background text-primary shadow-sm"><MessageSquare className="size-4" /></div>
+                    <article aria-label={`${smsTypeLabel(entry.log.sms_type)} SMS`} className="min-w-0 flex-1 rounded-xl border bg-card p-4 shadow-sm">
                       <div className="flex flex-wrap items-start justify-between gap-2">
-                        <p className="font-medium">{emailTypeLabel(log.email_type)}</p>
-                        <p className="text-xs text-muted-foreground">{formatSentAt(log.sent_at)}</p>
+                        <p className="font-medium">{smsTypeLabel(entry.log.sms_type)}</p>
+                        <Badge variant={entry.log.status === "failed" ? "destructive" : "secondary"}>SMS · {entry.log.status === "accepted" ? "Accepted by provider" : "Failed"}</Badge>
                       </div>
-                      <p className="mt-2 truncate text-sm text-muted-foreground">Delivered to {log.recipient_email}</p>
-                      {log.provider_message_id ? <p className="mt-2 truncate font-mono text-[11px] text-muted-foreground/70">ID {log.provider_message_id}</p> : null}
+                      <p className="mt-2 text-xs text-muted-foreground">{formatSentAt(entry.at)}</p>
+                      <p className="mt-2 break-all text-sm text-muted-foreground">To {entry.log.recipient_mobile}</p>
+                      <p className="mt-3 whitespace-pre-wrap break-words text-sm">{entry.log.body}</p>
+                      {entry.log.error ? <p className="mt-2 break-words text-sm text-destructive">{entry.log.error}</p> : null}
+                      {entry.log.provider_message_id ? <p className="mt-2 break-all font-mono text-[11px] text-muted-foreground/70">ID {entry.log.provider_message_id}</p> : null}
+                    </article>
+                  </li>
+                ) : (
+                  <li key={`email-${entry.log.id}`} className="relative flex gap-3">
+                    <div className="z-10 mt-3 flex size-9 shrink-0 items-center justify-center rounded-full border bg-background text-primary shadow-sm"><Mail className="size-4" /></div>
+                    <button type="button" onClick={() => setPreviewingLog(entry.log)} aria-label={`View ${emailTypeLabel(entry.log.email_type)} sent email`} className="min-w-0 flex-1 rounded-xl border bg-card p-4 text-left shadow-sm transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <p className="font-medium">{emailTypeLabel(entry.log.email_type)} <span className="text-xs text-muted-foreground">Email</span></p>
+                        <p className="text-xs text-muted-foreground">{formatSentAt(entry.at)}</p>
+                      </div>
+                      <p className="mt-2 truncate text-sm text-muted-foreground">Delivered to {entry.log.recipient_email}</p>
+                      {entry.log.provider_message_id ? <p className="mt-2 truncate font-mono text-[11px] text-muted-foreground/70">ID {entry.log.provider_message_id}</p> : null}
                       <p className="mt-3 flex items-center gap-1 text-xs font-medium text-primary">View sent email <ChevronRight className="size-3.5" /></p>
                     </button>
                   </li>
@@ -422,7 +443,7 @@ function CommunicationsSection({ booking, onSendEmail }: { booking: Booking; onS
               <div className="rounded-xl border border-dashed bg-muted/10 p-8 text-center">
                 <Mail className="mx-auto mb-3 size-8 text-muted-foreground" />
                 <p className="font-medium">No communications recorded</p>
-                <p className="mt-1 text-sm text-muted-foreground">Emails sent to this customer will appear here.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Emails and outgoing booking SMS will appear here.</p>
               </div>
             )}
           </>
@@ -771,7 +792,7 @@ function EmailHistoryPreview({ log, onBack }: { log: NonNullable<Booking["email_
 
   return (
     <section aria-labelledby="email-preview-title" className="space-y-4">
-      <Button variant="ghost" className="-ml-2 gap-1" onClick={onBack}><ChevronLeft className="size-4" />Back to email history</Button>
+      <Button variant="ghost" className="-ml-2 gap-1" onClick={onBack}><ChevronLeft className="size-4" />Back to communication history</Button>
       <div>
         <p className="text-sm font-medium text-primary">{emailTypeLabel(log.email_type)}</p>
         <h3 id="email-preview-title" className="mt-1 text-xl font-semibold">Sent email</h3>

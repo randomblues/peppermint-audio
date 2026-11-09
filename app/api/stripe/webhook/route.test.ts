@@ -10,11 +10,13 @@ const mocks = vi.hoisted(() => ({
   attemptDeferredDeposit: vi.fn(),
   notifyDepositAttention: vi.fn(),
   confirmPaidStripeBooking: vi.fn(),
+  sendDuePickupReminderSms: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase", () => ({ createAdminClient: mocks.createAdminClient }));
 vi.mock("@/lib/stripe", () => ({ getStripe: mocks.getStripe }));
 vi.mock("@/lib/booking-confirmation", () => ({ confirmPaidStripeBooking: mocks.confirmPaidStripeBooking }));
+vi.mock("@/lib/booking-sms-cron", () => ({ sendDuePickupReminderSms: mocks.sendDuePickupReminderSms }));
 vi.mock("@/lib/invoice-service", () => ({ markInvoiceStatus: mocks.markInvoiceStatus, sendBillingDocument: mocks.sendBillingDocument }));
 vi.mock("@/lib/deferred-deposits", () => ({
   readDepositBooking: mocks.readDepositBooking, syncDeferredDeposit: mocks.syncDeferredDeposit,
@@ -49,15 +51,13 @@ describe("Stripe webhook", () => {
     mocks.markInvoiceStatus.mockResolvedValue(undefined);
     mocks.sendBillingDocument.mockResolvedValue("document-1");
     mocks.confirmPaidStripeBooking.mockResolvedValue(undefined);
+    mocks.sendDuePickupReminderSms.mockResolvedValue(undefined);
     mocks.readDepositBooking.mockResolvedValue({
       id: "booking-1", stripe_hire_payment_intent_id: "pi_hire", hire_payment_status: "pending",
     });
   });
 
-  it.each([
-    ["hire", { hire_payment_status: "failed", stripe_hire_payment_intent_id: "pi_hire" }],
-    ["deposit", { deposit_payment_status: "failed", stripe_deposit_payment_intent_id: "pi_deposit" }],
-  ])("persists a failed %s payment", async (paymentType, updates) => {
+  it("persists a failed hire payment", async () => {
     const admin = adminClient();
     mocks.createAdminClient.mockReturnValue(admin);
     mocks.getStripe.mockReturnValue({
@@ -66,8 +66,8 @@ describe("Stripe webhook", () => {
           type: "payment_intent.payment_failed",
           data: {
             object: {
-              id: paymentType === "hire" ? "pi_hire" : "pi_deposit",
-              metadata: { bookingId: "booking-1", paymentType },
+              id: "pi_hire",
+              metadata: { bookingId: "booking-1", paymentType: "hire" },
             },
           },
         }),
@@ -77,9 +77,67 @@ describe("Stripe webhook", () => {
     const response = await POST(request());
 
     expect(response.status).toBe(200);
-    expect(admin.update).toHaveBeenCalledWith(expect.objectContaining(updates));
+    expect(admin.update).toHaveBeenCalledWith(expect.objectContaining({ hire_payment_status: "failed", stripe_hire_payment_intent_id: "pi_hire" }));
     expect(admin.eq).toHaveBeenCalledWith("id", "booking-1");
     expect(mocks.confirmPaidStripeBooking).not.toHaveBeenCalled();
+    expect(mocks.notifyDepositAttention).not.toHaveBeenCalled();
+  });
+
+  it.each(["requires_payment_method", "requires_action"])("notifies deposit attention using the current %s state", async status => {
+    const booking = { id: "booking-1", stripe_deposit_payment_intent_id: "pi_deposit" };
+    const updated = { ...booking, deposit_payment_status: status === "requires_action" ? "action_required" : "failed" };
+    const current = { id: "pi_deposit", status };
+    mocks.readDepositBooking.mockResolvedValueOnce(booking).mockResolvedValueOnce(updated);
+    mocks.getStripe.mockReturnValue({
+      webhooks: { constructEvent: vi.fn().mockReturnValue({
+        type: "payment_intent.payment_failed",
+        data: { object: { id: "pi_deposit", metadata: { bookingId: booking.id, paymentType: "deposit" } } },
+      }) },
+      paymentIntents: { retrieve: vi.fn().mockResolvedValue(current) },
+    });
+    expect((await POST(request())).status).toBe(200);
+    expect(mocks.syncDeferredDeposit).toHaveBeenCalledWith(expect.anything(), booking, current);
+    expect(mocks.notifyDepositAttention).toHaveBeenCalledWith(expect.anything(), updated);
+  });
+
+  it.each(["requires_capture", "succeeded", "canceled"])("ignores an old deposit failure when its current state is %s", async status => {
+    mocks.readDepositBooking.mockResolvedValue({ id: "booking-1", stripe_deposit_payment_intent_id: "pi_deposit" });
+    mocks.getStripe.mockReturnValue({
+      webhooks: { constructEvent: vi.fn().mockReturnValue({
+        type: "payment_intent.payment_failed",
+        data: { object: { id: "pi_deposit", metadata: { bookingId: "booking-1", paymentType: "deposit" } } },
+      }) },
+      paymentIntents: { retrieve: vi.fn().mockResolvedValue({ id: "pi_deposit", status }) },
+    });
+    expect((await POST(request())).status).toBe(200);
+    expect(mocks.syncDeferredDeposit).not.toHaveBeenCalled();
+    expect(mocks.notifyDepositAttention).not.toHaveBeenCalled();
+  });
+
+  it("ignores a failed non-deferred deposit intent that has been replaced", async () => {
+    mocks.readDepositBooking.mockResolvedValue({ id: "booking-1", stripe_deposit_payment_intent_id: "pi_new" });
+    mocks.getStripe.mockReturnValue({
+      webhooks: { constructEvent: vi.fn().mockReturnValue({
+        type: "payment_intent.payment_failed",
+        data: { object: { id: "pi_old", metadata: { bookingId: "booking-1", paymentType: "deposit" } } },
+      }) },
+    });
+    expect((await POST(request())).status).toBe(200);
+    expect(mocks.syncDeferredDeposit).not.toHaveBeenCalled();
+    expect(mocks.notifyDepositAttention).not.toHaveBeenCalled();
+  });
+
+  it("returns an error when the deposit notification fails so Stripe can retry", async () => {
+    mocks.readDepositBooking.mockResolvedValue({ id: "booking-1", stripe_deposit_payment_intent_id: "pi_deposit" });
+    mocks.notifyDepositAttention.mockRejectedValueOnce(new Error("SMS unavailable"));
+    mocks.getStripe.mockReturnValue({
+      webhooks: { constructEvent: vi.fn().mockReturnValue({
+        type: "payment_intent.payment_failed",
+        data: { object: { id: "pi_deposit", metadata: { bookingId: "booking-1", paymentType: "deposit" } } },
+      }) },
+      paymentIntents: { retrieve: vi.fn().mockResolvedValue({ id: "pi_deposit", status: "requires_payment_method" }) },
+    });
+    expect((await POST(request())).status).toBe(500);
   });
 
   it("ignores stale deferred-deposit events from a replaced intent", async () => {
@@ -137,6 +195,7 @@ describe("Stripe webhook", () => {
     expect((await POST(request())).status).toBe(200);
     expect(mocks.syncDeferredDeposit).toHaveBeenCalledWith(expect.anything(), expect.anything(), current);
     expect(mocks.sendBillingDocument).toHaveBeenCalledWith(expect.anything(), "booking-1", "deposit_authorisation");
+    expect(mocks.sendDuePickupReminderSms).toHaveBeenCalledWith("booking-1");
   });
 
   it("attempts a due last-minute hold only after recording the paid hire", async () => {
@@ -148,6 +207,7 @@ describe("Stripe webhook", () => {
     expect(mocks.attemptDeferredDeposit).toHaveBeenCalledWith(expect.anything(), "booking-1");
     expect(mocks.confirmPaidStripeBooking).toHaveBeenCalledWith(expect.anything(), "booking-1");
     expect(mocks.attemptDeferredDeposit.mock.invocationCallOrder[0]).toBeLessThan(mocks.sendBillingDocument.mock.invocationCallOrder[0]);
+    expect(mocks.sendDuePickupReminderSms).toHaveBeenCalledWith("booking-1");
   });
 
   it.each(["checkout.session.completed", "checkout.session.async_payment_succeeded"])("confirms a paid hire from %s", async (type) => {
@@ -156,6 +216,7 @@ describe("Stripe webhook", () => {
     }) } });
     expect((await POST(request())).status).toBe(200);
     expect(mocks.confirmPaidStripeBooking).toHaveBeenCalledWith(expect.anything(), "booking-1");
+    expect(mocks.sendDuePickupReminderSms).toHaveBeenCalledWith("booking-1");
   });
 
   it.each([
@@ -188,4 +249,41 @@ describe("Stripe webhook", () => {
     expect((await POST(request())).status).toBe(500);
     expect(mocks.confirmPaidStripeBooking).toHaveBeenCalledWith(expect.anything(), "booking-1");
   });
+
+  it("returns a retryable failure if the due pickup reminder fails after deposit authorisation", async () => {
+    mocks.readDepositBooking.mockResolvedValue({ id: "booking-1", stripe_deposit_payment_intent_id: "pi_deposit" });
+    mocks.syncDeferredDeposit.mockResolvedValue("authorized");
+    mocks.sendDuePickupReminderSms.mockRejectedValueOnce(new Error("SMS unavailable"));
+    mocks.getStripe.mockReturnValue({
+      webhooks: { constructEvent: vi.fn().mockReturnValue({
+        type: "payment_intent.amount_capturable_updated",
+        data: { object: { id: "pi_deposit", metadata: { bookingId: "booking-1", paymentType: "deposit", deferredDeposit: "true" } } },
+      }) },
+      paymentIntents: { retrieve: vi.fn().mockResolvedValue({ id: "pi_deposit", status: "requires_capture" }) },
+    });
+    expect((await POST(request())).status).toBe(500);
+    expect(mocks.sendDuePickupReminderSms).toHaveBeenCalledWith("booking-1");
+  });
+
+  it.each(["payment_intent.amount_capturable_updated", "payment_intent.succeeded"])(
+      "catches up a pickup reminder after a current immediate deposit %s event", async type => {
+        mocks.readDepositBooking.mockResolvedValue({ id: "booking-1", stripe_deposit_payment_intent_id: "pi_deposit" });
+        mocks.getStripe.mockReturnValue({ webhooks: { constructEvent: vi.fn().mockReturnValue({
+          type, data: { object: { id: "pi_deposit", metadata: { bookingId: "booking-1", paymentType: "deposit" } } },
+        }) } });
+        expect((await POST(request())).status).toBe(200);
+        expect(mocks.sendDuePickupReminderSms).toHaveBeenCalledWith("booking-1");
+      },
+    );
+
+  it.each(["payment_intent.amount_capturable_updated", "payment_intent.succeeded"])(
+      "does not send a pickup reminder for a replaced deposit %s event", async type => {
+        mocks.readDepositBooking.mockResolvedValue({ id: "booking-1", stripe_deposit_payment_intent_id: "pi_current" });
+        mocks.getStripe.mockReturnValue({ webhooks: { constructEvent: vi.fn().mockReturnValue({
+          type, data: { object: { id: "pi_old", metadata: { bookingId: "booking-1", paymentType: "deposit" } } },
+        }) } });
+        expect((await POST(request())).status).toBe(200);
+        expect(mocks.sendDuePickupReminderSms).not.toHaveBeenCalled();
+      },
+    );
 });

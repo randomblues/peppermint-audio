@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   create: vi.fn(), confirm: vi.fn(), retrieve: vi.fn(), cancel: vi.fn(),
-  send: vi.fn(), record: vi.fn(),
+  send: vi.fn(), record: vi.fn(), sms: vi.fn(),
   updateIntent: vi.fn(),
 }));
 vi.mock("@/lib/stripe", () => ({ getStripe: () => ({
@@ -10,6 +10,7 @@ vi.mock("@/lib/stripe", () => ({ getStripe: () => ({
 }) }));
 vi.mock("resend", () => ({ Resend: class { emails = { send: mocks.send }; } }));
 vi.mock("@/lib/email-log", () => ({ recordCustomerEmail: mocks.record }));
+vi.mock("@/lib/send-booking-sms", () => ({ sendDepositAttentionSms: mocks.sms }));
 
 import { attemptDeferredDeposit, notifyDepositAttention, releaseCancelledDeferredDeposit, syncDeferredDeposit, type DeferredDepositBooking } from "./deferred-deposits";
 
@@ -17,7 +18,7 @@ const now = new Date("2026-10-09T20:00:00Z"); // 7am on 10 October in Melbourne.
 let booking: DeferredDepositBooking;
 let update: ReturnType<typeof vi.fn>;
 
-function admin(failWrites = false) {
+function admin(failWrites = false, failSmsTracking = false) {
   let updates: object | null = null;
   let filters: [string, unknown][] = [];
   const query = {
@@ -30,6 +31,9 @@ function admin(failWrites = false) {
       if (updates) {
         const values = updates;
         updates = null;
+        if (failSmsTracking && "deposit_attention_sms_sent_at" in values) {
+          return { data: null, error: { message: "SMS tracking unavailable" } };
+        }
         if (failWrites || !matches) return { data: null, error: null };
         Object.assign(booking, values);
         return { data: { id: booking.id }, error: null };
@@ -59,13 +63,13 @@ beforeEach(() => {
   vi.clearAllMocks();
   update = vi.fn();
   booking = {
-    id: "booking-1", status: "confirmed", first_name: "<Alex>", email: "alex@example.com",
+    id: "booking-1", status: "confirmed", first_name: "<Alex>", email: "alex@example.com", mobile: "0400000000",
     pickup_date: "2026-10-10", dropoff_date: "2026-10-13", dropoff_time: "18:00",
     payment_method: "stripe_card_hold", hire_payment_status: "paid", security_deposit_cents: 10000,
     stripe_customer_id: "cus_1", stripe_hire_payment_intent_id: "pi_hire", stripe_deposit_payment_intent_id: null,
     deposit_hold_date: "2026-10-10", deposit_consent_at: "2026-09-01T00:00:00Z",
     deposit_payment_status: "scheduled", deposit_capture_before: null, deposit_error: null,
-    deposit_attention_sent_at: null, deposit_attention_claimed_at: null, payment_token: "secure-token",
+    deposit_attention_sent_at: null, deposit_attention_sms_sent_at: null, deposit_attention_claimed_at: null, payment_token: "secure-token",
   };
   mocks.retrieve.mockResolvedValue({
     id: "pi_hire", status: "succeeded", customer: "cus_1", payment_method: "pm_saved",
@@ -76,6 +80,7 @@ beforeEach(() => {
   mocks.cancel.mockResolvedValue(intent("canceled"));
   mocks.send.mockResolvedValue({ data: { id: "email-1" }, error: null });
   mocks.record.mockResolvedValue(undefined);
+  mocks.sms.mockResolvedValue({ id: "sms-1" });
   vi.stubEnv("RESEND_API_KEY", "re_test");
   vi.stubEnv("ENQUIRY_FROM_EMAIL", "from@example.com");
   vi.stubEnv("ENQUIRY_TO_EMAIL", "admin@example.com");
@@ -222,6 +227,9 @@ describe("deferred deposit holds", () => {
     booking.deposit_error = "internal diagnosis";
     await notifyDepositAttention(admin(), booking);
     expect(mocks.send).toHaveBeenCalledTimes(2);
+    expect(mocks.sms).toHaveBeenCalledTimes(1);
+    expect(mocks.sms).toHaveBeenCalledWith(expect.objectContaining({ id: booking.id, mobile: booking.mobile }));
+    expect(booking.deposit_attention_sms_sent_at).not.toBeNull();
     const internal = mocks.send.mock.calls[0][0];
     const customer = mocks.send.mock.calls[1][0];
     expect(internal.subject).toContain("Urgent");
@@ -281,6 +289,7 @@ describe("deferred deposit holds", () => {
     ]);
     expect(mocks.send).toHaveBeenCalledTimes(2);
     expect(mocks.record).toHaveBeenCalledTimes(1);
+    expect(mocks.sms).toHaveBeenCalledTimes(1);
     expect(booking.deposit_attention_sent_at).not.toBeNull();
     expect(booking.deposit_attention_claimed_at).toBeNull();
   });
@@ -299,6 +308,67 @@ describe("deferred deposit holds", () => {
     mocks.send.mockResolvedValue({ error: { message: "Email unavailable" } });
     await expect(notifyDepositAttention(admin(), booking)).rejects.toThrow("Email unavailable");
     expect(booking.deposit_attention_sent_at).toBeNull();
+    expect(booking.deposit_attention_claimed_at).toBeNull();
+    expect(mocks.sms).not.toHaveBeenCalled();
+  });
+
+  it.each(["failed", "action_required", "hold_too_short", "expired"])("sends a deposit SMS for %s", async status => {
+    booking.deposit_payment_status = status;
+    await notifyDepositAttention(admin(), booking);
+    expect(mocks.sms).toHaveBeenCalledTimes(1);
+    expect(booking.deposit_attention_sms_sent_at).not.toBeNull();
+  });
+
+  it.each(["cancelled", "completed"])("does not send deposit notifications for %s bookings", async status => {
+    booking.status = status;
+    booking.deposit_payment_status = "failed";
+    await notifyDepositAttention(admin(), booking);
+    expect(mocks.send).not.toHaveBeenCalled();
+    expect(mocks.sms).not.toHaveBeenCalled();
+  });
+
+  it.each(["scheduled", "authorized", "captured", "released", "authorizing"])("does not send a failure SMS for %s deposits", async status => {
+    booking.deposit_payment_status = status;
+    await notifyDepositAttention(admin(), booking);
+    expect(mocks.sms).not.toHaveBeenCalled();
+  });
+
+  it("retries an unsuccessful SMS without resending delivered emails", async () => {
+    booking.deposit_payment_status = "failed";
+    mocks.sms.mockRejectedValueOnce(new Error("SMS unavailable"));
+    await expect(notifyDepositAttention(admin(), booking)).rejects.toThrow("SMS unavailable");
+    expect(booking.deposit_attention_sent_at).not.toBeNull();
+    expect(booking.deposit_attention_sms_sent_at).toBeNull();
+    expect(booking.deposit_attention_claimed_at).toBeNull();
+    await notifyDepositAttention(admin(), booking);
+    expect(mocks.send).toHaveBeenCalledTimes(2);
+    expect(mocks.record).toHaveBeenCalledTimes(1);
+    expect(mocks.sms).toHaveBeenCalledTimes(2);
+    expect(booking.deposit_attention_sms_sent_at).not.toBeNull();
+  });
+
+  it("does not resend an already tracked SMS while sending pending emails", async () => {
+    booking.deposit_payment_status = "failed";
+    booking.deposit_attention_sms_sent_at = now.toISOString();
+    await notifyDepositAttention(admin(), booking);
+    expect(mocks.send).toHaveBeenCalledTimes(2);
+    expect(mocks.sms).not.toHaveBeenCalled();
+  });
+
+  it("ignores stale snapshots after another worker sends both channels", async () => {
+    booking.deposit_payment_status = "failed";
+    const staleBooking = { ...booking };
+    await notifyDepositAttention(admin(), booking);
+    await notifyDepositAttention(admin(), staleBooking);
+    expect(mocks.send).toHaveBeenCalledTimes(2);
+    expect(mocks.sms).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces SMS tracking failures without marking the SMS as delivered", async () => {
+    booking.deposit_payment_status = "failed";
+    booking.deposit_attention_sent_at = now.toISOString();
+    await expect(notifyDepositAttention(admin(false, true), booking)).rejects.toThrow("SMS tracking unavailable");
+    expect(booking.deposit_attention_sms_sent_at).toBeNull();
     expect(booking.deposit_attention_claimed_at).toBeNull();
   });
 });

@@ -25,7 +25,7 @@ vi.mock("next/font/google", () => ({
   Geist_Mono: () => ({ variable: "geist-mono" }),
 }));
 
-vi.mock("next/navigation", () => ({ redirect }));
+vi.mock("next/navigation", () => ({ redirect, usePathname: () => "/" }));
 
 vi.mock("@/lib/admin-auth", () => ({ requireAdmin }));
 

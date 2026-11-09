@@ -403,6 +403,7 @@ export const business = {
   serviceArea: "Melbourne",
   pickupSuburb: "Abbotsford",
   pickupPostcode: "3067",
+  pickupAddress: "181 Nicholson St, Abbotsford VIC 3067",
   phone: "0452 316 823",
   email: "contactus@peppermintaudio.com.au",
   googleReviewsUrl: "https://share.google/cZGs5Tv7JAHs5oQOi",

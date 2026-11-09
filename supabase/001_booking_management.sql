@@ -550,6 +550,7 @@ alter table public.bookings add column if not exists deposit_consent_at timestam
 alter table public.bookings add column if not exists deposit_capture_before timestamptz;
 alter table public.bookings add column if not exists deposit_error text;
 alter table public.bookings add column if not exists deposit_attention_sent_at timestamptz;
+alter table public.bookings add column if not exists deposit_attention_sms_sent_at timestamptz;
 alter table public.bookings add column if not exists deposit_attention_claimed_at timestamptz;
 create index if not exists bookings_deposit_hold_date_idx on public.bookings(deposit_hold_date) where deposit_hold_date is not null;
 alter table public.bookings drop constraint if exists bookings_status_check;
@@ -620,12 +621,172 @@ alter table public.booking_email_log enable row level security;
 revoke all on public.booking_email_log from anon, authenticated;
 drop policy if exists "service role manages booking email log" on public.booking_email_log;
 create policy "service role manages booking email log" on public.booking_email_log for all to service_role using (true) with check (true);
+
+alter table public.bookings add column if not exists confirmation_sms_sent_at timestamptz;
+alter table public.bookings add column if not exists pickup_sms_sent_at timestamptz;
+alter table public.bookings add column if not exists pickup_sms_claimed_at timestamptz;
+alter table public.bookings add column if not exists dropoff_sms_sent_at timestamptz;
+alter table public.bookings add column if not exists dropoff_sms_claimed_at timestamptz;
+alter table public.bookings add column if not exists calendar_token text;
+create unique index if not exists bookings_calendar_token_idx on public.bookings(calendar_token) where calendar_token is not null;
+
+create table if not exists public.booking_sms_log (
+  id uuid primary key default gen_random_uuid(),
+  booking_id uuid not null references public.bookings(id) on delete cascade,
+  recipient_mobile text not null,
+  sms_type text not null check (sms_type in ('confirmation','pickup_reminder','dropoff_reminder','deposit_attention')),
+  body text not null,
+  status text not null check (status in ('accepted','failed')),
+  provider_message_id text,
+  error text,
+  idempotency_key text not null unique,
+  recorded_at timestamptz not null default now()
+);
+alter table public.booking_sms_log drop constraint if exists booking_sms_log_sms_type_check;
+alter table public.booking_sms_log add constraint booking_sms_log_sms_type_check
+  check (sms_type in ('confirmation','pickup_reminder','dropoff_reminder','deposit_attention'));
+create index if not exists booking_sms_log_booking_id_idx on public.booking_sms_log(booking_id);
+create index if not exists booking_sms_log_recorded_at_idx on public.booking_sms_log(recorded_at);
+alter table public.booking_sms_log enable row level security;
+revoke all on public.booking_sms_log from anon, authenticated;
+drop policy if exists "service role manages booking sms log" on public.booking_sms_log;
+create policy "service role manages booking sms log" on public.booking_sms_log for all to service_role using (true) with check (true);
+
+create table if not exists public.booking_phone_verifications (
+  id uuid primary key default gen_random_uuid(),
+  phone text not null,
+  token_hash text not null unique,
+  code_hash text not null,
+  ip_hash text not null,
+  attempts integer not null default 0 check (attempts >= 0),
+  expires_at timestamptz not null,
+  verified_at timestamptz,
+  consumed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists booking_phone_verifications_phone_created_idx
+  on public.booking_phone_verifications(phone, created_at desc);
+create index if not exists booking_phone_verifications_ip_created_idx
+  on public.booking_phone_verifications(ip_hash, created_at desc);
+alter table public.booking_phone_verifications enable row level security;
+revoke all on public.booking_phone_verifications from anon, authenticated;
+drop policy if exists "service role manages phone verifications" on public.booking_phone_verifications;
+create policy "service role manages phone verifications" on public.booking_phone_verifications
+  for all to service_role using (true) with check (true);
+
+create or replace function public.issue_booking_phone_verification(
+  p_phone text,
+  p_token_hash text,
+  p_code_hash text,
+  p_ip_hash text,
+  p_expires_at timestamptz
+)
+returns boolean language plpgsql security definer set search_path = public as $$
+begin
+  if p_phone !~ '^614[0-9]{8}$'
+    or p_token_hash !~ '^[a-f0-9]{64}$'
+    or p_code_hash !~ '^[a-f0-9]{64}$'
+    or p_ip_hash !~ '^[a-f0-9]{64}$'
+    or p_expires_at <= now()
+    or p_expires_at > now() + interval '10 minutes' then
+    raise exception 'Invalid phone verification request.';
+  end if;
+
+  perform pg_advisory_xact_lock(hashtextextended('phone:' || p_phone, 0));
+  perform pg_advisory_xact_lock(hashtextextended('ip:' || p_ip_hash, 0));
+  perform pg_advisory_xact_lock(hashtextextended('booking-phone-verification-global', 0));
+  delete from public.booking_phone_verifications where created_at < now() - interval '1 day';
+
+  if (select count(*) from public.booking_phone_verifications
+      where phone = p_phone and created_at > now() - interval '15 minutes') >= 3
+    or (select count(*) from public.booking_phone_verifications
+      where ip_hash = p_ip_hash and created_at > now() - interval '1 hour') >= 10
+    or (select count(*) from public.booking_phone_verifications
+      where created_at > now() - interval '1 day') >= 50 then
+    return false;
+  end if;
+
+  insert into public.booking_phone_verifications (phone, token_hash, code_hash, ip_hash, expires_at)
+  values (p_phone, p_token_hash, p_code_hash, p_ip_hash, p_expires_at);
+  return true;
+end;
+$$;
+revoke all on function public.issue_booking_phone_verification(text, text, text, text, timestamptz) from public, anon, authenticated;
+grant execute on function public.issue_booking_phone_verification(text, text, text, text, timestamptz) to service_role;
+
+create or replace function public.check_booking_phone_verification(
+  p_token_hash text,
+  p_code_hash text
+)
+returns text language plpgsql security definer set search_path = public as $$
+declare
+  verification public.booking_phone_verifications%rowtype;
+begin
+  select * into verification
+  from public.booking_phone_verifications
+  where token_hash = p_token_hash
+  for update;
+
+  if not found or verification.consumed_at is not null then return 'invalid'; end if;
+  if verification.verified_at is not null then
+    if verification.verified_at > now() - interval '30 minutes' then return 'verified'; end if;
+    return 'expired';
+  end if;
+  if verification.expires_at <= now() then return 'expired'; end if;
+  if verification.attempts >= 5 then return 'attempt_limit'; end if;
+
+  update public.booking_phone_verifications
+  set attempts = attempts + 1
+  where id = verification.id;
+
+  if verification.code_hash <> p_code_hash then return 'invalid_code'; end if;
+
+  update public.booking_phone_verifications
+  set verified_at = now()
+  where id = verification.id;
+  return 'verified';
+end;
+$$;
+revoke all on function public.check_booking_phone_verification(text, text) from public, anon, authenticated;
+grant execute on function public.check_booking_phone_verification(text, text) to service_role;
+
+create or replace function public.consume_booking_phone_verification(
+  p_token_hash text,
+  p_phone text
+)
+returns boolean language plpgsql security definer set search_path = public as $$
+begin
+  update public.booking_phone_verifications
+  set consumed_at = now()
+  where token_hash = p_token_hash
+    and phone = p_phone
+    and verified_at is not null
+    and consumed_at is null
+    and verified_at > now() - interval '30 minutes';
+  return found;
+end;
+$$;
+revoke all on function public.consume_booking_phone_verification(text, text) from public, anon, authenticated;
+grant execute on function public.consume_booking_phone_verification(text, text) to service_role;
+
 drop trigger if exists bookings_updated_at on public.bookings;
 create trigger bookings_updated_at before update on public.bookings
 for each row execute function public.set_bookings_updated_at();
 
 create extension if not exists pg_cron;
+select cron.unschedule(jobid) from cron.job where jobname = 'purge-booking-phone-verifications';
+select cron.schedule(
+  'purge-booking-phone-verifications',
+  '17 * * * *',
+  $$delete from public.booking_phone_verifications where created_at < now() - interval '1 day'$$
+);
 select cron.unschedule(jobid) from cron.job where jobname = 'purge-booking-email-log';
+select cron.unschedule(jobid) from cron.job where jobname = 'purge-booking-sms-log';
+select cron.schedule(
+  'purge-booking-sms-log',
+  '27 3 * * *',
+  $$delete from public.booking_sms_log where recorded_at < now() - interval '30 days'$$
+);
 
 insert into storage.buckets (id, name, public) values ('booking-photo-ids', 'booking-photo-ids', false) on conflict (id) do nothing;
 drop policy if exists "service role manages booking photos" on storage.objects;

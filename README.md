@@ -160,6 +160,82 @@ For direct local launches it defaults to `http://127.0.0.1:30074`; overrides mus
 be loopback HTTP URLs. Hosted production keeps its existing Resend behavior;
 local email settings do not redirect hosted deployments.
 
+## SMS transport
+
+The provider-neutral message contract is in `lib/sms-provider-types.ts`, and
+`lib/sms-transport.ts` validates and delegates messages to an injected provider.
+Mobile Message is the current adapter. The booking form verifies the entered
+Australian mobile number before submission. Customer SMS is limited to booking
+confirmation, pickup/drop-off reminders, and security-deposit alerts when a hold fails,
+requires bank verification, expires, or cannot cover the hire. Deposit SMS uses
+safe, specific bank reasons when recorded (for example insufficient funds or an
+expired card), otherwise generic wording. It asks customers to check their
+recovery email before pickup or reply for help, without card details or raw
+provider diagnostics. Email and SMS delivery
+are tracked separately, so a failed SMS can be retried without resending the
+emails. Transactional SMS does not include opt-out wording. OTP and deposit
+messages stay within one part. Confirmation SMS is capped at two parts and includes
+a private calendar link; detailed pickup SMS is capped at three
+parts (up to three credits), including the requested pickup slot, address,
+transport reminder and instructions to message or call upon arrival or if
+running late or changing the scheduled pickup time. It says "today" or "tomorrow" using Melbourne time,
+or gives the date without the weekday for other days to keep within the segment
+limit. The private-residence note follows the pickup
+email. SMS uses AM/PM pickup times and does not request 30-minute advance notice;
+the email is unchanged.
+The photo-ID reminder remains in email only, not SMS.
+
+Confirmed-booking SMS links to `/calendar/<token>` on this website. The token is
+128 random bits encoded as 22 URL-safe characters (66 characters for the full
+production URL), persisted server-side so retries reuse the same link. The page
+offers separate pickup and drop-off events for Google Calendar and Apple/Outlook
+(`.ics`). Downloads and dates use Melbourne time, including daylight saving.
+Bookings without an agreed time are explicitly labelled and saved as all-day
+reminders, not invented appointment times. These are saved copies, not calendar
+subscriptions; customers must update saved events if hire times change.
+Links expose only the booking reference, dates, times and business address,
+are not indexed or cached, and stop working for cancelled/completed bookings
+or more than 30 days after return. Apply the migration's `calendar_token` column
+and unique index before deployment. Google Ads scripts do not load on the private
+calendar page, and external calendar links use a no-referrer policy.
+
+The business Google Calendar integration remains separate from customer calendar
+links. Request submission does not create an event. Confirmation saves the
+full-hire event (pickup through drop-off) for both admin and automatic Stripe confirmations.
+Existing tracked events are not duplicated. New events use a deterministic booking
+ID so an accepted event can be recovered after a tracking failure. Calendar errors
+are recorded and surfaced to the admin/webhook without preventing customer
+notifications. Enabled integration without a refresh token fails explicitly;
+reconnect Google if its authorisation has expired. Local calendar delivery remains
+disabled by default.
+Incoming replies are handled in the Mobile Message account; they are not yet
+shown in the admin dashboard.
+Outgoing booking SMS is recorded in the admin Communications trail alongside
+emails, including the submitted text, recipient, time, provider message ID,
+and acceptance or send failure. Provider acceptance does not prove handset
+delivery. Retries reuse one record per logical message; a failed retry cannot
+overwrite an accepted record. OTP codes are not recorded in this trail.
+SMS history is retained for 30 days and deleted with its booking. This requires
+the `booking_sms_log` table, access policy, and cleanup job in the canonical
+Supabase migration before deployment. Existing messages are not backfilled.
+
+Local SMS is disabled by default. Deliberate local sends require
+`IS_LOCAL_SMS_ENABLED=true` and a single `LOCAL_SMS_TEST_RECIPIENT`; every
+local send is redirected to that number. Local OTP tests exercise the flow but
+do not prove ownership of the number entered in the form. The verification code
+expires after five minutes; a successfully verified
+number can be used to submit its booking for 30 minutes. Challenges and codes
+are stored only as keyed hashes and rate-limited per number, source IP, and globally. The canonical Supabase
+migration must be applied before deploying phone verification or SMS tracking.
+The deposit alerts also require the `deposit_attention_sms_sent_at` booking
+column from that migration before deployment.
+The reminder schedulers also require the `pickup_sms_claimed_at`,
+`dropoff_sms_sent_at`, and `dropoff_sms_claimed_at` booking columns and the
+updated `booking_sms_log` message-type constraint.
+Configure SMS credentials as server-only Vercel environment variables; never
+enter them in command arguments or commit them. No live SMS is sent by unit
+tests.
+
 **Other external services remain separate:** local Supabase does not sandbox
 Stripe or Google Calendar. Do not use real customer information or live payment
 keys in local tests. Use Stripe test-mode keys and keep calendar disabled.
@@ -177,6 +253,12 @@ keys in local tests. Use Stripe test-mode keys and keep calendar disabled.
 - `LOCAL_EMAIL_MODE`: local-only `capture` (default) or explicit `resend`
 - `LOCAL_EMAIL_TEST_RECIPIENT`: single designated recipient required for local Resend mode
 - `LOCAL_EMAIL_INBOX_URL`: loopback HTTP Mailpit URL (injected by the local launcher)
+- `SMS_PROVIDER`: production SMS provider (`mobilemessage`)
+- `MOBILEMESSAGE_API_USERNAME`, `MOBILEMESSAGE_API_PASSWORD`: server-only Mobile Message API credentials
+- `MOBILEMESSAGE_SENDER_ID`: approved Mobile Message sender ID, such as the dedicated number configured in the provider account
+- `SMS_OTP_HASH_SECRET`: server-only random secret used to hash phone-verification tokens and codes
+- `IS_LOCAL_SMS_ENABLED`: local-only SMS safety switch; only `true` enables live Mobile Message sends (unset or `false` keeps SMS disabled). Replaces `LOCAL_SMS_MODE`.
+- `LOCAL_SMS_TEST_RECIPIENT`: single Australian mobile number required for local SMS mode; all local messages are redirected here
 - `LOCAL_STRIPE_WEBHOOKS`: set to `true` to start Stripe CLI test-mode webhook forwarding during local development
 - `SUPABASE_URL`: Supabase project URL
 - `SUPABASE_ANON_KEY`: Supabase publishable/anon key
@@ -294,8 +376,8 @@ bookings can still be confirmed while payment is due.
 If delivery fails, the booking remains confirmed and the admin can retry
 using **Send confirmation email**. Automated pickup reminders exclude cancelled
 and completed bookings. Manual reminders use the actual pickup date without
-assuming tomorrow. Calendar-outcome recording failures are logged independently
-and do not prevent booking-request email attempts.
+assuming tomorrow. Google Calendar runs only for confirmed bookings; errors are
+recorded independently and do not prevent customer notification attempts.
 
 Invoice PDFs paginate long item lists and payment details above the branded
 footers. Billing delivery tracking errors are surfaced; provider idempotency
@@ -357,11 +439,48 @@ Cleanup refunds test hire and captured-deposit charges, releases active holds,
 and removes each local booking and Stripe customer. Normal unit runs skip this
 external check.
 
-## Pickup reminders
+## Pickup and drop-off reminders
 
-Reminders are sent around noon Melbourne time on the day before pickup. Vercel invokes the route once daily at 01:00 UTC (11:00 am AEST / 12:00 pm AEDT).
+Email reminders are unchanged: around noon Melbourne time on the day before pickup, once daily at 01:00 UTC (11:00 am AEST / 12:00 pm AEDT).
 
 `/api/cron/pickup-reminders` runs once daily through Vercel Cron and emails customers with a pickup scheduled for the next day in Melbourne. Set `CRON_SECRET` to a long random value in Vercel project environment variables; Vercel sends it as a Bearer token. The route uses the server-only Supabase service role and Resend credentials. Apply the booking migration before enabling the cron.
+
+Pickup and drop-off SMS use two Hobby-compatible, once-daily Vercel jobs:
+`/api/cron/hire-reminders` at 21:00 UTC and
+`/api/cron/hire-reminders-evening` at 08:00 UTC. Both jobs process both reminder
+types. Hobby may start a job up to 59 minutes after its scheduled hour.
+The morning window is 7–8 am AEST / 8–9 am AEDT, and the evening window is
+6–7 pm AEST / 7–8 pm AEDT. Melbourne-local date/time checks handle daylight saving.
+Pickups at or before 9:00 am are eligible from the previous evening window.
+Required Stripe
+deposits must already be authorised (or captured), and the hire paid; zero
+deposits need no hold. An unready deposit is checked again on later runs and
+successful deposit/hire payment events attempt a catch-up for that booking only, but
+no pickup SMS is sent after the pickup slot. If an early pickup's hold is not
+ready the previous evening, the SMS can catch up before pickup once secured.
+The message asks the customer to contact the business beforehand if running late
+or changing their pickup time.
+
+The SMS cron uses `CRON_SECRET`, server-only Supabase and Mobile Message
+credentials. Concurrent runs use a recoverable booking-level claim plus a
+stable provider idempotency key. Apply the migration before enabling it.
+No sub-daily cron expression, external scheduler or paid Vercel plan is required.
+The single-type `/api/cron/pickup-sms` and `/api/cron/dropoff-sms` endpoints remain
+available for authorised manual recovery but are not scheduled.
+
+Confirmed bookings are eligible for drop-off SMS from the morning window on the
+return day, or from the previous evening window for returns at or before 9:00 am. Missed runs
+can catch up strictly before the scheduled return; submitted, cancelled,
+completed and already-reminded bookings are skipped. Return reminders do not
+depend on deposit status. The message includes the scheduled return time in
+AM/PM format, a reminder to check and pack all equipment, cables and accessories,
+then a separate contact/late-fee paragraph. It has no address or private-residence note. It uses "today"
+or "tomorrow" as appropriate and is capped at three SMS parts (up to three credits).
+
+Both reminders appear in the admin Communications trail and use independent
+sent timestamps, recoverable claims and provider idempotency keys. Apply the
+canonical migration before deployment to add drop-off tracking and allow its
+message type in the SMS history table. This does not add a drop-off email.
 
 ## Run
 

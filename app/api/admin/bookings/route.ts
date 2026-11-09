@@ -48,7 +48,9 @@ export async function GET(request: Request) {
   const search = url.searchParams.get("search")?.trim();
   const status = url.searchParams.get("status");
   const all = url.searchParams.get("all") === "true";
-  let query = session.admin.from("bookings").select("*").order("pickup_date", { ascending: true });
+  let query = session.admin.from("bookings")
+    .select("*,sms_logs:booking_sms_log(id,recipient_mobile,sms_type,body,status,provider_message_id,error,recorded_at)")
+    .order("pickup_date", { ascending: true });
   if (all) query = query.order("id", { ascending: true });
   if (status && ["submitted", "confirmed", "completed", "cancelled"].includes(status)) query = query.eq("status", status);
   if (search) {
@@ -114,9 +116,11 @@ export async function PATCH(request: Request) {
     lineItemUpdate = { hire_line_items: parsedItems.items, hire_amount_cents: lineItemsTotalCents(parsedItems.items, nights) };
   }
   let confirmation: {
+    id: string;
     email: string;
     first_name: string;
     event_type: string;
+    mobile: string;
     pickup_date: string;
     dropoff_date: string;
     pickup_time?: string | null;
@@ -125,12 +129,13 @@ export async function PATCH(request: Request) {
     hire_line_items: BookingLineItem[] | null;
     additional_details?: string | null;
     confirmation_email_sent: boolean;
+    confirmation_sms_sent_at: string | null;
   } | null = null;
   let paymentUpdate: Record<string, unknown> & { hire_payment_status: string; deposit_payment_status: string; payment_received_at: string } | null = null;
   let standardBankTransferReceived = false;
   if (body.status === "confirmed") {
     const result = await session.admin.from("bookings")
-      .select("id,email,first_name,event_type,pickup_date,dropoff_date,pickup_time,dropoff_time,created_at,hire_line_items,additional_details,confirmation_email_sent,hire_payment_status,payment_method,security_deposit_cents,deposit_payment_status,bank_transfer_option,stripe_hire_payment_intent_id,stripe_deposit_payment_intent_id")
+      .select("id,email,mobile,first_name,event_type,pickup_date,dropoff_date,pickup_time,dropoff_time,created_at,hire_line_items,additional_details,confirmation_email_sent,confirmation_sms_sent_at,hire_payment_status,payment_method,security_deposit_cents,deposit_payment_status,bank_transfer_option,stripe_hire_payment_intent_id,stripe_deposit_payment_intent_id")
       .eq("id", body.id)
       .single();
     if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 });

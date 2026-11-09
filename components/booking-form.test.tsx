@@ -5,6 +5,7 @@ import { StrictMode } from "react";
 import { BookingForm } from "./booking-form";
 
 const mockTrackBookingSubmission = vi.hoisted(() => vi.fn());
+const mockFetch = vi.hoisted(() => vi.fn());
 
 const mockCart = vi.hoisted(() => ({
     items: [{ id: "equipment:bose-s1-pro:Single speaker", name: "Bose S1 Pro", kind: "equipment", price: 55, quantity: 1 }],
@@ -18,20 +19,42 @@ vi.mock("@/lib/google-ads", () => ({
   trackGoogleAdsBookingSubmission: mockTrackBookingSubmission,
 }));
 
+async function verifyContactMobile() {
+  fireEvent.click(screen.getByRole("button", { name: /Send verification code/ }));
+  await screen.findByLabelText("Verification code");
+  fireEvent.change(screen.getByLabelText("Verification code"), { target: { value: "123456" } });
+  fireEvent.click(screen.getByRole("button", { name: "Verify number" }));
+  await screen.findByText("Mobile number verified.");
+}
+
 describe("BookingForm", () => {
   beforeEach(() => {
     mockCart.hireDates = { pickupDate: "2026-10-20", dropoffDate: "2026-10-23" };
     mockCart.clearCart.mockClear();
     mockTrackBookingSubmission.mockClear();
+    mockFetch.mockReset().mockImplementation(async (url: string, options: { body?: FormData | string } = {}) => {
+      if (url === "/api/phone-verification") {
+        const request = JSON.parse(String(options.body)) as { action: string };
+        return {
+          ok: true,
+          json: async () => request.action === "send"
+            ? { challengeToken: "v".repeat(43) }
+            : { verified: true },
+        };
+      }
+      return { ok: true, json: async () => ({ bookingReference: "PA-123456789012" }) };
+    });
+    vi.stubGlobal("fetch", mockFetch);
   });
 
-  it("restores contact details under Strict Mode and uses only cart dates", () => {
+  it("restores contact details under Strict Mode and uses only cart dates", async () => {
     window.localStorage.setItem("peppermint-audio-booking-draft", JSON.stringify({
       firstName: "Pricing", lastName: "Test", email: "pricing@example.com", mobile: "0400000000",
       pickupDate: "2026-10-01", dropoffDate: "2026-10-02",
     }));
     render(<StrictMode><BookingForm /></StrictMode>);
     expect(screen.getByLabelText("First name")).toHaveValue("Pricing");
+    await verifyContactMobile();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByText("Hire total · 3 nights")).toBeInTheDocument();
     const draft = JSON.parse(window.localStorage.getItem("peppermint-audio-booking-draft")!);
@@ -40,13 +63,14 @@ describe("BookingForm", () => {
     expect(draft).not.toHaveProperty("dropoffDate");
   });
 
-  it("uses cart dates for totals and offers date changes only through the cart", () => {
+  it("uses cart dates for totals and offers date changes only through the cart", async () => {
     window.localStorage.setItem("peppermint-audio-booking-draft", JSON.stringify({
       firstName: "Alex", lastName: "Smith", email: "alex@example.com", mobile: "0412345678",
       eventType: "Party", eventAddress: "1 Example Street", pickupDate: "2026-10-20",
       dropoffDate: "2026-10-23", pickupTime: "10:00", dropoffTime: "12:00",
     }));
     const { rerender } = render(<BookingForm />);
+    await verifyContactMobile();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByText("Hire total · 3 nights")).toBeInTheDocument();
     expect(screen.getByText("$110.00")).toBeInTheDocument();
@@ -75,13 +99,14 @@ describe("BookingForm", () => {
     expect(screen.getByText("$55.00 each / night")).toBeInTheDocument();
   });
 
-  it("keeps extra-details copy neutral about the pickup-and-drop-off hire", () => {
+  it("keeps extra-details copy neutral about the pickup-and-drop-off hire", async () => {
     window.localStorage.setItem("peppermint-audio-booking-draft", JSON.stringify({
       firstName: "Alex", lastName: "Smith", email: "alex@example.com", mobile: "0412345678",
       eventType: "Party", eventAddress: "1 Example Street", pickupTime: "10:00", dropoffTime: "12:00",
     }));
     render(<BookingForm />);
 
+    await verifyContactMobile();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.change(screen.getByLabelText("Choose files"), {
@@ -113,11 +138,8 @@ describe("BookingForm", () => {
       firstName: "Alex", lastName: "Smith", email: "alex@example.com", mobile: "0412345678",
       eventType: "Wedding", eventAddress: "1 Example Street", pickupTime: "10:00", dropoffTime: "12:00",
     }));
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true, json: async () => ({ bookingReference: "PA-123456789012" }),
-    });
-    vi.stubGlobal("fetch", fetchMock);
     render(<BookingForm />);
+    await verifyContactMobile();
     for (let step = 0; step < 2; step++) fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.change(screen.getByLabelText("Choose files"), {
       target: { files: [
@@ -144,15 +166,18 @@ describe("BookingForm", () => {
     expect(mockCart.clearCart).toHaveBeenCalledOnce();
     expect(mockTrackBookingSubmission).toHaveBeenCalledOnce();
     expect(window.localStorage.getItem("peppermint-audio-booking-draft")).toBeNull();
-    expect(fetchMock).toHaveBeenCalledOnce();
-    const submittedFiles = (fetchMock.mock.calls[0][1].body as FormData).getAll("idFiles");
+    const bookingCalls = mockFetch.mock.calls.filter(([url]) => url === "/api/booking");
+    expect(bookingCalls).toHaveLength(1);
+    const bookingForm = bookingCalls[0][1].body as FormData;
+    expect(bookingForm.get("phoneVerificationToken")).toBe("v".repeat(43));
+    const submittedFiles = bookingForm.getAll("idFiles");
     expect(submittedFiles).toEqual([
       expect.objectContaining({ name: "front.png" }),
       expect.objectContaining({ name: "back.png" }),
     ]);
   });
 
-  it("uses a step-by-step flow and moves from your details to event details", () => {
+  it("uses a step-by-step flow and requires phone verification before continuing", async () => {
     render(<BookingForm />);
 
     expect(screen.getByText("Booking details")).toBeInTheDocument();
@@ -168,10 +193,72 @@ describe("BookingForm", () => {
     fireEvent.change(screen.getByLabelText("Mobile number"), { target: { value: "0412345678" } });
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
+    expect(screen.getByText("Step 1 of 4")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Verify your mobile number before continuing.");
+    await verifyContactMobile();
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByText("Step 2 of 4")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Event details" })).toBeInTheDocument();
     expect(screen.getByLabelText("Event address")).toBeInTheDocument();
     expect(screen.queryByText(/Bose S1 Pro PA Speaker/)).not.toBeInTheDocument();
+  });
+
+  it("clears phone verification when the customer changes their mobile number", async () => {
+    render(<BookingForm />);
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Alex" } });
+    fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Smith" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "alex@example.com" } });
+    fireEvent.change(screen.getByLabelText("Mobile number"), { target: { value: "0412345678" } });
+    await verifyContactMobile();
+
+    fireEvent.change(screen.getByLabelText("Mobile number"), { target: { value: "0412345679" } });
+
+    expect(screen.queryByText("Mobile number verified.")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Verify your mobile number before continuing.");
+    expect(screen.getByText("Step 1 of 4")).toBeInTheDocument();
+  });
+
+  it("allows a new verification after booking submission fails", async () => {
+    mockFetch.mockImplementation(async (url: string, options: { body?: FormData | string } = {}) => {
+      if (url === "/api/phone-verification") {
+        const request = JSON.parse(String(options.body)) as { action: string };
+        return {
+          ok: true,
+          json: async () => request.action === "send"
+            ? { challengeToken: "v".repeat(43) }
+            : { verified: true },
+        };
+      }
+      return { ok: false, json: async () => ({ error: "Booking submission failed." }) };
+    });
+    window.localStorage.setItem("peppermint-audio-booking-draft", JSON.stringify({
+      firstName: "Alex",
+      lastName: "Smith",
+      email: "alex@example.com",
+      mobile: "0412345678",
+      eventType: "Wedding",
+      eventAddress: "1 Example Street",
+      pickupTime: "10:00",
+      dropoffTime: "12:00",
+    }));
+    render(<BookingForm />);
+    await verifyContactMobile();
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.change(screen.getByLabelText("Choose files"), {
+      target: { files: [
+        new File(["front"], "front.png", { type: "image/png" }),
+        new File(["back"], "back.png", { type: "image/png" }),
+      ] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Submit a Booking Request" }));
+
+    expect(await screen.findByText("Please verify your mobile number again before retrying.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Your details" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send verification code" })).toBeInTheDocument();
   });
 
   it("sends direct visits without dates back to the cart", () => {
@@ -182,7 +269,7 @@ describe("BookingForm", () => {
     expect(screen.queryByLabelText("First name")).not.toBeInTheDocument();
   });
 
-  it("puts photo ID before review and only shows final-step errors after submit", () => {
+  it("puts photo ID before review and only shows final-step errors after submit", async () => {
     window.localStorage.setItem(
       "peppermint-audio-booking-draft",
       JSON.stringify({
@@ -201,6 +288,7 @@ describe("BookingForm", () => {
     );
 
     render(<BookingForm />);
+    await verifyContactMobile();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
@@ -222,7 +310,7 @@ describe("BookingForm", () => {
     expect(screen.queryByText("Please confirm that you have read and agree to the terms")).not.toBeInTheDocument();
   });
 
-  it.each(["picker", "drop"] as const)("adds photo IDs separately using the %s, preserves files at the limit and allows replacement after removal", (method) => {
+  it.each(["picker", "drop"] as const)("adds photo IDs separately using the %s, preserves files at the limit and allows replacement after removal", async (method) => {
     window.localStorage.setItem(
       "peppermint-audio-booking-draft",
       JSON.stringify({
@@ -240,6 +328,7 @@ describe("BookingForm", () => {
     );
 
     render(<BookingForm />);
+    await verifyContactMobile();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
 

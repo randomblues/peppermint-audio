@@ -57,6 +57,42 @@ beforeEach(async () => {
 });
 
 describe("AdminConsole", () => {
+  it("interleaves outgoing SMS with emails, showing content and accurate provider outcomes", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ bookings: [{
+      ...booking,
+      sms_logs: [
+        { id: "sms-accepted", sms_type: "confirmation", recipient_mobile: "+61400000000",
+          body: "Confirmed <script>not executable</script>", status: "accepted", provider_message_id: "sms-provider-1",
+          error: null, recorded_at: "2026-10-04T00:00:00Z" },
+        { id: "sms-failed", sms_type: "deposit_attention", recipient_mobile: "+61400000000",
+          body: "Please check your email before pickup.", status: "failed", provider_message_id: null,
+          error: "SMS provider rejected the request (503).", recorded_at: "2026-10-02T00:00:00Z" },
+        { id: "sms-dropoff", sms_type: "dropoff_reminder", recipient_mobile: "+61400000000",
+          body: "Your equipment drop-off is today at 6:00 PM.", status: "accepted", provider_message_id: "sms-dropoff-1",
+          error: null, recorded_at: "2026-10-01T00:00:00Z" },
+      ],
+    }] }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AdminConsole />);
+    fireEvent.click(await screen.findByText("Alex Smith"));
+    fireEvent.click(screen.getByRole("button", { name: /Communications/ }));
+    const history = screen.getByRole("list", { name: "Communication history" });
+    const entries = within(history).getAllByRole("listitem");
+    expect(entries).toHaveLength(4);
+    expect(entries[0]).toHaveTextContent("SMS · Accepted by provider");
+    expect(entries[0]).toHaveTextContent("+61400000000");
+    expect(entries[0]).toHaveTextContent("Confirmed <script>not executable</script>");
+    expect(entries[0].querySelector("script")).toBeNull();
+    expect(entries[1]).toHaveTextContent("View sent email");
+    expect(entries[2]).toHaveTextContent("Security deposit alert");
+    expect(entries[2]).toHaveTextContent("SMS · Failed");
+    expect(entries[2]).toHaveTextContent("SMS provider rejected the request (503).");
+    expect(entries[3]).toHaveTextContent("Drop-off reminder");
+    expect(within(history).getByRole("article", { name: "Drop-off reminder SMS" })).toHaveTextContent("6:00 PM");
+    expect(screen.getByText(/SMS acceptance is not delivery confirmation/)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("asks for payment receipt before confirming a bank transfer and allows cancelling", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ bookings: [{
       ...booking, payment_method: "bank_transfer", hire_payment_status: "bank_transfer_pending",
@@ -240,7 +276,7 @@ describe("AdminConsole", () => {
 
     fireEvent.click(communications);
     expect(communications).toHaveAttribute("aria-expanded", "true");
-    expect(within(bookingDialog).getByRole("heading", { name: "Email history" })).toBeInTheDocument();
+    expect(within(bookingDialog).getByRole("heading", { name: "Communication history" })).toBeInTheDocument();
     expect(within(bookingDialog).getByRole("button", { name: "Send Email" })).toBeInTheDocument();
     fireEvent.click(within(bookingDialog).getByRole("button", { name: "Send Email" }));
     expect(screen.getByRole("dialog", { name: "Send an email" })).toBeInTheDocument();
@@ -251,8 +287,8 @@ describe("AdminConsole", () => {
     expect(await screen.findByLabelText("invoice.pdf, page 1")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Download" })).toHaveAttribute("href", "/api/admin/email-history/attachment?id=email-one&index=0");
     expect(fetchMock).toHaveBeenCalledWith("/api/admin/email-history?id=email-one");
-    fireEvent.click(within(bookingDialog).getByRole("button", { name: "Back to email history" }));
-    expect(within(bookingDialog).getByRole("heading", { name: "Email history" })).toBeInTheDocument();
+    fireEvent.click(within(bookingDialog).getByRole("button", { name: "Back to communication history" }));
+    expect(within(bookingDialog).getByRole("heading", { name: "Communication history" })).toBeInTheDocument();
   });
 
   it("updates status and notes, sends a reminder, and opens photo links", async () => {

@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { buildPickupReminderEmail, createAdminClient, getMelbourneTomorrow, recordCustomerEmail, send, Resend } = vi.hoisted(() => {
+const { buildPickupReminderEmail, createAdminClient, getMelbourneTomorrow, recordCustomerEmail, sendPickupReminderSms, send, Resend } = vi.hoisted(() => {
   const send = vi.fn();
   return {
     buildPickupReminderEmail: vi.fn(() => ({ subject: "Pickup reminder", text: "Reminder text", html: "<p>Reminder</p>" })),
     createAdminClient: vi.fn(),
     getMelbourneTomorrow: vi.fn(() => "2026-09-29"),
     recordCustomerEmail: vi.fn(),
+    sendPickupReminderSms: vi.fn(),
     send,
     Resend: vi.fn(() => ({ emails: { send } })),
   };
@@ -16,6 +17,7 @@ vi.mock("resend", () => ({ Resend }));
 vi.mock("@/lib/pickup-reminders", () => ({ buildPickupReminderEmail, getMelbourneTomorrow }));
 vi.mock("@/lib/supabase", () => ({ createAdminClient }));
 vi.mock("@/lib/email-log", () => ({ recordCustomerEmail }));
+vi.mock("@/lib/send-booking-sms", () => ({ sendPickupReminderSms }));
 
 import { GET, isCronAuthorized } from "./route";
 
@@ -23,22 +25,26 @@ const bookings = [
   {
     id: "booking-1",
     email: "one@example.com",
+    mobile: "0412345678",
     first_name: "One",
     last_name: "Customer",
     event_type: "Party",
     pickup_date: "2026-09-29",
     hire_line_items: [],
     additional_details: null,
+    pickup_sms_sent_at: null,
   },
   {
     id: "booking-2",
     email: "two@example.com",
+    mobile: "0412345679",
     first_name: "Two",
     last_name: "Customer",
     event_type: "Wedding",
     pickup_date: "2026-09-29",
     hire_line_items: [],
     additional_details: "Details",
+    pickup_sms_sent_at: null,
   },
 ];
 
@@ -57,6 +63,7 @@ function configureAdmin(data: unknown[] = bookings, queryError: unknown = null, 
     select: vi.fn(() => query),
     eq: vi.fn(() => query),
     neq: vi.fn(() => query),
+    or: vi.fn().mockResolvedValue({ data, error: queryError }),
     is: vi.fn().mockResolvedValue({ data, error: queryError }),
   };
   createAdminClient.mockReturnValue({
@@ -83,6 +90,7 @@ describe("GET /api/cron/pickup-reminders", () => {
     vi.stubEnv("RESEND_API_KEY", "resend-key");
     vi.stubEnv("ENQUIRY_FROM_EMAIL", "Peppermint Audio <from@example.com>");
     send.mockResolvedValue({ data: { id: "email-id" }, error: null });
+    sendPickupReminderSms.mockResolvedValue({ id: "sms-id" });
     configureAdmin();
   });
 
@@ -124,7 +132,7 @@ describe("GET /api/cron/pickup-reminders", () => {
     expect(response.status).toBe(200);
     expect(getMelbourneTomorrow).toHaveBeenCalledOnce();
     const query = createAdminClient.mock.results[0].value.from.mock.results[0].value;
-    expect(query.select).toHaveBeenCalledWith("id,email,first_name,last_name,event_type,pickup_date,pickup_time,hire_line_items,additional_details");
+    expect(query.select).toHaveBeenCalledWith("id,email,first_name,last_name,event_type,pickup_date,pickup_time,hire_line_items,additional_details,reminder_sent_at");
     expect(query.eq).toHaveBeenCalledWith("pickup_date", "2026-09-29");
     expect(query.neq).toHaveBeenCalledWith("status", "cancelled");
     expect(query.neq).toHaveBeenCalledWith("status", "completed");
@@ -151,13 +159,17 @@ describe("GET /api/cron/pickup-reminders", () => {
     expect(buildPickupReminderEmail).toHaveBeenCalledTimes(2);
     expect(recordCustomerEmail).toHaveBeenCalledTimes(2);
     expect(send).toHaveBeenCalledTimes(2);
+    expect(sendPickupReminderSms).not.toHaveBeenCalled();
     expect(send).toHaveBeenNthCalledWith(1, expect.objectContaining({ from: "Peppermint Audio <from@example.com>", to: ["one@example.com"] }));
     expect(send).toHaveBeenNthCalledWith(2, expect.objectContaining({ to: ["two@example.com"] }));
     expect(update).toHaveBeenCalledTimes(2);
   });
 
   it("continues after send, response, or update failures and reports each booking", async () => {
-    const { update } = configureAdmin(bookings, null, [{ message: "mark failed" }]);
+    const { update } = configureAdmin([
+      { ...bookings[0], pickup_sms_sent_at: "already-sent" },
+      bookings[1],
+    ], null, [{ message: "mark failed" }]);
     send.mockResolvedValueOnce({ error: { message: "provider rejected" } }).mockResolvedValueOnce({ data: { id: "email-id" }, error: null });
 
     const response = await GET(request());
@@ -173,6 +185,30 @@ describe("GET /api/cron/pickup-reminders", () => {
       ],
     });
     expect(send).toHaveBeenCalledTimes(2);
+    expect(sendPickupReminderSms).not.toHaveBeenCalled();
     expect(update).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not send pickup SMS from the day-before email job", async () => {
+    const response = await GET(request());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      sent: 2,
+      failures: [],
+    });
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(sendPickupReminderSms).not.toHaveBeenCalled();
+  });
+
+  it("does not resend an already tracked email or send a pickup SMS", async () => {
+    configureAdmin([{ ...bookings[0], reminder_sent_at: "2026-09-28T00:00:00Z" }]);
+
+    const response = await GET(request());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ selected: 1, sent: 0, failures: [] });
+    expect(send).not.toHaveBeenCalled();
+    expect(sendPickupReminderSms).not.toHaveBeenCalled();
   });
 });

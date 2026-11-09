@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { OAuth2, calendar, eventsInsert, generateAuthUrl, getToken, setCredentials } = vi.hoisted(() => ({
+const { OAuth2, calendar, eventsInsert, eventsUpdate, generateAuthUrl, getToken, setCredentials } = vi.hoisted(() => ({
   OAuth2: vi.fn(),
   calendar: vi.fn(),
   eventsInsert: vi.fn(),
+  eventsUpdate: vi.fn(),
   generateAuthUrl: vi.fn(),
   getToken: vi.fn(),
   setCredentials: vi.fn(),
@@ -50,7 +51,7 @@ describe("Google Calendar integration", () => {
     delete process.env.GOOGLE_CALENDAR_REFRESH_TOKEN;
     delete process.env.GOOGLE_CALENDAR_ID;
     OAuth2.mockImplementation(() => ({ generateAuthUrl, getToken, setCredentials }));
-    calendar.mockReturnValue({ events: { insert: eventsInsert } });
+    calendar.mockReturnValue({ events: { insert: eventsInsert, update: eventsUpdate } });
     generateAuthUrl.mockReturnValue("https://accounts.google.test/auth");
     getToken.mockResolvedValue({ tokens: { refresh_token: "refresh-token" } });
     eventsInsert.mockResolvedValue({ data: { htmlLink: "https://calendar.google.test/event" } });
@@ -72,8 +73,8 @@ describe("Google Calendar integration", () => {
     expect(getToken).toHaveBeenCalledWith("auth-code");
   });
 
-  it("skips calendar creation when no refresh token is configured", async () => {
-    await expect(createBookingCalendarEvent(details)).resolves.toBeNull();
+  it("surfaces enabled but unconnected calendar configuration", async () => {
+    await expect(createBookingCalendarEvent(details)).rejects.toThrow("enabled but not connected");
     expect(eventsInsert).not.toHaveBeenCalled();
   });
 
@@ -115,11 +116,36 @@ describe("Google Calendar integration", () => {
     expect(eventsInsert.mock.calls[0][0].requestBody.end).toEqual({ date: "2027-01-02" });
   });
 
-  it("returns null when Google does not provide an event link", async () => {
+  it("fails explicitly when Google does not provide an event link", async () => {
     process.env.GOOGLE_CALENDAR_REFRESH_TOKEN = "refresh-token";
     eventsInsert.mockResolvedValue({ data: {} });
-    await expect(createBookingCalendarEvent({ ...details, hireLineItems: [], additionalDetails: "" })).resolves.toBeNull();
+    await expect(createBookingCalendarEvent({ ...details, hireLineItems: [], additionalDetails: "" })).rejects.toThrow("did not return an event link");
     expect(eventsInsert.mock.calls[0][0].requestBody.description).toContain("Hire items: None specified");
     expect(eventsInsert.mock.calls[0][0].requestBody.description).toContain("None provided");
+  });
+
+  it("accepts PostgreSQL time values without appending seconds twice", async () => {
+    process.env.GOOGLE_CALENDAR_REFRESH_TOKEN = "refresh-token\r\n";
+    await createBookingCalendarEvent({ ...details, pickupTime: "10:00:00", dropoffTime: "17:00:00" });
+    expect(eventsInsert.mock.calls[0][0].requestBody.start.dateTime).toBe("2026-12-31T10:00:00");
+    expect(eventsInsert.mock.calls[0][0].requestBody.end.dateTime).toBe("2027-01-01T17:00:00");
+    expect(setCredentials).toHaveBeenCalledWith({ refresh_token: "refresh-token" });
+  });
+
+  it("recovers a duplicate booking event without creating another entry", async () => {
+    process.env.GOOGLE_CALENDAR_REFRESH_TOKEN = "refresh-token";
+    eventsInsert.mockRejectedValueOnce(Object.assign(new Error("Already exists"), { code: 409 }));
+    eventsUpdate.mockResolvedValueOnce({ data: { htmlLink: "https://calendar.google.test/existing" } });
+    await expect(createBookingCalendarEvent(details, { bookingId: "booking-1" })).resolves.toBe("https://calendar.google.test/existing");
+    const id = eventsInsert.mock.calls[0][0].requestBody.id;
+    expect(id).toMatch(/^[a-f0-9]{64}$/);
+    expect(eventsUpdate).toHaveBeenCalledWith(expect.objectContaining({ eventId: id }));
+  });
+
+  it("does not mistake OAuth failures for duplicate events", async () => {
+    process.env.GOOGLE_CALENDAR_REFRESH_TOKEN = "refresh-token";
+    eventsInsert.mockRejectedValueOnce(Object.assign(new Error("invalid_grant"), { code: 401 }));
+    await expect(createBookingCalendarEvent(details, { bookingId: "booking-1" })).rejects.toThrow("invalid_grant");
+    expect(eventsUpdate).not.toHaveBeenCalled();
   });
 });

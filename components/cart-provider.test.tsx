@@ -92,6 +92,20 @@ describe("CartProvider hire dates", () => {
       eventType: "Party", eventAddress: "1 Example Street", pickupTime: "10:00", dropoffTime: "12:00",
     }));
     rerender(<CartProvider><BookingForm /></CartProvider>);
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      if (String(input) === "/api/phone-verification") {
+        const request = JSON.parse(String(init?.body)) as { action: string };
+        return new Response(JSON.stringify(request.action === "send"
+          ? { challengeToken: "v".repeat(43) }
+          : { verified: true }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ bookingReference: "PA-QA" }), { status: 200 });
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send verification code" }));
+    await screen.findByLabelText("Verification code");
+    fireEvent.change(screen.getByLabelText("Verification code"), { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: "Verify number" }));
+    await screen.findByText("Mobile number verified.");
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByText(/Pickup: 20 October 2026/)).toBeInTheDocument();
     expect(screen.getByText("$860.00")).toBeInTheDocument();
@@ -99,15 +113,14 @@ describe("CartProvider hire dates", () => {
     expect(screen.getByRole("combobox", { name: "Pickup time" })).toHaveValue("10:00");
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ bookingReference: "PA-QA" }), { status: 200 }));
     fireEvent.drop(screen.getByTestId("photo-id-dropzone"), {
       dataTransfer: { files: [new File(["front"], "front.png", { type: "image/png" }), new File(["back"], "back.png", { type: "image/png" })] },
     });
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: "Submit a Booking Request" }));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    const request = fetchMock.mock.calls[0][1]?.body;
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => String(url) === "/api/booking")).toHaveLength(1));
+    const request = fetchMock.mock.calls.find(([url]) => String(url) === "/api/booking")?.[1]?.body;
     expect(request).toBeInstanceOf(FormData);
     if (!(request instanceof FormData)) throw new Error("Expected multipart booking request.");
     expect(request.get("pickupDate")).toBe("2026-10-20");
