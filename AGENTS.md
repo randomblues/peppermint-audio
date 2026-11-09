@@ -381,6 +381,13 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Prevention:** Run `supabase link --project-ref <ref>` from the repository root and verify the project reports `linked: true` before remote queries.
 - **Next action:** Verify the remote target with a read-only query before applying an explicitly approved SQL change.
 
+### 2026-11-09 — Different local and global Supabase CLI versions
+
+- **Symptom:** Production SQL stalled at `Initialising login role...` despite successful authentication and project listing.
+- **Root cause:** The repository CLI and globally authenticated CLI were different versions. The repository CLI stalled, while the global v3 CLI completed the same remote operation.
+- **Prevention:** Compare the repository and global CLI versions before repeating login or linkage steps. Use the selected CLI's documented remote flags and verify the target with a read-only query first.
+- **Next action:** For approved production SQL, use `supabase db query --remote=<ref> --read-only "<sql>"` for verification; use `--yes` for writes only after explicit approval. Keep the existing app launcher for local development.
+
 # Agent working rules
 
 These rules are mandatory. Safety, preservation of existing work, bounded execution, and truthful verification take priority over speed.
