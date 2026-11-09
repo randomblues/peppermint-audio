@@ -9,14 +9,15 @@ const headers = {
 export async function GET(request: Request, { params }: { params: Promise<{ token: string; kind?: string }> }) {
   const { token, kind } = await params;
   const eventKind = kind ?? new URL(request.url).searchParams.get("event");
-  if (eventKind !== null && eventKind !== "pickup" && eventKind !== "dropoff") {
-    return Response.json({ error: "Choose pickup or drop-off." }, { status: 400, headers });
+  if (eventKind !== null && eventKind !== "pickup" && eventKind !== "dropoff" && eventKind !== "hire") {
+    return Response.json({ error: "Choose hire, pickup or drop-off." }, { status: 400, headers });
   }
   try {
     const calendar = await readBookingCalendar(token);
     if (!calendar) return Response.json({ error: "This calendar link is unavailable. Please contact Peppermint Audio." }, { status: 404, headers });
     if (!eventKind) return Response.json(calendar, { headers });
-    const event = calendar.events.find(entry => entry.kind === eventKind);
+    const event = eventKind === "hire" ? calendar.events
+      : calendar.events.find(entry => entry.kind === eventKind);
     if (!event) throw new Error("The requested calendar event is missing.");
     return new Response(buildHireCalendarFile(event, calendar.reference), {
       headers: {

@@ -128,6 +128,7 @@ Never put secret values in source files, test fixtures committed with real crede
 **Internal implementation changes must strictly never leak internal information into customer-facing content.** Admin-only controls, internal notes, implementation details, diagnostic messages, schema or workflow rationale, legal/tax reasoning, and developer explanations must not appear in customer emails, invoices, receipts, PDFs, payment pages, booking confirmations, public pages, or other externally visible output unless that exact wording has been deliberately approved as customer copy.
 
 - Keep internal/admin state separate from customer-facing document and email copy.
+- **Strictly never turn internal chat discussions, implementation decisions, provider differences, workarounds, or developer explanations into interface text or other customer-facing copy. Approval of functionality is not approval to publish its explanation. Omit such wording unless the user explicitly approves the exact customer-facing text.**
 - When behavior changes internally, review every affected customer-facing surface instead of exposing the internal explanation by default.
 - For tax and legal behavior, expose only the accurate customer-facing result required for the document (for example, the appropriate document title and applicable totals), not the internal legal rationale.
 - Test both relevant states when wording depends on configuration, such as GST-inclusive versus non-GST invoices.
@@ -387,6 +388,13 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Root cause:** The repository CLI and globally authenticated CLI were different versions. The repository CLI stalled, while the global v3 CLI completed the same remote operation.
 - **Prevention:** Compare the repository and global CLI versions before repeating login or linkage steps. Use the selected CLI's documented remote flags and verify the target with a read-only query first.
 - **Next action:** For approved production SQL, use `supabase db query --remote=<ref> --read-only "<sql>"` for verification; use `--yes` for writes only after explicit approval. Keep the existing app launcher for local development.
+
+### 2026-11-09 — Internal calendar discussion published as interface copy
+
+- **Symptom:** The customer calendar card displayed an explanation of the Google versus Apple/Outlook event behaviour discussed internally.
+- **Root cause:** Approval of the calendar functionality was incorrectly treated as approval to publish the implementation explanation.
+- **Prevention:** Strictly keep internal discussions and implementation explanations out of all interfaces, messages, and documents shown to customers. Functional approval never authorizes explanatory copy; the exact wording requires separate explicit approval.
+- **Next action:** Remove the calendar implementation explanations, preserve the agreed functionality, and assert their absence in unit and browser tests, including when times are not arranged.
 
 # Agent working rules
 

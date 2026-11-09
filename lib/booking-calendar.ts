@@ -10,6 +10,17 @@ export type HireCalendarEvent = {
   googleUrl: string;
 };
 
+export type HireCalendarPeriod = {
+  kind: "hire";
+  title: string;
+  date: string;
+  endDate: string;
+  startsAt: string | null;
+  endsAt: string | null;
+  description: string;
+  googleUrl: string;
+};
+
 export const HIRE_COLLECTION_ADDRESS = business.pickupAddress;
 const calendarTimeZone = "Australia/Melbourne";
 
@@ -39,6 +50,14 @@ function compactDate(value: string) {
   return value.replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
 }
 
+function googleCalendarUrl(title: string, start: string, end: string, description: string) {
+  const params = new URLSearchParams({
+    action: "TEMPLATE", text: title, dates: `${start}/${end}`, ctz: calendarTimeZone,
+    location: HIRE_COLLECTION_ADDRESS, details: description,
+  });
+  return `https://calendar.google.com/calendar/render?${params}`;
+}
+
 export function createHireCalendarEvent(kind: HireCalendarEvent["kind"], date: string, time?: string | null): HireCalendarEvent {
   if (rentalDays(date, date) === null || (time && !/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(time))) {
     throw new Error("A valid hire date and agreed time are required for the calendar.");
@@ -47,12 +66,8 @@ export function createHireCalendarEvent(kind: HireCalendarEvent["kind"], date: s
   const startsAt = time ? melbourneInstant(date, time) : null;
   const start = compactDate(startsAt ?? date);
   const end = startsAt ? start : compactDate(nextDay(date));
-  const params = new URLSearchParams({
-    action: "TEMPLATE", text: title, dates: `${start}/${end}`, ctz: calendarTimeZone,
-    location: HIRE_COLLECTION_ADDRESS,
-    details: `Message or call ${business.phone} upon arrival.${time ? "" : " Time to be arranged."}`,
-  });
-  return { kind, title, date, time: time?.slice(0, 5) || null, startsAt, googleUrl: `https://calendar.google.com/calendar/render?${params}` };
+  const description = `Message or call ${business.phone} upon arrival.${time ? "" : " Time to be arranged."}`;
+  return { kind, title, date, time: time?.slice(0, 5) || null, startsAt, googleUrl: googleCalendarUrl(title, start, end, description) };
 }
 
 export function formatHireCalendarDate(event: HireCalendarEvent) {
@@ -65,16 +80,47 @@ export function formatHireCalendarDate(event: HireCalendarEvent) {
   return { date, time };
 }
 
-export function buildHireCalendarFile(event: HireCalendarEvent, reference: string, now = new Date()) {
+export function createHireCalendarPeriod(events: HireCalendarEvent[]): HireCalendarPeriod {
+  const pickup = events.find(event => event.kind === "pickup");
+  const dropoff = events.find(event => event.kind === "dropoff");
+  if (events.length !== 2 || !pickup || !dropoff || rentalDays(pickup.date, dropoff.date) === null
+    || (pickup.startsAt && dropoff.startsAt && pickup.startsAt >= dropoff.startsAt)) {
+    throw new Error("A valid pickup and later drop-off are required for the hire calendar.");
+  }
+  const timed = Boolean(pickup.startsAt && dropoff.startsAt);
+  const startsAt = timed ? pickup.startsAt : null;
+  const endsAt = timed ? dropoff.startsAt : null;
+  const endDate = nextDay(dropoff.date);
+  const title = "Peppermint Audio equipment hire";
+  const pickupLabel = formatHireCalendarDate(pickup);
+  const dropoffLabel = formatHireCalendarDate(dropoff);
+  const description = [
+    `Pickup: ${pickupLabel.date}, ${pickupLabel.time}.`,
+    `Drop-off: ${dropoffLabel.date}, ${dropoffLabel.time}.`,
+    "All times are Melbourne time.",
+    `Message or call ${business.phone} upon arrival.`,
+  ].join("\n");
+  return {
+    kind: "hire", title, date: pickup.date, endDate, startsAt, endsAt, description,
+    googleUrl: googleCalendarUrl(title, compactDate(startsAt ?? pickup.date), compactDate(endsAt ?? endDate), description),
+  };
+}
+
+export function buildHireCalendarFile(event: HireCalendarEvent | HireCalendarEvent[], reference: string, now = new Date()) {
+  const events = Array.isArray(event) ? event : [event];
+  if (Array.isArray(event)) createHireCalendarPeriod(events);
   const escape = (value: string) => value.replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
   const lines = [
     "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Peppermint Audio//Hire Calendar//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
-    "BEGIN:VEVENT", `UID:${escape(reference)}-${event.kind}@peppermintaudio.com.au`, `DTSTAMP:${compactDate(now.toISOString())}`,
-    event.startsAt ? `DTSTART:${compactDate(event.startsAt)}` : `DTSTART;VALUE=DATE:${compactDate(event.date)}`,
-    ...(!event.startsAt ? [`DTEND;VALUE=DATE:${compactDate(nextDay(event.date))}`] : []),
-    `SUMMARY:${escape(event.title)}`, `LOCATION:${escape(HIRE_COLLECTION_ADDRESS)}`,
-    `DESCRIPTION:${escape(`Message or call ${business.phone} upon arrival.${event.time ? "" : " Time to be arranged."}`)}`,
-    "END:VEVENT", "END:VCALENDAR",
+    ...events.flatMap(entry => [
+      "BEGIN:VEVENT", `UID:${escape(reference)}-${entry.kind}@peppermintaudio.com.au`, `DTSTAMP:${compactDate(now.toISOString())}`,
+      entry.startsAt ? `DTSTART:${compactDate(entry.startsAt)}` : `DTSTART;VALUE=DATE:${compactDate(entry.date)}`,
+      ...(!entry.startsAt ? [`DTEND;VALUE=DATE:${compactDate(nextDay(entry.date))}`] : []),
+      `SUMMARY:${escape(entry.title)}`, `LOCATION:${escape(HIRE_COLLECTION_ADDRESS)}`,
+      `DESCRIPTION:${escape(`Message or call ${business.phone} upon arrival.${entry.time ? "" : " Time to be arranged."}`)}`,
+      "END:VEVENT",
+    ]),
+    "END:VCALENDAR",
   ];
   return `${lines.map(line => {
     const characters = Array.from(line);

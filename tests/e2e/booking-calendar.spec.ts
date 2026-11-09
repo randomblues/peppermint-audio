@@ -4,7 +4,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
-import { createHireCalendarEvent } from "../../lib/booking-calendar";
+import { createHireCalendarEvent, createHireCalendarPeriod } from "../../lib/booking-calendar";
 import { getMelbourneTomorrow } from "../../lib/pickup-reminders";
 
 test("private customer calendar offers both events and formats at every supported width", async ({ page }, testInfo) => {
@@ -26,6 +26,7 @@ test("private customer calendar offers both events and formats at every supporte
     createHireCalendarEvent("pickup", pickupDate, "10:00"),
     createHireCalendarEvent("dropoff", dropoffDate, "18:00"),
   ];
+  const hire = createHireCalendarPeriod(events);
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
@@ -44,22 +45,26 @@ test("private customer calendar offers both events and formats at every supporte
     const json = await response.json();
     expect(Object.keys(json).sort()).toEqual(["events", "reference"]);
     expect(json.events.map((event: { kind: string }) => event.kind)).toEqual(["pickup", "dropoff"]);
-  for (const width of [360, 390, 412, 540, 768, 1024, 1280, 1920]) {
-    await page.setViewportSize({ width, height: 900 });
-    await page.goto(`/calendar/${token}`, { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: "Add your hire to your calendar" })).toBeVisible();
-    await expect(page.getByRole("article")).toHaveCount(2);
-    await expect(page.getByRole("article", { name: "Pickup calendar event" })).toContainText("10:00 am");
-    await expect(page.getByRole("article", { name: "Drop-off calendar event" })).toContainText("6:00 pm");
-    await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex, nofollow");
-    await expect(page.locator('meta[name="referrer"]')).toHaveAttribute("content", "no-referrer");
-    await expect(page.locator('script[src*="googletagmanager.com"]')).toHaveCount(0);
-    for (const event of events) {
-      const card = page.getByRole("article", { name: event.kind === "pickup" ? "Pickup calendar event" : "Drop-off calendar event" });
+    for (const width of [360, 390, 412, 540, 768, 1024, 1280, 1920]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(`/calendar/${token}`, { waitUntil: "domcontentloaded" });
+      await expect(page.getByRole("heading", { name: "Add your hire to your calendar" })).toBeVisible();
+      await expect(page.getByRole("article")).toHaveCount(1);
+      const card = page.getByRole("article", { name: "Hire calendar event" });
+      await expect(card).toContainText("10:00 am");
+      await expect(card).toContainText("6:00 pm");
+      await expect(card.getByRole("heading", { name: "Pickup", exact: true })).toBeVisible();
+      await expect(card.getByRole("heading", { name: "Drop-off", exact: true })).toBeVisible();
+      await expect(card).not.toContainText(/Google Calendar saves|Apple \/ Outlook saves|all-day/i);
+      await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex, nofollow");
+      await expect(page.locator('meta[name="referrer"]')).toHaveAttribute("content", "no-referrer");
+      await expect(page.locator('script[src*="googletagmanager.com"]')).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Check availability" })).toHaveCount(0);
       const google = card.getByRole("link", { name: /Google Calendar/ });
       await google.scrollIntoViewIfNeeded();
       await expect(google).toBeVisible();
-      await expect(google).toHaveAttribute("href", event.googleUrl);
+      await google.click({ trial: true });
+      await expect(google).toHaveAttribute("href", hire.googleUrl);
       await expect(google).toHaveAttribute("rel", "noopener noreferrer");
       const apple = card.getByRole("link", { name: /Apple \/ Outlook/ });
       await apple.scrollIntoViewIfNeeded();
@@ -67,32 +72,48 @@ test("private customer calendar offers both events and formats at every supporte
       const download = page.waitForEvent("download");
       await apple.click();
       const file = await download;
-      expect(file.suggestedFilename()).toBe(`peppermint-audio-${event.kind}.ics`);
+      expect(file.suggestedFilename()).toBe("peppermint-audio-hire.ics");
       const savedPath = await file.path();
-      if (!savedPath || !event.startsAt) throw new Error("The timed calendar download is missing.");
+      if (!savedPath) throw new Error("The calendar download is missing.");
       const contents = readFileSync(savedPath, "utf8");
-      expect(contents).toContain("BEGIN:VCALENDAR\r\n");
-      expect(contents).toContain(`SUMMARY:${event.title}\r\n`);
-      expect(contents).toContain(`DTSTART:${event.startsAt.replace(/[-:]/g, "").replace(".000", "")}\r\n`);
+      expect(contents.match(/BEGIN:VCALENDAR/g)).toHaveLength(1);
+      expect(contents.match(/BEGIN:VEVENT/g)).toHaveLength(2);
+      for (const event of events) {
+        if (!event.startsAt) throw new Error("The timed calendar event is missing.");
+        expect(contents).toContain(`SUMMARY:${event.title}\r\n`);
+        expect(contents).toContain(`DTSTART:${event.startsAt.replace(/[-:]/g, "").replace(".000", "")}\r\n`);
+      }
+      const layout = await page.evaluate(() => ({
+        viewport: document.documentElement.clientWidth, width: document.documentElement.scrollWidth,
+        clipped: Array.from(document.querySelectorAll("article, article p, article a, h1")).filter(
+          element => element.clientWidth > 0 && element.scrollWidth > element.clientWidth + 1,
+        ).map(element => element.tagName),
+        overlapping: (() => {
+          const buttons = Array.from(document.querySelectorAll("article a")).map(element => element.getBoundingClientRect());
+          return buttons.length === 2 && buttons[0].right > buttons[1].left && buttons[0].bottom > buttons[1].top;
+        })(),
+      }));
+      expect(layout.width).toBeLessThanOrEqual(layout.viewport + 1);
+      expect(layout.clipped).toEqual([]);
+      expect(layout.overlapping).toBe(false);
+      await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+      const header = await page.getByRole("banner").boundingBox();
+      expect(header?.y).toBe(0);
+      await page.screenshot({
+        path: testInfo.outputPath(`booking-calendar-${width}.png`), fullPage: true,
+        style: "nextjs-portal { display: none !important; }",
+      });
+      if (width === 390) {
+        await page.screenshot({
+          path: testInfo.outputPath("booking-calendar-mobile-viewport.png"),
+          style: "nextjs-portal { display: none !important; }",
+        });
+      }
+      await page.getByRole("link", { name: "Call 0452 316 823" }).scrollIntoViewIfNeeded();
+      await expect(page.getByRole("link", { name: "Call 0452 316 823" })).toHaveAttribute("href", "tel:0452316823");
     }
-    const layout = await page.evaluate(() => ({
-      viewport: document.documentElement.clientWidth, width: document.documentElement.scrollWidth,
-      clipped: Array.from(document.querySelectorAll("article, article p, article a, h1")).filter(
-        element => element.clientWidth > 0 && element.scrollWidth > element.clientWidth + 1,
-      ).map(element => element.tagName),
-      overlapping: (() => {
-        const cards = Array.from(document.querySelectorAll("article")).map(element => element.getBoundingClientRect());
-        return cards.length === 2 && cards[0].right > cards[1].left && cards[0].bottom > cards[1].top;
-      })(),
-    }));
-    expect(layout.width).toBeLessThanOrEqual(layout.viewport + 1);
-    expect(layout.clipped).toEqual([]);
-    expect(layout.overlapping).toBe(false);
-    await page.screenshot({ path: testInfo.outputPath(`booking-calendar-${width}.png`), fullPage: true });
-    await page.getByRole("link", { name: "Call 0452 316 823" }).scrollIntoViewIfNeeded();
-    await expect(page.getByRole("link", { name: "Call 0452 316 823" })).toHaveAttribute("href", "tel:0452316823");
-  }
-  expect(errors).toEqual([]);
+    expect(errors).toEqual([]);
   } finally {
     const cleanup = await admin.from("bookings").delete().eq("id", bookingId);
     if (cleanup.error) throw new Error(`Local calendar fixture could not be removed: ${cleanup.error.message}`);

@@ -26,7 +26,7 @@ import { whatsappUrl } from "@/components/whatsapp-button";
 export function MobileContactBar() {
   const pathname = usePathname();
 
-  if (pathname.startsWith("/admin") || pathname.startsWith("/pay/") || pathname === "/booking") return null;
+  if (pathname.startsWith("/admin") || pathname.startsWith("/pay/") || pathname.startsWith("/calendar/") || pathname === "/booking") return null;
   return (
     <div className="fixed inset-x-3 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-40 md:inset-x-auto md:right-5 md:bottom-5 md:w-[min(calc(100%-2.5rem),22rem)] md:pb-[env(safe-area-inset-bottom)]">
       <Sheet>

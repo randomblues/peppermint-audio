@@ -37,7 +37,7 @@ The individual equipment catalogue supports instant search across product names,
 
 Administrative routes are under `/admin`; they require a Supabase session and an explicit admin role or email in `ADMIN_EMAILS`.
 
-Public browsing pages include a fixed **Check availability** contact prompt. On mobile it uses a dark two-line button with a stronger border, with footer clearance to keep the enquiry link accessible; at tablet/desktop widths it retains the original dark floating treatment. The calendar icon uses the same translucent mint background, mint outline, and staggered pulse animation at every width; the pulse respects reduced-motion preferences. It opens WhatsApp, phone, and email options, and stays hidden during booking, payment, and admin flows.
+Public browsing pages include a fixed **Check availability** contact prompt. On mobile it uses a dark two-line button with a stronger border, with footer clearance to keep the enquiry link accessible; at tablet/desktop widths it retains the original dark floating treatment. The calendar icon uses the same translucent mint background, mint outline, and staggered pulse animation at every width; the pulse respects reduced-motion preferences. It opens WhatsApp, phone, and email options, and stays hidden during booking, payment, private calendar, and admin flows.
 
 ## Setup
 
@@ -188,11 +188,16 @@ The photo-ID reminder remains in email only, not SMS.
 Confirmed-booking SMS links to `/calendar/<token>` on this website. The token is
 128 random bits encoded as 22 URL-safe characters (66 characters for the full
 production URL), persisted server-side so retries reuse the same link. The page
-offers separate pickup and drop-off events for Google Calendar and Apple/Outlook
-(`.ics`). Downloads and dates use Melbourne time, including daylight saving.
-Bookings without an agreed time are explicitly labelled and saved as all-day
-reminders, not invented appointment times. These are saved copies, not calendar
-subscriptions; customers must update saved events if hire times change.
+shows pickup and drop-off together in one card. Google Calendar adds one event
+starting at pickup and ending at drop-off. Apple/Outlook downloads one `.ics`
+file containing two separate events: pickup and drop-off. Downloads and dates
+use Melbourne time, including daylight saving. If either agreed time is missing,
+Google uses an all-day event covering the inclusive hire dates, retaining both
+dates and any agreed time in the description. Apple/Outlook uses an all-day
+reminder only for an event whose time is not arranged.
+The original individual-event download URLs remain available for existing links.
+These are saved copies, not calendar subscriptions; customers must update their
+saved calendar entries if hire times change.
 Links expose only the booking reference, dates, times and business address,
 are not indexed or cached, and stop working for cancelled/completed bookings
 or more than 30 days after return. Apply the migration's `calendar_token` column
