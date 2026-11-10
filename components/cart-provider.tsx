@@ -24,6 +24,8 @@ const hireDatesSchema = z.object({
 type HireDates = z.infer<typeof hireDatesSchema>;
 const emptyHireDates: HireDates = { pickupDate: "", dropoffDate: "" };
 
+export const MAX_CART_ITEM_QUANTITY = 100;
+
 type CartItem = {
   id: string;
   name: string;
@@ -39,7 +41,7 @@ const cartItemsSchema = z.array(z.object({
   kind: z.enum(["package", "equipment"]),
   option: z.string().optional(),
   price: z.number().finite().nonnegative(),
-  quantity: z.number().int().min(1).max(100),
+  quantity: z.number().int().min(1).max(MAX_CART_ITEM_QUANTITY),
 })).max(100);
 
 type CartContextValue = {
@@ -125,7 +127,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const existing = current.find((entry) => entry.id === item.id);
       if (existing) {
         return current.map((entry) =>
-          entry.id === item.id ? { ...entry, quantity: Math.min(100, entry.quantity + 1) } : entry,
+          entry.id === item.id ? { ...entry, quantity: Math.min(MAX_CART_ITEM_QUANTITY, entry.quantity + 1) } : entry,
         );
       }
       return [...current, { ...item, quantity: 1 }];
@@ -134,7 +136,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     updateQuantity: (id, quantity) =>
       setItems((current) =>
         quantity > 0
-          ? current.map((item) => (item.id === id ? { ...item, quantity: Math.min(100, quantity) } : item))
+          ? current.map((item) =>
+            item.id === id ? { ...item, quantity: Math.min(MAX_CART_ITEM_QUANTITY, quantity) } : item,
+          )
           : current.filter((item) => item.id !== id),
       ),
     clearCart: () => {

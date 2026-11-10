@@ -27,6 +27,7 @@ function HireDatesControls() {
 
 afterEach(() => {
   localStorage.clear();
+  sessionStorage.clear();
   vi.restoreAllMocks();
 });
 
@@ -102,6 +103,8 @@ describe("CartProvider hire dates", () => {
       return new Response(JSON.stringify({ bookingReference: "PA-QA" }), { status: 200 });
     });
     fireEvent.click(screen.getByRole("button", { name: "Send verification code" }));
+    await screen.findByRole("dialog", { name: "Confirm your mobile number" });
+    fireEvent.click(screen.getByRole("button", { name: "Send code now" }));
     await screen.findByLabelText("Verification code");
     fireEvent.change(screen.getByLabelText("Verification code"), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: "Verify number" }));

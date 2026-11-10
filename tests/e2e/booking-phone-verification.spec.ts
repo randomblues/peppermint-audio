@@ -29,6 +29,7 @@ test("booking phone verification works at supported viewport widths", async ({ p
       email: "test@example.com",
       mobile: "",
     }));
+    window.sessionStorage.removeItem("peppermint-audio-phone-verification-session");
   });
   await page.route("**/api/phone-verification", async (route) => {
     const request = route.request().postDataJSON() as { action: string };
@@ -45,11 +46,20 @@ test("booking phone verification works at supported viewport widths", async ({ p
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/booking", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Your details" })).toBeVisible();
+    await expect(page.getByText("Mobile number verified.")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Next", exact: true })).toBeDisabled();
     await page.getByLabel("Mobile number").fill("0412345678");
+    await expect(page.getByText("Mobile number verified.")).toHaveCount(0);
     await page.getByRole("button", { name: "Send verification code" }).click();
+    const confirmationDialog = page.getByRole("dialog", { name: "Confirm your mobile number" });
+    await expect(confirmationDialog).toContainText("0412345678");
+    await confirmationDialog.getByRole("button", { name: "Send code now" }).click();
     await page.getByLabel("Verification code").fill("123456");
+    await expect(page.getByText("SECURE CHECK")).toHaveCount(0);
     await page.getByRole("button", { name: "Verify number" }).click();
     await expect(page.getByText("Mobile number verified.")).toBeVisible();
+    await expect(page.getByText("We’ll text a code to confirm you can receive messages at this number.")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Next", exact: true })).toBeEnabled();
     await page.getByRole("button", { name: "Next", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Event details" })).toBeVisible();
 

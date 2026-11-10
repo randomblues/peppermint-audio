@@ -45,10 +45,27 @@ test("converts real HEIC photo IDs before submitting the booking", async ({ page
       body: JSON.stringify({ bookingReference: "PA-HEIC-TEST" }),
     });
   });
+  await page.route("**/api/phone-verification", async (route) => {
+    const request = route.request().postDataJSON() as { action: string };
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(request.action === "send"
+        ? { ok: true, challengeToken: "v".repeat(43) }
+        : { ok: true, verified: true }),
+    });
+  });
   await page.goto("/booking");
-  for (let step = 0; step < 2; step++) {
-    await page.getByRole("button", { name: "Next", exact: true }).click();
-  }
+  await page.getByRole("button", { name: "Send verification code" }).click();
+  await page.getByRole("dialog", { name: "Confirm your mobile number" })
+    .getByRole("button", { name: "Send code now" }).click();
+  await page.getByLabel("Verification code").fill("123456");
+  await page.getByRole("button", { name: "Verify number" }).click();
+  await expect(page.getByText("Mobile number verified.")).toBeVisible();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page.getByText("Scan or upload clear photos of the front and back of your ID.")).toBeVisible();
+  await expect(page.getByText("Upload clear photos of the front and back of your valid photo ID.")).toHaveCount(0);
   const fixture = path.join(process.cwd(), "tests/fixtures/synthetic-photo.heic");
   await page.locator("#photo-id-files").setInputFiles(fixture);
   await page.locator("#photo-id-files").setInputFiles(fixture);

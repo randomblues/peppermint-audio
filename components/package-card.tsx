@@ -17,6 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useCart } from "@/components/cart-provider";
+import { CartQuantityControls } from "@/components/cart-quantity-controls";
 import { addOnCatalog, hirePricing, type PackageTier } from "@/lib/site-content";
 
 type PackageCardProps = {
@@ -65,7 +66,7 @@ function createUpsellReason(addOnSlug: string) {
 }
 
 export function PackageCard({ pkg, compact = false, priority = false }: PackageCardProps) {
-  const { addItem } = useCart();
+  const { items, addItem, updateQuantity } = useCart();
   const [showAllInclusions, setShowAllInclusions] = useState(false);
   const [showCheckoutPrompt, setShowCheckoutPrompt] = useState(false);
   const [addedUpsellSlugs, setAddedUpsellSlugs] = useState<string[]>([]);
@@ -83,6 +84,9 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
       reason: createUpsellReason(slug),
     }));
   const hasSuggestions = upsellSuggestions.length > 0;
+  const cartItemId = `package:${pkg.slug}`;
+  const cartQuantity = items.find((item) => item.id === cartItemId)?.quantity ?? 0;
+  const cartItem = { id: cartItemId, name: pkg.name, kind: "package" as const, price: pkg.price };
   const imageClassName =
     pkg.slug === "budget-with-a-boom"
       ? "object-contain p-2"
@@ -97,7 +101,7 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
   }
 
   function handleAddPackageToCart() {
-    addItem({ id: `package:${pkg.slug}`, name: pkg.name, kind: "package", price: pkg.price });
+    addItem(cartItem);
     setAddedUpsellSlugs([]);
     setShowCheckoutPrompt(true);
   }
@@ -234,13 +238,20 @@ export function PackageCard({ pkg, compact = false, priority = false }: PackageC
             compact ? "mt-auto border-t border-border/70 p-4 sm:p-5" : ""
           }`}
         >
-          <Button
+          {cartQuantity ? (
+            <CartQuantityControls
+              itemName={pkg.name}
+              quantity={cartQuantity}
+              onDecrease={() => updateQuantity(cartItemId, cartQuantity - 1)}
+              onIncrease={() => addItem(cartItem)}
+            />
+          ) : <Button
             className={`${compact ? "h-11 w-full" : "w-full"} rounded-xl border border-primary/40 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_88%,white),color-mix(in_oklab,var(--primary)_78%,white)_42%,color-mix(in_oklab,var(--primary)_70%,black))] text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_10px_24px_rgb(0_0_0/0.28),0_0_28px_color-mix(in_oklab,var(--primary)_22%,transparent)] transition-all hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.24),0_14px_26px_rgb(0_0_0/0.3),0_0_34px_color-mix(in_oklab,var(--primary)_30%,transparent)]`}
             onClick={handleAddPackageToCart}
           >
             <ShoppingCart className="size-4" aria-hidden="true" />
             Add to cart
-          </Button>
+          </Button>}
           {compact ? (
             <Button
               variant="ghost"

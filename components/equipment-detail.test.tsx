@@ -16,6 +16,7 @@ describe("EquipmentDetail", () => {
   });
 
   it("keeps the pair selected by default and carries a single selection into booking enquiry", () => {
+    localStorage.clear();
     render(
       <CartProvider>
         <EquipmentDetail item={{
@@ -46,5 +47,13 @@ describe("EquipmentDetail", () => {
     );
     expect(screen.getByRole("button", { name: "Add to cart" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add to cart" })).toHaveClass("rounded-xl");
+    fireEvent.click(screen.getByRole("button", { name: "Add to cart" }));
+    expect(screen.getByLabelText("Quantity in cart: 1")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add one Test Speaker to cart" }));
+    expect(screen.getByLabelText("Quantity in cart: 2")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Remove one Test Speaker from cart" }));
+    expect(screen.getByLabelText("Quantity in cart: 1")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Remove one Test Speaker from cart" }));
+    expect(screen.getByRole("button", { name: "Add to cart" })).toBeInTheDocument();
   });
 });

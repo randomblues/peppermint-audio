@@ -26,6 +26,17 @@ test("booking pickup time starts at 7:30am across supported viewports", async ({
       dropoffDate: dateValue(dropoff),
     }));
     localStorage.removeItem("peppermint-audio-booking-draft");
+    sessionStorage.removeItem("peppermint-audio-phone-verification-session");
+  });
+  await page.route("**/api/phone-verification", async (route) => {
+    const request = route.request().postDataJSON() as { action: string };
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(request.action === "send"
+        ? { ok: true, challengeToken: "v".repeat(43) }
+        : { ok: true, verified: true }),
+    });
   });
 
   for (const width of viewportWidths) {
@@ -36,6 +47,12 @@ test("booking pickup time starts at 7:30am across supported viewports", async ({
     await page.getByLabel("Last name").fill("Example");
     await page.getByLabel("Email").fill("alex@example.invalid");
     await page.getByLabel("Mobile number").fill("0400000000");
+    await page.getByRole("button", { name: "Send verification code" }).click();
+    await page.getByRole("dialog", { name: "Confirm your mobile number" })
+      .getByRole("button", { name: "Send code now" }).click();
+    await page.getByLabel("Verification code").fill("123456");
+    await page.getByRole("button", { name: "Verify number" }).click();
+    await expect(page.getByText("Mobile number verified.")).toBeVisible();
     await page.getByRole("button", { name: "Next", exact: true }).click();
     const pickupHint = page.getByText("Pickups are available from 7:30 am onwards.");
     await expect(pickupHint).toBeVisible();

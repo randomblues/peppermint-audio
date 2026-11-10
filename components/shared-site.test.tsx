@@ -107,6 +107,7 @@ describe("Navbar", () => {
         "/equipment/beamz-s1500",
       );
       fireEvent.click(screen.getByRole("button", { name: "Add to cart" }));
+      expect(screen.getByLabelText("Quantity in cart: 1")).toBeInTheDocument();
 
       expect(lineItemsFromCart(localStorage.getItem("peppermint-audio-cart") ?? "[]")).toEqual([
         expect.objectContaining({
@@ -116,6 +117,12 @@ describe("Navbar", () => {
           unitPriceCents: 3000,
         }),
       ]);
+      fireEvent.click(screen.getByRole("button", { name: `Add one ${item.name} to cart` }));
+      expect(screen.getByLabelText("Quantity in cart: 2")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: `Remove one ${item.name} from cart` }));
+      expect(screen.getByLabelText("Quantity in cart: 1")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: `Remove one ${item.name} from cart` }));
+      expect(screen.getByRole("button", { name: "Add to cart" })).toBeInTheDocument();
       localStorage.clear();
     });
 
@@ -329,6 +336,14 @@ describe("PackageCard", () => {
         },
       ]),
     );
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByLabelText("Quantity in cart: 1")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: `Add one ${pkg.name} to cart` }));
+    expect(screen.getByLabelText("Quantity in cart: 2")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: `Remove one ${pkg.name} from cart` }));
+    expect(screen.getByLabelText("Quantity in cart: 1")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: `Remove one ${pkg.name} from cart` }));
+    expect(screen.getByRole("button", { name: "Add to cart" })).toBeInTheDocument();
   });
 
   it("suggests wireless mics and party lights only for packages where those add-ons apply", () => {

@@ -8,6 +8,7 @@ import { ArrowUpRight, ShoppingCart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/components/cart-provider";
+import { CartQuantityControls } from "@/components/cart-quantity-controls";
 import {
   Card,
   CardContent,
@@ -24,7 +25,16 @@ type EquipmentCardProps = {
 
 export function EquipmentCard({ item, priority = false }: EquipmentCardProps) {
   const [selectedOption, setSelectedOption] = useState(item.options[0]);
-  const { addItem } = useCart();
+  const { items, addItem, updateQuantity } = useCart();
+  const cartItemId = `equipment:${item.slug}:${selectedOption.label}`;
+  const cartQuantity = items.find((cartItem) => cartItem.id === cartItemId)?.quantity ?? 0;
+  const cartItem = {
+    id: cartItemId,
+    name: item.name,
+    kind: "equipment" as const,
+    option: selectedOption.label,
+    price: selectedOption.price,
+  };
 
   return (
     <Card className="h-full overflow-hidden border">
@@ -98,25 +108,27 @@ export function EquipmentCard({ item, priority = false }: EquipmentCardProps) {
           ))}
         </ul>
       </CardContent>
-      <CardFooter className="mt-auto gap-2">
-        <Button
+      <CardFooter className="mt-auto flex-col gap-2 sm:flex-row">
+        {cartQuantity ? (
+          <CartQuantityControls
+            itemName={item.name}
+            quantity={cartQuantity}
+            onDecrease={() => updateQuantity(cartItemId, cartQuantity - 1)}
+            onIncrease={() => addItem(cartItem)}
+            className="w-full sm:w-auto sm:flex-none"
+          />
+        ) : <Button
           className="min-w-0 flex-1 rounded-xl border border-primary/40 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_88%,white),color-mix(in_oklab,var(--primary)_78%,white)_42%,color-mix(in_oklab,var(--primary)_70%,black))] text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_10px_24px_rgb(0_0_0/0.28),0_0_28px_color-mix(in_oklab,var(--primary)_22%,transparent)] transition-all hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.24),0_14px_26px_rgb(0_0_0/0.3),0_0_34px_color-mix(in_oklab,var(--primary)_30%,transparent)]"
           onClick={() =>
-            addItem({
-              id: `equipment:${item.slug}:${selectedOption.label}`,
-              name: item.name,
-              kind: "equipment",
-              option: selectedOption.label,
-              price: selectedOption.price,
-            })
+            addItem(cartItem)
           }
         >
           <ShoppingCart className="size-4" aria-hidden="true" />
           Add to cart
-        </Button>
+        </Button>}
         <Button
           variant="outline"
-          className="shrink-0 rounded-xl border border-primary/15 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--background)_95%,var(--primary)_8%),color-mix(in_oklab,var(--background)_82%,black))] px-3 text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_6px_16px_rgb(0_0_0/0.2)] backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:text-foreground hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_8px_20px_rgb(0_0_0/0.24),0_0_14px_color-mix(in_oklab,var(--primary)_12%,transparent)]"
+          className="w-full min-w-0 rounded-xl border border-primary/15 px-3 text-muted-foreground shadow-none transition-colors hover:border-primary/35 hover:bg-primary/5 hover:text-foreground sm:w-auto sm:flex-1"
           nativeButton={false}
           render={<Link href={`/equipment/${item.slug}`} />}
         >

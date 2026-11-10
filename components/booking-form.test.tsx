@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StrictMode } from "react";
 
@@ -20,15 +20,22 @@ vi.mock("@/lib/google-ads", () => ({
 }));
 
 async function verifyContactMobile() {
-  fireEvent.click(screen.getByRole("button", { name: /Send verification code/ }));
+  const sendButton = screen.getByRole("button", { name: "Send verification code" });
+  await waitFor(() => expect(sendButton).toBeEnabled());
+  fireEvent.click(sendButton);
+  const confirmationDialog = await screen.findByRole("dialog", { name: "Confirm your mobile number" });
+  fireEvent.click(within(confirmationDialog).getByRole("button", { name: "Send code now" }));
   await screen.findByLabelText("Verification code");
   fireEvent.change(screen.getByLabelText("Verification code"), { target: { value: "123456" } });
   fireEvent.click(screen.getByRole("button", { name: "Verify number" }));
   await screen.findByText("Mobile number verified.");
+  expect(screen.queryByText("SECURE CHECK")).not.toBeInTheDocument();
+  expect(screen.queryByText("We’ll text a code to confirm you can receive messages at this number.")).not.toBeInTheDocument();
 }
 
 describe("BookingForm", () => {
   beforeEach(() => {
+    window.sessionStorage.clear();
     mockCart.hireDates = { pickupDate: "2026-10-20", dropoffDate: "2026-10-23" };
     mockCart.clearCart.mockClear();
     mockTrackBookingSubmission.mockClear();
@@ -194,8 +201,9 @@ describe("BookingForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     expect(screen.getByText("Step 1 of 4")).toBeInTheDocument();
-    expect(screen.getByRole("alert")).toHaveTextContent("Verify your mobile number before continuing.");
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
     await verifyContactMobile();
+    expect(screen.getByRole("button", { name: "Next" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByText("Step 2 of 4")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Event details" })).toBeInTheDocument();
@@ -205,21 +213,23 @@ describe("BookingForm", () => {
 
   it("clears phone verification when the customer changes their mobile number", async () => {
     render(<BookingForm />);
+    expect(screen.queryByText("Mobile number verified.")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Alex" } });
     fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Smith" } });
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "alex@example.com" } });
     fireEvent.change(screen.getByLabelText("Mobile number"), { target: { value: "0412345678" } });
+    expect(screen.queryByText("Mobile number verified.")).not.toBeInTheDocument();
     await verifyContactMobile();
 
     fireEvent.change(screen.getByLabelText("Mobile number"), { target: { value: "0412345679" } });
 
     expect(screen.queryByText("Mobile number verified.")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
-    expect(screen.getByRole("alert")).toHaveTextContent("Verify your mobile number before continuing.");
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
     expect(screen.getByText("Step 1 of 4")).toBeInTheDocument();
   });
 
-  it("allows a new verification after booking submission fails", async () => {
+  it("requires a fresh verification after booking submission fails", async () => {
     mockFetch.mockImplementation(async (url: string, options: { body?: FormData | string } = {}) => {
       if (url === "/api/phone-verification") {
         const request = JSON.parse(String(options.body)) as { action: string };
@@ -258,7 +268,44 @@ describe("BookingForm", () => {
 
     expect(await screen.findByText("Please verify your mobile number again before retrying.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Your details" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Send verification code" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Resend in (01:00|00:5[0-9])$/ })).toBeDisabled();
+  });
+
+  it("confirms the destination number before sending and starts the resend cooldown", async () => {
+    render(<BookingForm />);
+    fireEvent.change(screen.getByLabelText("Mobile number"), { target: { value: "0412345678" } });
+    const sendButton = screen.getByRole("button", { name: "Send verification code" });
+    await waitFor(() => expect(sendButton).toBeEnabled());
+    fireEvent.click(sendButton);
+
+    const confirmationDialog = await screen.findByRole("dialog", { name: "Confirm your mobile number" });
+    expect(within(confirmationDialog).getByText("0412345678")).toBeInTheDocument();
+    expect(mockFetch).not.toHaveBeenCalled();
+    fireEvent.click(within(confirmationDialog).getByRole("button", { name: "Edit number" }));
+    expect(mockFetch).not.toHaveBeenCalled();
+
+    fireEvent.click(sendButton);
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Confirm your mobile number" }))
+      .getByRole("button", { name: "Send code now" }));
+    await screen.findByLabelText("Verification code");
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("timer")).toHaveTextContent(/Resend available in 01:00|Resend available in 00:59/);
+  });
+
+  it("caps verification code requests at five for the browser session", async () => {
+    window.sessionStorage.setItem("peppermint-audio-phone-verification-session", JSON.stringify({
+      requestCount: 5,
+      nextRequestAt: 0,
+    }));
+    render(<BookingForm />);
+    fireEvent.change(screen.getByLabelText("Mobile number"), { target: { value: "0412345678" } });
+
+    expect(await screen.findByRole("button", { name: "Request limit reached" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Request limit reached" }));
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog", { name: "Confirm your mobile number" })).not.toBeInTheDocument();
   });
 
   it("sends direct visits without dates back to the cart", () => {
@@ -333,7 +380,8 @@ describe("BookingForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     const frontFile = new File(["front"], "front-id.png", { type: "image/png" });
-    expect(screen.getByText("Upload clear photos of the front and back of your valid photo ID.")).toBeInTheDocument();
+    expect(screen.getByText("Scan or upload clear photos of the front and back of your ID.")).toBeInTheDocument();
+    expect(screen.queryByText("Upload clear photos of the front and back of your valid photo ID.")).not.toBeInTheDocument();
     expect(screen.queryByText(/automatically resized|PDF files must/)).not.toBeInTheDocument();
     const backFile = new File(["back"], "back-id.png", { type: "image/png" });
     const addFiles = (files: File[]) => {
