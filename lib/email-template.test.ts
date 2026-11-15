@@ -108,4 +108,20 @@ describe("email template", () => {
     expect(html).toContain("Tax invoice");
     expect(html).not.toContain("<h1");
   });
+
+  it("can omit the eyebrow without an empty header paragraph or broken preview", () => {
+    const html = emailLayout({
+      title: "Your pickup details",
+      intro: "Hi Alex, please review your pickup details.",
+      content: "<p>Pickup address</p>",
+    });
+    const document = new DOMParser().parseFromString(html, "text/html");
+
+    expect(document.querySelector("h1")?.textContent?.trim()).toBe("Your pickup details");
+    expect(document.querySelector("h1")?.parentElement?.querySelector("p")).toBeNull();
+    expect(document.body.firstElementChild?.firstChild?.textContent).toBe(
+      "Your pickup details Hi Alex, please review your pickup details.",
+    );
+    expect(html).not.toContain("undefined");
+  });
 });

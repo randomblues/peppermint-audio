@@ -191,9 +191,14 @@ transport reminder and instructions to message or call upon arrival or if
 running late or changing the scheduled pickup time. It says "today" or "tomorrow" using Melbourne time,
 or gives the date without the weekday for other days to keep within the segment
 limit. The private-residence note follows the pickup
-email. SMS uses AM/PM pickup times and does not request 30-minute advance notice;
-the email is unchanged.
-The photo-ID reminder remains in email only, not SMS.
+email. SMS uses AM/PM pickup times. Pickup emails and same-day confirmation
+instructions ask customers to call upon arrival, without a 30-minute advance-notice requirement.
+Pickup emails omit the small "Pickup reminder" header label and group the address, phone and private-residence note in
+one block, with hire items listed once in a separate block immediately below.
+Same-day confirmations retain hire items once in their summary. Both email
+templates share a short transport note covering space for large PA speakers or
+bulky equipment, an invitation to message or call about vehicle fit, loading help
+and safe handling.
 
 Confirmed-booking SMS links to `/calendar/<token>` on this website. The token is
 128 random bits encoded as 22 URL-safe characters (66 characters for the full

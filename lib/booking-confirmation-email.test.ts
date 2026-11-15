@@ -66,5 +66,20 @@ describe("buildBookingConfirmationEmail", () => {
     expect(email.text).toContain("Please call on arrival.");
     expect(email.html).toContain("Same-day pickup details");
     expect(email.html).toContain("181 Nicholson St, Abbotsford VIC 3067");
+    expect(email.text).not.toMatch(/30 minutes before arriving/i);
+    expect(email.html).not.toMatch(/30 minutes before arriving/i);
+    expect(email.text).toContain("Please respect the property and call upon arrival.");
+    expect(email.html).toContain("Please respect the property and call upon arrival.");
+    for (const body of [email.text, new DOMParser().parseFromString(email.html, "text/html").body.textContent ?? ""]) {
+      expect(body).toContain("Please make sure your vehicle has enough space for your hire, especially large PA speakers or other bulky equipment.");
+      expect(body).toContain("Unsure it will fit? Message or call us and we can help you check.");
+      expect(body).toContain("We're happy to lend a hand with loading. Please remember that safe transport and handling after pickup are your responsibility.");
+      expect(body).not.toContain("Please bring suitable transport and valid photo ID for pickup.");
+      expect(body).not.toContain("folded-down rear seats");
+      expect(body).not.toContain("PreSonus AIR15s");
+      expect(body).not.toContain("subwoofer");
+      expect(body.match(/Hire items/g)).toHaveLength(1);
+      expect(body.match(/Standard Party/g)).toHaveLength(1);
+    }
   });
 });

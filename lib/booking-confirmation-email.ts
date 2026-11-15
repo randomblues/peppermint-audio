@@ -24,13 +24,9 @@ export function buildBookingConfirmationEmail(details: BookingConfirmationDetail
     ? [
       "",
       "Same-day pickup details:",
-      "Hire items:",
       "Pickup address: 181 Nicholson St, Abbotsford VIC 3067",
-      "Please message or call Peppermint Audio on 0452 316 823 30 minutes before arriving.",
       "",
       "Please note: Peppermint Audio is a small business operating from a private residence. Please respect the property and call upon arrival.",
-      "",
-      ...(pickupInstructions.hireItems.length ? pickupInstructions.hireItems.map((item) => `- ${item}`) : ["- None specified"]),
       "",
       "Transport and handling:",
       ...pickupInstructions.transportText,
@@ -38,7 +34,6 @@ export function buildBookingConfirmationEmail(details: BookingConfirmationDetail
       ...(pickupInstructions.additionalDetails
         ? ["Additional requirements:", pickupInstructions.additionalDetails, "Please confirm these requirements with Peppermint Audio at pickup. Peppermint Audio is not responsible for anything extra required beyond what is provided in the package and discussed additional requirements.", ""]
         : []),
-      "Please bring suitable transport and valid photo ID for pickup.",
     ].join("\n")
     : "";
   const sectionHeading = (title: string) => `<h2 style="font-size:16px;color:#20211f">${title}</h2>`;
@@ -48,10 +43,7 @@ export function buildBookingConfirmationEmail(details: BookingConfirmationDetail
       `<div style="margin-top:24px;border:1px solid #e4ddd5;border-radius:12px;background:#faf9f7;padding:20px">`,
       `<p style="margin:0 0 16px;font-size:14px;font-weight:bold;color:#20211f">Same-day pickup details</p>`,
       `<p style="margin:7px 0;font-size:14px"><strong>Pickup address:</strong> 181 Nicholson St, Abbotsford VIC 3067</p>`,
-      `<p style="margin:16px 0;padding:12px;background:#fff3d6;border:1px solid #e8c979"><strong>Please message or call Peppermint Audio on 0452 316 823 30 minutes before arriving.</strong></p>`,
       `<p style="margin:16px 0;padding:12px;background:#e8eee8"><strong>Please note:</strong> Peppermint Audio is a small business operating from a private residence. Please respect the property and call upon arrival.</p>`,
-      sectionHeading("Hire items"),
-      bulletList(pickupInstructions.hireItems.length ? pickupInstructions.hireItems : ["None specified"]),
       sectionHeading("Transport and handling"),
       bulletList(pickupInstructions.transportText),
       ...(pickupInstructions.additionalDetails
@@ -61,7 +53,6 @@ export function buildBookingConfirmationEmail(details: BookingConfirmationDetail
           `<p><strong>Please confirm these requirements with Peppermint Audio at pickup.</strong> Peppermint Audio is not responsible for anything extra required beyond what is provided in the package and discussed additional requirements.</p>`,
         ]
         : []),
-      `<p>Please bring suitable transport and valid photo ID for pickup.</p>`,
       `</div>`,
     ].join("")
     : "";

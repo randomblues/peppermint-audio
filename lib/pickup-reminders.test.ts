@@ -16,6 +16,7 @@ describe("pickup reminders", () => {
     expect(email.text).not.toContain("tomorrow");
     expect(email.html).not.toContain("tomorrow");
     expect(email.html).toContain("Your pickup details");
+    expect(email.html).not.toContain("Pickup reminder");
   });
 
   it("calculates tomorrow in Melbourne across a DST boundary", () => {
@@ -57,11 +58,35 @@ describe("pickup reminders", () => {
     const residenceNotice = "Peppermint Audio is a small business operating from a private residence. Please respect the property and call upon arrival.";
     expect(email.text).toContain(residenceNotice);
     expect(email.html).toContain(residenceNotice);
+    expect(email.text).not.toMatch(/30 minutes before arriving/i);
+    expect(email.html).not.toMatch(/30 minutes before arriving/i);
     expect(email.text).toContain("pickup is tomorrow, 29 September 2026 at 10:00");
     expect(email.text).toContain("Hire items:");
     expect(email.text).toContain("Wireless Microphone");
-    expect(email.text).toContain("The Big Celebration package includes a PreSonus AIR15s subwoofer");
-    expect(email.html).toContain("The Big Celebration package includes a PreSonus AIR15s subwoofer");
+    for (const body of [email.text, new DOMParser().parseFromString(email.html, "text/html").body.textContent ?? ""]) {
+      expect(body).toContain("Please make sure your vehicle has enough space for your hire, especially large PA speakers or other bulky equipment.");
+      expect(body).toContain("Unsure it will fit? Message or call us and we can help you check.");
+      expect(body).toContain("We're happy to lend a hand with loading. Please remember that safe transport and handling after pickup are your responsibility.");
+      expect(body).not.toContain("Please bring suitable transport and valid photo ID for pickup.");
+      expect(body).not.toContain("folded-down rear seats");
+      expect(body).not.toContain("PreSonus AIR15s");
+      expect(body).not.toContain("subwoofer");
+      expect(body.match(/Hire items/g)).toHaveLength(1);
+      expect(body.match(/Wireless Microphone/g)).toHaveLength(1);
+    }
+    const document = new DOMParser().parseFromString(email.html, "text/html");
+    const contactBlock = document.querySelector("table")?.parentElement;
+    expect(contactBlock?.textContent).toContain("181 Nicholson St, Abbotsford VIC 3067");
+    expect(contactBlock?.textContent).toContain("0452 316 823");
+    expect(contactBlock?.textContent).toContain(residenceNotice);
+    expect(contactBlock?.textContent).not.toContain("Hire items");
+    const itemsBlock = contactBlock?.nextElementSibling;
+    expect(itemsBlock?.textContent).toContain("Hire items");
+    expect(itemsBlock?.querySelectorAll("li")).toHaveLength(2);
+    expect(itemsBlock?.textContent).toContain("Speech & Presentation Package");
+    expect(itemsBlock?.textContent).toContain("Wireless Microphone");
+    expect(email.text.indexOf("Phone:")).toBeGreaterThan(email.text.indexOf("Pickup address:"));
+    expect(email.text.indexOf("Hire items:")).toBeGreaterThan(email.text.indexOf(residenceNotice));
   });
 
   it("uses safe fallbacks when hire items and details are absent", () => {

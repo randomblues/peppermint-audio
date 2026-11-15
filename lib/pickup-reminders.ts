@@ -49,10 +49,9 @@ export function getPickupInstructions(booking: PickupInstructionSource) {
     hireItems: hireItems.map((item) => `${item.quantity} x ${item.name}${item.option ? ` (${item.option})` : ""}`),
     additionalDetails: booking.additional_details?.trim() ?? "",
     transportText: [
-      "Please make sure there is adequate space in your transport when collecting the equipment.",
-      "For the smaller packages, a sedan with an empty boot or folded-down rear seats should generally be suitable.",
-      "The Big Celebration package includes a PreSonus AIR15s subwoofer and requires additional space. The same applies if a subwoofer has been selected as an add-on.",
-      "Help will be provided on site to load the equipment, but the hirer is responsible for transporting and safely handling it after pickup.",
+      "Please make sure your vehicle has enough space for your hire, especially large PA speakers or other bulky equipment.",
+      "Unsure it will fit? Message or call us and we can help you check.",
+      "We're happy to lend a hand with loading. Please remember that safe transport and handling after pickup are your responsibility.",
     ],
   };
 }
@@ -72,19 +71,17 @@ export function buildPickupReminderEmail(booking: PickupReminderBooking, options
     `Hi ${booking.first_name}. Your pickup is ${options.tomorrow === false ? "on" : "tomorrow,"} ${pickupDate}${pickupTime}.`,
     "",
     "Here are your pickup details:",
+    `Pickup address: 181 Nicholson St, Abbotsford VIC 3067`,
+    "Phone: 0452 316 823",
+    `Please note: ${getPickupResidenceNotice()}`,
+    "",
     "Hire items:",
     ...(hireItems.length ? hireItems.map((item) => `- ${item}`) : ["- None specified"]),
-    `Pickup address: 181 Nicholson St, Abbotsford VIC 3067`,
-    "Please message or call Peppermint Audio on 0452 316 823 30 minutes before arriving.",
-    "",
-    `Please note: ${getPickupResidenceNotice()}`,
     "",
     "Transport and handling:",
     ...transportText,
     "",
     additionalText,
-    "",
-    "Please bring suitable transport and valid photo ID for pickup.",
     "",
     emailFooterText,
   ].filter(Boolean).join("\n");
@@ -94,21 +91,16 @@ export function buildPickupReminderEmail(booking: PickupReminderBooking, options
     ? emailPanel(`<p style="margin:0 0 8px;color:#1d2823;font-size:15px;font-weight:700">Additional requirements</p><p style="margin:0;color:#405148;font-size:14px;line-height:1.65;white-space:pre-line">${escapeEmailHtml(additionalDetails)}</p><p style="margin:12px 0 0;color:#405148;font-size:13px;line-height:1.6"><strong>Please confirm these requirements at pickup.</strong> Peppermint Audio is not responsible for anything extra required beyond what is provided in the package and discussed requirements.</p>`, "soft")
     : "";
   const html = emailLayout({
-    eyebrow: "Pickup reminder",
     title: options.tomorrow === false ? "Your pickup details" : "Your pickup is tomorrow",
     intro: `Hi ${escapeEmailHtml(booking.first_name.trim()) || "there"}, please review the details below for ${escapeEmailHtml(pickupDate)}${escapeEmailHtml(pickupTime)}.`,
     content: `
       ${emailPanel(emailDetailsTable([
-        { label: "Hire items", value: hireItems.join(", ") || "None specified" },
         { label: "Pickup address", value: "181 Nicholson St, Abbotsford VIC 3067" },
         { label: "Phone", value: "0452 316 823" },
-      ]), "accent")}
-      ${emailPanel(`<p style="margin:0;color:#574412;font-size:14px;line-height:1.6"><strong>Please message or call 30 minutes before arriving.</strong></p>`, "warning")}
-      ${emailPanel(`<p style="margin:0;color:#405148;font-size:14px;line-height:1.6"><strong>Please note:</strong> ${escapeEmailHtml(getPickupResidenceNotice())}</p>`, "soft")}
+      ]) + `<p style="margin:16px 0 0;color:#405148;font-size:14px;line-height:1.6"><strong>Please note:</strong> ${escapeEmailHtml(getPickupResidenceNotice())}</p>`, "accent")}
       ${emailPanel(`<p style="margin:0;color:#1d2823;font-size:15px;font-weight:700">Hire items</p>${hireItemsList}`, "soft")}
       ${emailPanel(`<p style="margin:0;color:#1d2823;font-size:15px;font-weight:700">Transport and handling</p>${transportList}`, "soft")}
       ${additionalPanel}
-      <p style="margin:24px 0 0;color:#718078;font-size:14px;line-height:1.65">Please bring suitable transport and valid photo ID for pickup.</p>
     `,
   });
   return { subject: `Pickup reminder for ${pickupDate} — Peppermint Audio`, text, html };

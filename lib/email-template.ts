@@ -42,12 +42,12 @@ export function emailLayout({
   intro,
   content,
 }: {
-  eyebrow: string;
+  eyebrow?: string;
   title?: string;
   intro?: string;
   content: string;
 }) {
-  const preview = [escapeEmailHtml(eyebrow), title ? escapeEmailHtml(title) : "", intro]
+  const preview = [eyebrow ? escapeEmailHtml(eyebrow) : "", title ? escapeEmailHtml(title) : "", intro]
     .filter(Boolean).join(" ");
   // Keep the preview in one text run; padding stops clients appending flattened body markup.
   const previewPadding = "&nbsp;&zwnj;".repeat(150);
@@ -57,7 +57,7 @@ export function emailLayout({
       <div style="margin:0 auto;max-width:640px;overflow:hidden;border:1px solid #dbe5de;border-radius:22px;background:#fff;box-shadow:0 10px 30px rgba(28,41,37,.08)">
         <div style="background:#16251f;padding:34px 36px 30px;text-align:center">
           <img src="${logoUrl}" alt="Peppermint Audio" width="190" style="display:block;width:190px;height:auto;margin:0 auto 30px" />
-          <p style="margin:0;color:#8bd2aa;font-size:12px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase">${escapeEmailHtml(eyebrow)}&nbsp;</p>
+          ${eyebrow ? `<p style="margin:0;color:#8bd2aa;font-size:12px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase">${escapeEmailHtml(eyebrow)}&nbsp;</p>` : ""}
           ${title ? `<h1 style="margin:10px 0 0;color:#fff;font-size:30px;line-height:1.18;letter-spacing:-.4px">${escapeEmailHtml(title)}&nbsp;</h1>` : ""}
         </div>
         <div style="padding:34px 36px 38px">
