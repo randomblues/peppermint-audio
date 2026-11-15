@@ -652,7 +652,18 @@ export function BookingForm() {
                 </div>
                 <details className="rounded-lg border px-4 py-3">
                   <summary className="cursor-pointer font-medium">Read the PA Equipment Hire Terms & Conditions</summary>
-                  <div className="space-y-3 pt-4 text-sm text-muted-foreground">{hireTerms.map((term) => <div key={term.title}><p className="font-medium text-foreground">{term.title}</p><p>{term.body}</p></div>)}</div>
+                  <div className="space-y-4 pt-4 text-sm text-muted-foreground">
+                    {hireTerms.map((term) => (
+                      <div key={term.title} className="space-y-2">
+                        <p className="font-medium text-foreground">{term.title}</p>
+                        {term.body.split("\n\n").map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+                      </div>
+                    ))}
+                    <div className="flex flex-wrap gap-x-5 gap-y-2">
+                      <Link href="/terms-of-hire" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-primary underline underline-offset-4">Terms of Hire</Link>
+                      <Link href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-primary underline underline-offset-4">Privacy Policy</Link>
+                    </div>
+                  </div>
                 </details>
                 <label className="flex items-start gap-3 text-sm">
                   <input type="checkbox" className="mt-1 size-4 accent-primary" checked={values.termsAccepted === "accepted"} onChange={(event) => update("termsAccepted", event.target.checked ? "accepted" : "")} />

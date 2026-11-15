@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 import { business } from "@/lib/site-content";
 
@@ -29,6 +30,10 @@ export function Footer() {
             </div>
           </dl>
         </div>
+        <nav aria-label="Policies" className="mt-8 flex flex-wrap gap-x-6 gap-y-2 border-t border-border/60 pt-5">
+          <Link href="/privacy-policy" className="inline-flex min-h-11 items-center rounded-sm text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">Privacy Policy</Link>
+          <Link href="/terms-of-hire" className="inline-flex min-h-11 items-center rounded-sm text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">Terms of Hire</Link>
+        </nav>
       </div>
     </footer>
   );

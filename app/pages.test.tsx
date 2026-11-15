@@ -7,7 +7,9 @@ import ContactPage from "./contact/page";
 import FaqPage from "./faq/page";
 import HowItWorksPage from "./how-it-works/page";
 import GetStartedPage from "./get-started/page";
-import { business, faqs, homeHireSteps, howItWorks, packageTiers } from "@/lib/site-content";
+import PrivacyPolicyPage from "./privacy-policy/page";
+import TermsOfHirePage from "./terms-of-hire/page";
+import { business, faqs, hireTerms, homeHireSteps, howItWorks, packageTiers, privacyPolicy } from "@/lib/site-content";
 
 vi.mock("@/components/enquiry-form", () => ({
   EnquiryForm: ({ packageName }: { packageName?: string }) => (
@@ -20,6 +22,34 @@ vi.mock("@/components/payment-checkout", () => ({
 }));
 
 describe("static site pages", () => {
+  it.each([
+    { title: "Privacy Policy", Page: PrivacyPolicyPage, sections: privacyPolicy.sections },
+    { title: "Terms of Hire", Page: TermsOfHirePage, sections: hireTerms },
+  ])("$title exposes every section through navigation without publishing review notes", ({ title, Page, sections }) => {
+    render(<Page />);
+
+    expect(screen.getByRole("heading", { level: 1, name: title })).toBeInTheDocument();
+    const contents = screen.getByRole("navigation", { name: "On this page" });
+    sections.forEach((section, index) => {
+      const heading = screen.getByRole("heading", { level: 2, name: section.title });
+      expect(heading.closest("section")).toHaveAttribute("id", `section-${index + 1}`);
+      expect(within(contents).getByRole("link", { name: section.title })).toHaveAttribute("href", `#section-${index + 1}`);
+      for (const paragraph of section.body.split("\n\n")) {
+        expect(within(heading.closest("section")!).getByText(paragraph)).toBeInTheDocument();
+      }
+    });
+    expect(screen.getByRole("link", { name: business.email })).toHaveAttribute("href", `mailto:${business.email}`);
+    expect(screen.getByRole("link", { name: business.phone })).toHaveAttribute("href", "tel:0452316823");
+    expect(screen.queryByText(/review-only|review notes|not approved|legal compliance certification|refresh token/i)).not.toBeInTheDocument();
+  });
+
+  it("terms preserve consumer rights rather than publishing the former blanket liability exclusion", () => {
+    render(<TermsOfHirePage />);
+    expect(screen.getByText(/Nothing in these terms excludes, restricts or modifies any rights or remedies/)).toBeInTheDocument();
+    expect(screen.queryByText(/We are not liable for injury, damage, or loss of event time/)).not.toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Policies" }).querySelector('a[href="/privacy-policy"]')).toBeInTheDocument();
+  });
+
   it("home page exposes primary calls to action, package data, and process content", () => {
     render(<Home />);
 

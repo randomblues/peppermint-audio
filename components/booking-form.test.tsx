@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StrictMode } from "react";
 
 import { BookingForm } from "./booking-form";
+import { hireTerms } from "@/lib/site-content";
 
 const mockTrackBookingSubmission = vi.hoisted(() => vi.fn());
 const mockFetch = vi.hoisted(() => vi.fn());
@@ -133,6 +134,17 @@ describe("BookingForm", () => {
       "Share any additional details or special requests for your booking...",
     );
     expect(screen.queryByText(/venue access|access requirements|setup notes/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Read the PA Equipment Hire Terms & Conditions"));
+    const terms = screen.getByText("Read the PA Equipment Hire Terms & Conditions").closest("details")!;
+    expect(terms).toHaveAttribute("open");
+    for (const term of hireTerms) {
+      expect(within(terms).getByText(term.title)).toBeVisible();
+      for (const paragraph of term.body.split("\n\n")) {
+        expect(within(terms).getByText(paragraph)).toBeVisible();
+      }
+    }
+    expect(within(terms).getByRole("link", { name: "Terms of Hire" })).toHaveAttribute("target", "_blank");
+    expect(within(terms).getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy-policy");
   });
 
   afterEach(() => {

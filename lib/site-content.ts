@@ -355,45 +355,6 @@ export const equipmentCatalog: EquipmentItem[] = [
     })),
 ];
 
-export const hireTerms = [
-  {
-    title: "1. ID Verification",
-    body: "Valid photo ID must be presented at pickup. The booking name must match the ID. We reserve the right to refuse hire if ID cannot be verified.",
-  },
-  {
-    title: "2. Security Deposit",
-    body: "A refundable deposit is required for all hires. The amount depends on the package and will be confirmed before booking. For hires of three nights or less, your card is saved securely with your consent and a temporary hold is placed before pickup. We will contact you if the deposit needs attention before pickup. Longer hires use bank transfer. The deposit covers damage, missing items, or late returns. Card holds are released, or transferred deposits refunded, if equipment is returned on time, in original condition, and with all accessories.",
-  },
-  {
-    title: "3. Equipment Responsibility",
-    body: "The hirer is fully responsible for all equipment from pickup until return. Equipment must not be dropped, exposed to water, or misused. Any damage or loss will be charged at repair or replacement cost.",
-  },
-  {
-    title: "4. Late Returns",
-    body: "Equipment must be returned at the agreed time. Late returns may incur additional fees. Delays affecting other bookings may result in extra charges.",
-  },
-  {
-    title: "5. Use of Equipment",
-    body: "Equipment is for normal event use only, such as parties and functions. It must not be used for illegal activities or unsafe environments. The hirer is responsible for explicitly enquiring about any additional equipment or accessories required that are not included in the selected package.",
-  },
-  {
-    title: "6. Pickup & Return",
-    body: "All equipment is collected and returned from 181 Nicholson St, Abbotsford, Melbourne (3067). The hirer must ensure suitable transport to prevent damage.",
-  },
-  {
-    title: "7. Faults & Issues",
-    body: "If issues occur, contact Peppermint Audio immediately. We are not responsible for venue power issues, setup errors, or external limitations.",
-  },
-  {
-    title: "8. Liability",
-    body: "We are not liable for injury, damage, or loss of event time caused by equipment use or external factors. The hirer assumes full responsibility once equipment is collected.",
-  },
-  {
-    title: "9. Agreement",
-    body: "By completing the booking and providing the requested deposit authorisation or bank transfer, you confirm you have read and agree to these terms and authorise charges for damage, loss, or late return.",
-  },
-];
-
 const heroHeadingLines = ["Good sound.", "Less stress."];
 
 export const business = {
@@ -416,6 +377,84 @@ export const business = {
   ctaImage:
     "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=1600&h=700&fit=crop",
 };
+
+export const privacyPolicy = {
+  title: "Privacy Policy",
+  introduction: "Peppermint Audio collects personal information to respond to enquiries and manage audio-equipment hires.",
+  sections: [
+    {
+      title: "Information we collect and use",
+      body: "We collect your name, contact details, event details, hire selections, photo ID, payment records and related communications. We use this information to verify your identity, arrange your hire, process payments and deposits, send confirmations and reminders, and resolve hire-related issues.\n\nPhoto-ID images are stored privately and sent to our business inbox with your booking request. Card details are handled by our payment provider; our booking records do not store full card numbers or security codes.",
+    },
+    {
+      title: "Sharing and Google Calendar",
+      body: "We share relevant information with providers that support hosting, storage, payments, email, SMS and advertising measurement. These providers may process information outside Australia.\n\nWith the business account holder's authorisation, we use Google Calendar to create and update confirmed-hire events containing customer contact details, hire details and relevant booking notes. Photo ID is not included. Customers do not need to grant us access to their calendars.",
+    },
+    {
+      title: "Website storage and advertising",
+      body: "Our website remembers your cart and unfinished booking details using browser storage. Google Ads may use cookies and similar technologies to measure advertising performance. You can manage cookies and clear saved website data in your browser settings.",
+    },
+    {
+      title: "Security and retention",
+      body: "We use access controls and private storage to help protect your information. We retain information as reasonably needed to manage hires, resolve outstanding matters and meet legal obligations.",
+    },
+    {
+      title: "Your information and concerns",
+      body: `To request access, correction or deletion of your information, or raise a privacy concern, email ${business.email} or call ${business.phone}. We may verify your identity and may need to retain some records for legal or outstanding business matters.\n\nWe may update this policy as our practices change.`,
+    },
+  ],
+};
+
+export const hireTerms = [
+  {
+    title: "1. Booking requests and confirmation",
+    body: "Submitting a booking request does not confirm equipment availability or reserve a confirmed hire. We review availability, final pricing and the payment arrangements before confirming your booking.\n\nYour booking confirmation sets out the agreed equipment, hire dates and other relevant arrangements. Contact us promptly if any details are incorrect.",
+  },
+  {
+    title: "2. Identification",
+    body: "Supply the requested photo-ID images with your booking request and present valid photo ID at pickup. The booking name must match the ID.\n\nWe reserve the right to refuse hire if your identity cannot be verified. Our Privacy Policy explains how we handle personal information and photo ID.",
+  },
+  {
+    title: "3. Hire charges and payment",
+    body: "We will confirm the hire charges and payment arrangements before confirming your booking. Follow the payment instructions supplied with your invoice or payment request.\n\nAny cash-on-pickup arrangement must be agreed with us in advance. A payment receipt records a payment; the booking confirmation records the confirmed hire arrangements.",
+  },
+  {
+    title: "4. Security deposit",
+    body: "A refundable security deposit is required for all hires. We will confirm the amount before booking.\n\nFor hires of three nights or less, a card may be saved securely with your consent and a temporary security-deposit hold placed before pickup. The payment request sets out the amount and the authorisation required. We will contact you if the deposit needs attention before pickup.\n\nLonger hires use bank transfer. Where a bank-transfer deposit is agreed, follow the instructions supplied with your payment request.\n\nThe deposit covers damage, missing items and late returns. Card holds are released, or transferred deposits refunded, when equipment is returned on time, in its original condition and with all accessories, subject to any applicable deductions.\n\nYou remain responsible for applicable repair, replacement or late-return charges where they exceed the deposit.",
+  },
+  {
+    title: "5. Pickup, transport and return",
+    body: `Equipment is collected and returned from:\n\n${business.pickupAddress}\n\nCollect and return equipment at the agreed times. You are responsible for arranging suitable transport and protecting the equipment during loading, travel and unloading.\n\nReturn all equipment and supplied accessories.`,
+  },
+  {
+    title: "6. Responsibility for equipment",
+    body: "You are responsible for the equipment from pickup until return.\n\nDo not drop equipment, expose it to water or misuse it. Equipment must be used safely and for normal event purposes, such as parties, functions, presentations and live performances. Do not use it for illegal activities or in unsafe environments.\n\nDamage or loss may be charged at the applicable repair or replacement cost.",
+  },
+  {
+    title: "7. Equipment selection and setup",
+    body: "Check that your selected equipment and package inclusions meet your event requirements. You are responsible for asking about additional equipment or accessories that are not included in your selection.\n\nAllow sufficient time to set up and test the equipment before your event. Follow the setup and operating guidance supplied with the hire.",
+  },
+  {
+    title: "8. Late returns",
+    body: "Equipment must be returned at the agreed time. Late returns may incur additional fees, including charges for delays affecting other bookings.\n\nIf you expect to be late, contact us as soon as possible. An extension is not agreed unless we confirm it.",
+  },
+  {
+    title: "9. Faults and problems",
+    body: "Contact Peppermint Audio immediately if equipment is not working correctly or another issue occurs.\n\nVenue power problems, setup errors and other external limitations may affect equipment performance. Subject to your rights under Australian Consumer Law, we are not responsible for problems caused by those external factors.",
+  },
+  {
+    title: "10. Booking changes and cancellations",
+    body: "Contact us as soon as possible if you need to change or cancel your booking. We will advise whether a change can be accommodated and explain any applicable payment or refund arrangements.",
+  },
+  {
+    title: "11. Liability and consumer rights",
+    body: "You are responsible for using and transporting the equipment safely.\n\nNothing in these terms excludes, restricts or modifies any rights or remedies that cannot lawfully be excluded, including applicable rights under Australian Consumer Law.\n\nSubject to those rights, Peppermint Audio is not responsible for injury, damage or lost event time caused by your misuse of equipment, unsafe setup or external factors outside our control.",
+  },
+  {
+    title: "12. Agreement and authorisations",
+    body: "By accepting these terms with your booking request, you acknowledge the hire conditions above. Any card-saving or payment authorisation is provided separately through the relevant payment request.\n\nCompleting the booking and providing the agreed deposit authorisation or bank transfer confirms your agreement to the hire terms, including responsibility for applicable damage, loss and late-return charges.",
+  },
+];
 
 export const homeHireSteps = [
   {

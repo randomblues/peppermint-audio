@@ -194,6 +194,9 @@ describe("Footer", () => {
     expect(within(footer).getByText("Email: contactus@peppermintaudio.com.au")).toBeInTheDocument();
     expect(within(footer).queryByText("Send an enquiry")).not.toBeInTheDocument();
     expect(within(footer).queryByRole("separator")).not.toBeInTheDocument();
+    const policies = within(footer).getByRole("navigation", { name: "Policies" });
+    expect(within(policies).getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy-policy");
+    expect(within(policies).getByRole("link", { name: "Terms of Hire" })).toHaveAttribute("href", "/terms-of-hire");
   });
 });
 

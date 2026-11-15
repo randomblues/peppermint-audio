@@ -9,6 +9,8 @@ import EquipmentDetailPage, { generateMetadata as generateEquipmentMetadata } fr
 import PaymentCancelledPage from "./payment/cancelled/page";
 import PaymentSuccessPage from "./payment/success/page";
 import { metadata as packagesMetadata } from "./packages/page";
+import { metadata as privacyMetadata } from "./privacy-policy/page";
+import { metadata as termsMetadata } from "./terms-of-hire/page";
 import robots from "./robots";
 import sitemap from "./sitemap";
 import { business, equipmentCatalog } from "@/lib/site-content";
@@ -86,6 +88,12 @@ describe("app wrappers and metadata", () => {
     expect(packagesMetadata.title).toBe("Packages");
     expect(packagesMetadata.alternates?.canonical).toBe("/packages");
     expect(cartMetadata.robots).toEqual({ index: false, follow: false });
+    expect(privacyMetadata.alternates?.canonical).toBe("/privacy-policy");
+    expect(termsMetadata.alternates?.canonical).toBe("/terms-of-hire");
+    expect(sitemap().map((entry) => entry.url)).toEqual(expect.arrayContaining([
+      `${business.website}/privacy-policy`,
+      `${business.website}/terms-of-hire`,
+    ]));
 
     const equipmentMetadata = await generateEquipmentMetadata({
       params: Promise.resolve({ slug: equipmentCatalog[0].slug }),
@@ -161,15 +169,17 @@ describe("app wrappers and metadata", () => {
   it("returns public routes with the expected sitemap priorities", () => {
     const entries = sitemap();
 
-    expect(entries.slice(0, 6)).toEqual([
+    expect(entries.slice(0, 8)).toEqual([
       { url: business.website, changeFrequency: "weekly", priority: 1 },
       { url: `${business.website}/packages`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${business.website}/equipment`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${business.website}/how-it-works`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${business.website}/faq`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${business.website}/contact`, changeFrequency: "monthly", priority: 0.7 },
+      { url: `${business.website}/privacy-policy`, changeFrequency: "monthly", priority: 0.7 },
+      { url: `${business.website}/terms-of-hire`, changeFrequency: "monthly", priority: 0.7 },
     ]);
-    expect(entries).toHaveLength(6 + equipmentCatalog.length);
+    expect(entries).toHaveLength(8 + equipmentCatalog.length);
     for (const item of equipmentCatalog) {
       expect(entries).toContainEqual({
         url: `${business.website}/equipment/${item.slug}`,

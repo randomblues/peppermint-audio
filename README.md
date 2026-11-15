@@ -20,6 +20,8 @@ For parallel agent work, see the [isolated worktree and browser workflow](./READ
 - `/how-it-works`
 - `/faq`
 - `/contact` (enquiry form)
+- `/privacy-policy`
+- `/terms-of-hire`
 - `/get-started`
 - `/cart` (hire selection)
 - `/booking` (booking request form)
@@ -32,6 +34,8 @@ The hero uses a quiet, separated event-type list and a Melbourne hire descriptio
 The locally served homepage photo, `public/home-live-sound.jpg`, is [A Stage with Microphones and a Bar Stool by Caio](https://www.pexels.com/photo/a-stage-with-microphones-and-a-bar-stool-13061474/), used under the [Pexels License](https://www.pexels.com/license/). It is stock photography, not a photograph of Peppermint Audio's own inventory or an event serviced by the business.
 
 The FAQ leads with five conversational questions about choosing a package, booking ahead, self-setup, specific requirements, and individual equipment hire. Multi-night pricing, pickup/delivery, and booking steps sit in a collapsed "A few practical bits" section. All answers and their contextual links live in `lib/site-content.ts`; FAQ structured data uses the same answers.
+
+The Privacy Policy and Terms of Hire are public, footer-linked pages with section navigation, contact links and route-specific metadata. Their approved copy lives in `lib/site-content.ts`; the booking form renders the same canonical `hireTerms` as the terms page. Policy pages contain customer copy only, not draft review notes. Use their production URLs when completing Google OAuth branding; publishing pages does not reconnect Google Calendar or replace its refresh token.
 
 The individual equipment catalogue supports instant search across product names, categories, descriptions, features, and hire options, a category dropdown, and sorting by starting nightly price or name. Filters use the `q`, `category`, and `sort` URL parameters so filtered views can be shared and restored with browser navigation. The same compact category dropdown is used on desktop and mobile; prices and cart selections remain unchanged. Popular badges come from the catalogue data, appear on cards and detail pages, and can be found with a "popular" search without changing the catalogue order.
 
