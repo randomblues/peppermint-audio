@@ -3,6 +3,34 @@ import { describe, expect, it } from "vitest";
 import { emailDetailsTable, emailLayout, emailPanel, escapeEmailHtml } from "./email-template";
 
 describe("email template", () => {
+  it("keeps booking preview text separated when inter-tag whitespace is removed", () => {
+    const html = emailLayout({
+      eyebrow: "New booking request",
+      title: "A new request needs review",
+      intro: "A customer has submitted a booking request.",
+      content: emailPanel(emailDetailsTable([
+        { label: "Booking Reference:", value: "PA-EXAMPLE" },
+        { label: "Customer", value: "Alex & Co" },
+      ])),
+    });
+    const document = new DOMParser().parseFromString(html.replace(/>\s+</g, "><"), "text/html");
+    const preview = document.body.textContent?.replace(/\s+/g, " ").trim();
+
+    expect(preview).toContain(
+      "New booking request A new request needs review A customer has submitted a booking request. Booking Reference: PA-EXAMPLE Customer Alex & Co",
+    );
+  });
+
+  it("separates the eyebrow from details when the title and intro are omitted", () => {
+    const html = emailLayout({
+      eyebrow: "Invoice",
+      content: emailDetailsTable([{ label: "Customer", value: "<Alex>" }]),
+    });
+    const document = new DOMParser().parseFromString(html.replace(/>\s+</g, "><"), "text/html");
+
+    expect(document.body.textContent).toContain("Invoice Customer <Alex> ");
+  });
+
   it("escapes dynamic values and preserves the shared brand shell", () => {
     const html = emailLayout({
       eyebrow: "Invoice",

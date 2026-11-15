@@ -18,8 +18,8 @@ export function emailDetailsTable(rows: Array<{ label: string; value: string }>)
     <table role="presentation" style="width:100%;border-collapse:separate;border-spacing:0;font-size:14px;line-height:1.5">
       ${rows.map((row, index) => `
         <tr>
-          <td style="width:36%;padding:12px 10px 12px 16px;border-bottom:${index === rows.length - 1 ? "0" : "1px solid #e7ece8"};color:#668074;font-weight:700;vertical-align:top">${escapeEmailHtml(row.label)}</td>
-          <td style="padding:12px 16px 12px 10px;border-bottom:${index === rows.length - 1 ? "0" : "1px solid #e7ece8"};color:#1d2823;font-weight:600;text-align:left;vertical-align:top;overflow-wrap:anywhere">${escapeEmailHtml(row.value)}</td>
+          <td style="width:36%;padding:12px 10px 12px 16px;border-bottom:${index === rows.length - 1 ? "0" : "1px solid #e7ece8"};color:#668074;font-weight:700;vertical-align:top">${escapeEmailHtml(row.label)} </td>
+          <td style="padding:12px 16px 12px 10px;border-bottom:${index === rows.length - 1 ? "0" : "1px solid #e7ece8"};color:#1d2823;font-weight:600;text-align:left;vertical-align:top;overflow-wrap:anywhere">${escapeEmailHtml(row.value)} </td>
         </tr>
       `).join("")}
     </table>
@@ -47,16 +47,17 @@ export function emailLayout({
   intro?: string;
   content: string;
 }) {
+  // Spaces inside text elements survive email preview extraction that removes inter-tag whitespace.
   return `
     <div style="margin:0;background:#eef2ef;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;color:#1d2823">
       <div style="margin:0 auto;max-width:640px;overflow:hidden;border:1px solid #dbe5de;border-radius:22px;background:#fff;box-shadow:0 10px 30px rgba(28,41,37,.08)">
         <div style="background:#16251f;padding:34px 36px 30px;text-align:center">
           <img src="${logoUrl}" alt="Peppermint Audio" width="190" style="display:block;width:190px;height:auto;margin:0 auto 30px" />
-          <p style="margin:0;color:#8bd2aa;font-size:12px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase">${escapeEmailHtml(eyebrow)}</p>
-          ${title ? `<h1 style="margin:10px 0 0;color:#fff;font-size:30px;line-height:1.18;letter-spacing:-.4px">${escapeEmailHtml(title)}</h1>` : ""}
+          <p style="margin:0;color:#8bd2aa;font-size:12px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase">${escapeEmailHtml(eyebrow)} </p>
+          ${title ? `<h1 style="margin:10px 0 0;color:#fff;font-size:30px;line-height:1.18;letter-spacing:-.4px">${escapeEmailHtml(title)} </h1>` : ""}
         </div>
         <div style="padding:34px 36px 38px">
-          ${intro ? `<p style="margin:0 0 24px;color:#53645b;font-size:16px;line-height:1.65">${intro}</p>` : ""}
+          ${intro ? `<p style="margin:0 0 24px;color:#53645b;font-size:16px;line-height:1.65">${intro} </p>` : ""}
           ${content}
         </div>
         ${emailFooterHtml}
