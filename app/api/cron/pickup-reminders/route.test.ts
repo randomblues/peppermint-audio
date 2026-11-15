@@ -24,6 +24,7 @@ import { GET, isCronAuthorized } from "./route";
 const bookings = [
   {
     id: "booking-1",
+    status: "confirmed",
     email: "one@example.com",
     mobile: "0412345678",
     first_name: "One",
@@ -36,6 +37,7 @@ const bookings = [
   },
   {
     id: "booking-2",
+    status: "confirmed",
     email: "two@example.com",
     mobile: "0412345679",
     first_name: "Two",
@@ -56,7 +58,11 @@ function configureAdmin(data: unknown[] = bookings, queryError: unknown = null, 
   let updateIndex = 0;
   const update = vi.fn(() => ({
     eq: vi.fn(() => ({
-      is: vi.fn().mockResolvedValue({ error: updateErrors[updateIndex++] ?? null }),
+      is: vi.fn(() => ({
+        select: vi.fn(() => ({
+          maybeSingle: vi.fn().mockResolvedValue({ data: { id: "marked" }, error: updateErrors[updateIndex++] ?? null }),
+        })),
+      })),
     })),
   }));
   const query = {
@@ -124,7 +130,7 @@ describe("GET /api/cron/pickup-reminders", () => {
     expect(send).toHaveBeenCalledTimes(2);
   });
 
-  it("queries tomorrow's non-cancelled, unreminded bookings", async () => {
+  it("queries only tomorrow's confirmed, unreminded bookings", async () => {
     configureAdmin([]);
 
     const response = await GET(request());
@@ -132,10 +138,9 @@ describe("GET /api/cron/pickup-reminders", () => {
     expect(response.status).toBe(200);
     expect(getMelbourneTomorrow).toHaveBeenCalledOnce();
     const query = createAdminClient.mock.results[0].value.from.mock.results[0].value;
-    expect(query.select).toHaveBeenCalledWith("id,email,first_name,last_name,event_type,pickup_date,pickup_time,hire_line_items,additional_details,reminder_sent_at");
+    expect(query.select).toHaveBeenCalledWith("id,email,first_name,last_name,status,event_type,pickup_date,pickup_time,hire_line_items,additional_details,reminder_sent_at");
     expect(query.eq).toHaveBeenCalledWith("pickup_date", "2026-09-29");
-    expect(query.neq).toHaveBeenCalledWith("status", "cancelled");
-    expect(query.neq).toHaveBeenCalledWith("status", "completed");
+    expect(query.eq).toHaveBeenCalledWith("status", "confirmed");
     expect(query.is).toHaveBeenCalledWith("reminder_sent_at", null);
   });
 
@@ -160,9 +165,40 @@ describe("GET /api/cron/pickup-reminders", () => {
     expect(recordCustomerEmail).toHaveBeenCalledTimes(2);
     expect(send).toHaveBeenCalledTimes(2);
     expect(sendPickupReminderSms).not.toHaveBeenCalled();
-    expect(send).toHaveBeenNthCalledWith(1, expect.objectContaining({ from: "Peppermint Audio <from@example.com>", to: ["one@example.com"] }));
-    expect(send).toHaveBeenNthCalledWith(2, expect.objectContaining({ to: ["two@example.com"] }));
+    expect(send).toHaveBeenNthCalledWith(1, expect.objectContaining({ from: "Peppermint Audio <from@example.com>", to: ["one@example.com"] }), {
+      idempotencyKey: "pickup-reminder-booking-1-2026-09-29",
+    });
+    expect(send).toHaveBeenNthCalledWith(2, expect.objectContaining({ to: ["two@example.com"] }), {
+      idempotencyKey: "pickup-reminder-booking-2-2026-09-29",
+    });
     expect(update).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["submitted", "cancelled", "completed"])("does not email or mark a %s booking", async (status) => {
+    const { update } = configureAdmin([{ ...bookings[0], status, reminder_sent_at: null }]);
+
+    const response = await GET(request());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ pickupDate: "2026-09-29", selected: 1, sent: 0, failures: [] });
+    expect(buildPickupReminderEmail).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+    expect(recordCustomerEmail).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("leaves a submitted booking eligible for a later run after confirmation", async () => {
+    configureAdmin([{ ...bookings[0], status: "submitted", reminder_sent_at: null }]);
+    await GET(request());
+    expect(send).not.toHaveBeenCalled();
+
+    const { update } = configureAdmin([{ ...bookings[0], status: "confirmed", reminder_sent_at: null }]);
+    const response = await GET(request());
+
+    expect(await response.json()).toEqual({ pickupDate: "2026-09-29", selected: 1, sent: 1, failures: [] });
+    expect(send).toHaveBeenCalledOnce();
+    expect(recordCustomerEmail).toHaveBeenCalledOnce();
+    expect(update).toHaveBeenCalledOnce();
   });
 
   it("continues after send, response, or update failures and reports each booking", async () => {

@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => {
     send,
     sendBookingConfirmationEmail: vi.fn(),
     sendBookingConfirmationSms: vi.fn(),
+    sendDuePickupReminderEmail: vi.fn(),
     recordCustomerEmail: vi.fn(),
     removeCustomerEmailAttachments: vi.fn(),
     releaseCancelledDeferredDeposit: vi.fn(),
@@ -45,6 +46,7 @@ vi.mock("@/lib/send-booking-confirmation", () => ({
 vi.mock("@/lib/send-booking-sms", () => ({
   sendBookingConfirmationSms: mocks.sendBookingConfirmationSms,
 }));
+vi.mock("@/lib/send-pickup-reminder", () => ({ sendDuePickupReminderEmail: mocks.sendDuePickupReminderEmail }));
 vi.mock("@/lib/email-log", () => ({
   recordCustomerEmail: mocks.recordCustomerEmail,
   removeCustomerEmailAttachments: mocks.removeCustomerEmailAttachments,
@@ -83,6 +85,7 @@ describe("admin booking routes", () => {
     mocks.requireAdmin.mockResolvedValue(adminSession());
     mocks.sendBookingConfirmationEmail.mockResolvedValue("email-1");
     mocks.sendBookingConfirmationSms.mockResolvedValue({ id: "sms-1" });
+    mocks.sendDuePickupReminderEmail.mockResolvedValue(false);
     mocks.removeCustomerEmailAttachments.mockResolvedValue(undefined);
     mocks.send.mockResolvedValue({ data: { id: "custom-1" }, error: null });
   });
@@ -257,6 +260,8 @@ describe("admin booking routes", () => {
     }));
     expect(update.update).toHaveBeenCalledWith(expect.objectContaining({ confirmation_email_sent: true }));
     expect(update.update.mock.invocationCallOrder[0]).toBeLessThan(mocks.sendBookingConfirmationEmail.mock.invocationCallOrder[0]);
+    expect(mocks.sendDuePickupReminderEmail).toHaveBeenCalledWith(expect.anything(), "b1");
+    expect(update.update.mock.invocationCallOrder[0]).toBeLessThan(mocks.sendDuePickupReminderEmail.mock.invocationCallOrder[0]);
   });
 
   it.each(["write", "delivery", "tracking"])("preserves usable confirmation state after a %s failure", async (failure) => {

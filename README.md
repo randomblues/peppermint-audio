@@ -131,6 +131,12 @@ point rather than the local npm launcher. Local mode is rejected on Vercel.
 
 ### Safe local email
 
+The shared email layout includes a hidden, padded preheader built from its
+existing heading and introduction, plus non-breaking separators between body
+fields. This avoids relying on visual HTML block spacing in notification
+previews. Browser tests check that the preheader stays hidden; the actual iPhone
+Mail notification still requires a device check after deployment.
+
 Both `npm run dev` and `npm start` default application emails to **capture**
 when `SUPABASE_TARGET=local`, regardless of `NODE_ENV`. Enquiries, booking
 acknowledgements, confirmations, reminders, custom emails, billing PDFs and
@@ -383,8 +389,8 @@ sends the confirmation and payment receipt.
 The separate **Confirm payment** checkbox is no longer needed. Cash-on-pickup
 bookings can still be confirmed while payment is due.
 If delivery fails, the booking remains confirmed and the admin can retry
-using **Send confirmation email**. Automated pickup reminders exclude cancelled
-and completed bookings. Manual reminders use the actual pickup date without
+using **Send confirmation email**. Automated pickup reminder emails require a
+confirmed booking and skip submitted, cancelled and completed bookings. Manual reminders use the actual pickup date without
 assuming tomorrow. Google Calendar runs only for confirmed bookings; errors are
 recorded independently and do not prevent customer notification attempts.
 
@@ -452,7 +458,17 @@ external check.
 
 Email reminders are unchanged: around noon Melbourne time on the day before pickup, once daily at 01:00 UTC (11:00 am AEST / 12:00 pm AEDT).
 
-`/api/cron/pickup-reminders` runs once daily through Vercel Cron and emails customers with a pickup scheduled for the next day in Melbourne. Set `CRON_SECRET` to a long random value in Vercel project environment variables; Vercel sends it as a Bearer token. The route uses the server-only Supabase service role and Resend credentials. Apply the booking migration before enabling the cron.
+`/api/cron/pickup-reminders` runs once daily through Vercel Cron and emails customers with a confirmed booking and a pickup scheduled for the next day in Melbourne, provided no pickup reminder email has already been recorded. Submitted requests are not eligible until confirmed. Set `CRON_SECRET` to a long random value in Vercel project environment variables; Vercel sends it as a Bearer token. The route uses the server-only Supabase service role and Resend credentials. Apply the booking migration before enabling the cron.
+
+Confirmation also automatically sends the pickup reminder email when pickup is
+today or tomorrow in Melbourne, including evening bookings confirmed after the
+daily reminder job. This applies to admin confirmation and paid Stripe
+confirmation. Earlier confirmations wait for the daily job. Both paths share
+delivery tracking and a provider idempotency key per booking and pickup date to
+prevent duplicate sends during concurrent runs or retries. The email uses the
+actual pickup date rather than assuming tomorrow. Reminder failures are surfaced
+to the confirmation caller; retrying confirmation retries the unsent reminder
+without resending already-tracked confirmation messages.
 
 Pickup and drop-off SMS use two Hobby-compatible, once-daily Vercel jobs:
 `/api/cron/hire-reminders` at 21:00 UTC and

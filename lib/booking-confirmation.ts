@@ -4,6 +4,7 @@ import { recordCustomerEmail } from "@/lib/email-log";
 import { sendBookingConfirmationEmail, type BookingConfirmationRecord } from "@/lib/send-booking-confirmation";
 import { sendBookingConfirmationSms } from "@/lib/send-booking-sms";
 import { syncConfirmedBookingCalendar } from "@/lib/confirmed-booking-calendar";
+import { sendDuePickupReminderEmail } from "@/lib/send-pickup-reminder";
 
 export class ConfirmationError extends Error {
   constructor(message: string, public readonly status: number) {
@@ -64,10 +65,20 @@ export async function sendTrackedBookingConfirmation(...args: Parameters<typeof 
   const results = await Promise.allSettled([
     sendConfirmationMessages(...args),
     syncConfirmedBookingCalendar(args[0], args[1]),
+    (async () => {
+      try {
+        await sendDuePickupReminderEmail(args[0], args[1]);
+      } catch (error) {
+        console.error("Confirmed booking pickup reminder failed:", error);
+        const message = error instanceof Error ? error.message : "Pickup reminder email could not be sent.";
+        throw new ConfirmationError(`Booking confirmed, but the pickup reminder email failed. Retry confirming this booking to try again. ${message}`, 502);
+      }
+    })(),
   ]);
-  const [messages, calendar] = results;
+  const [messages, calendar, pickupReminder] = results;
   if (calendar.status === "rejected") console.error("Confirmed booking Google Calendar sync failed:", calendar.reason);
   if (messages.status === "rejected") throw messages.reason;
+  if (pickupReminder.status === "rejected") throw pickupReminder.reason;
   if (calendar.status === "rejected") {
     throw new ConfirmationError("Booking confirmed and customer notified, but Google Calendar could not be updated. Check the calendar connection and retry confirmation.", 502);
   }

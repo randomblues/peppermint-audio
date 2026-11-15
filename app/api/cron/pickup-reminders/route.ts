@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { EmailTransport as Resend, emailConfiguration } from "@/lib/email-transport";
-import { buildPickupReminderEmail, getMelbourneTomorrow, type PickupReminderBooking } from "@/lib/pickup-reminders";
+import { emailConfiguration } from "@/lib/email-transport";
+import { getMelbourneTomorrow } from "@/lib/pickup-reminders";
 import { createAdminClient } from "@/lib/supabase";
-import { recordCustomerEmail } from "@/lib/email-log";
+import { pickupReminderFields, sendPickupReminderEmail, type TrackedPickupReminderBooking } from "@/lib/send-pickup-reminder";
 
 export const runtime = "nodejs";
 
@@ -22,48 +22,25 @@ export async function GET(request: Request) {
   const pickupDate = getMelbourneTomorrow(now);
   const admin = createAdminClient();
   const result = await admin.from("bookings")
-    .select("id,email,first_name,last_name,event_type,pickup_date,pickup_time,hire_line_items,additional_details,reminder_sent_at")
+    .select(pickupReminderFields)
     .eq("pickup_date", pickupDate)
-    .neq("status", "cancelled")
-    .neq("status", "completed")
+    .eq("status", "confirmed")
     .is("reminder_sent_at", null);
   if (result.error) {
     console.error("Pickup reminder booking query failed:", result.error);
     return NextResponse.json({ error: "Booking query failed" }, { status: 500 });
   }
 
-  const resend = new Resend(apiKey);
   const sent: string[] = [];
   const failures: { id: string; error: string }[] = [];
-  for (const booking of (result.data ?? []) as (PickupReminderBooking & {
-    id: string;
-    reminder_sent_at: string | null;
-  })[]) {
-    if (!booking.reminder_sent_at) {
-      try {
-        const email = buildPickupReminderEmail(booking);
-        const response = await resend.emails.send({ from, to: [booking.email], subject: email.subject, text: email.text, html: email.html });
-        if (response.error) throw new Error(response.error.message);
-        try {
-          await recordCustomerEmail(admin, {
-            bookingId: booking.id,
-            recipientEmail: booking.email,
-            emailType: "pickup_reminder",
-            providerMessageId: response.data?.id,
-          });
-        } catch (error) {
-          console.error(`Pickup reminder email log failed for booking ${booking.id}:`, error);
-        }
-        const update = await admin.from("bookings").update({ reminder_sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", booking.id).is("reminder_sent_at", null);
-        if (update.error) throw new Error(`Reminder sent but could not be marked: ${update.error.message}`);
-        sent.push(booking.id);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        console.error(`Pickup reminder failed for booking ${booking.id}:`, message);
-        failures.push({ id: booking.id, error: message });
-      }
+  for (const booking of (result.data ?? []) as TrackedPickupReminderBooking[]) {
+    try {
+      if (await sendPickupReminderEmail(admin, booking)) sent.push(booking.id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      console.error(`Pickup reminder failed for booking ${booking.id}:`, message);
+      failures.push({ id: booking.id, error: message });
     }
-
   }
   return NextResponse.json({ pickupDate, selected: result.data?.length ?? 0, sent: sent.length, failures });
 }

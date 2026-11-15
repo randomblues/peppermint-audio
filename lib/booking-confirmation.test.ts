@@ -6,12 +6,14 @@ const mocks = vi.hoisted(() => ({
   sendBookingConfirmationSms: vi.fn(),
   recordCustomerEmail: vi.fn(),
   syncCalendar: vi.fn(),
+  sendDuePickupReminderEmail: vi.fn(),
 }));
 vi.mock("@/lib/supabase", () => ({ createAdminClient: mocks.createAdminClient }));
 vi.mock("@/lib/send-booking-confirmation", () => ({ sendBookingConfirmationEmail: mocks.sendBookingConfirmationEmail }));
 vi.mock("@/lib/send-booking-sms", () => ({ sendBookingConfirmationSms: mocks.sendBookingConfirmationSms }));
 vi.mock("@/lib/email-log", () => ({ recordCustomerEmail: mocks.recordCustomerEmail }));
 vi.mock("@/lib/confirmed-booking-calendar", () => ({ syncConfirmedBookingCalendar: mocks.syncCalendar }));
+vi.mock("@/lib/send-pickup-reminder", () => ({ sendDuePickupReminderEmail: mocks.sendDuePickupReminderEmail }));
 
 import { createAdminClient } from "@/lib/supabase";
 import { confirmPaidStripeBooking } from "./booking-confirmation";
@@ -43,6 +45,7 @@ describe("paid Stripe booking confirmation", () => {
     mocks.sendBookingConfirmationSms.mockResolvedValue({ id: "sms-1" });
     mocks.recordCustomerEmail.mockResolvedValue(undefined);
     mocks.syncCalendar.mockResolvedValue(undefined);
+    mocks.sendDuePickupReminderEmail.mockResolvedValue(false);
   });
 
   it("persists confirmation before emailing and tracks delivery", async () => {
@@ -55,6 +58,8 @@ describe("paid Stripe booking confirmation", () => {
     expect(query.update).toHaveBeenCalledWith(expect.objectContaining({ confirmation_sms_sent_at: expect.any(String) }));
     expect(mocks.recordCustomerEmail).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ bookingId: booking.id, emailType: "confirmation" }));
     expect(mocks.sendBookingConfirmationSms).toHaveBeenCalledWith(expect.objectContaining({ mobile: booking.mobile }));
+    expect(mocks.sendDuePickupReminderEmail).toHaveBeenCalledWith(expect.anything(), booking.id);
+    expect(query.update.mock.invocationCallOrder[0]).toBeLessThan(mocks.sendDuePickupReminderEmail.mock.invocationCallOrder[0]);
   });
 
   it.each([
@@ -130,5 +135,18 @@ describe("paid Stripe booking confirmation", () => {
     await expect(confirmPaidStripeBooking(createAdminClient(), booking.id)).rejects.toThrow("Google Calendar could not be updated");
     expect(mocks.sendBookingConfirmationEmail).toHaveBeenCalledOnce();
     expect(mocks.sendBookingConfirmationSms).toHaveBeenCalledOnce();
+    expect(mocks.sendDuePickupReminderEmail).toHaveBeenCalledOnce();
+  });
+
+  it("retries the pickup reminder even when confirmation email and SMS were already sent", async () => {
+    client({ status: "confirmed", confirmation_email_sent: true, confirmation_sms_sent_at: "2026-11-14T00:00:00Z" });
+    mocks.sendDuePickupReminderEmail.mockRejectedValueOnce(new Error("provider down"));
+
+    await expect(confirmPaidStripeBooking(createAdminClient(), booking.id)).rejects.toThrow("pickup reminder email failed");
+    await confirmPaidStripeBooking(createAdminClient(), booking.id);
+
+    expect(mocks.sendDuePickupReminderEmail).toHaveBeenCalledTimes(2);
+    expect(mocks.sendBookingConfirmationEmail).not.toHaveBeenCalled();
+    expect(mocks.sendBookingConfirmationSms).not.toHaveBeenCalled();
   });
 });

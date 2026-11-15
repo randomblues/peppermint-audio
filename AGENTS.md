@@ -396,6 +396,13 @@ This section is a persistent, lightweight feedback loop. When a technical issue 
 - **Prevention:** Strictly keep internal discussions and implementation explanations out of all interfaces, messages, and documents shown to customers. Functional approval never authorizes explanatory copy; the exact wording requires separate explicit approval.
 - **Next action:** Remove the calendar implementation explanations, preserve the agreed functionality, and assert their absence in unit and browser tests, including when times are not arranged.
 
+### 2026-11-15 - Email preview tests did not establish iPhone notification compatibility
+
+- **Symptom:** A fresh production booking notification still joined words after a spacing fix passed unit tests.
+- **Root cause:** The regression test removed inter-tag whitespace but did not reproduce the failing notification extraction. Ordinary trailing spaces and passing browser tests did not establish iPhone Mail compatibility.
+- **Prevention:** Use a dedicated email preheader rather than relying solely on HTML block spacing. Distinguish template/browser verification from actual email-client verification; never claim an iPhone notification is fixed solely from unit or browser tests.
+- **Next action:** After deployment, inspect a fresh email notification on the affected iPhone. Until that succeeds, report the change as locally verified with device confirmation outstanding.
+
 # Agent working rules
 
 These rules are mandatory. Safety, preservation of existing work, bounded execution, and truthful verification take priority over speed.

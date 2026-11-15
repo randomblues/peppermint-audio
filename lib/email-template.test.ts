@@ -3,6 +3,29 @@ import { describe, expect, it } from "vitest";
 import { emailDetailsTable, emailLayout, emailPanel, escapeEmailHtml } from "./email-template";
 
 describe("email template", () => {
+  it("provides one coherent notification preview even when block-edge whitespace is stripped", () => {
+    const html = emailLayout({
+      eyebrow: "New booking request",
+      title: "A new request needs review",
+      intro: "A customer has submitted a booking request with photo ID. Review availability before confirming it.",
+      content: emailDetailsTable([{ label: "Booking Reference:", value: "PA-EXAMPLE" }]),
+    });
+    const document = new DOMParser().parseFromString(html, "text/html");
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const parts: string[] = [];
+    while (walker.nextNode()) parts.push(walker.currentNode.textContent?.trim() ?? "");
+    const preview = parts.join("").replace(/[\u00a0\u200c]/g, " ").replace(/\s+/g, " ").trim();
+
+    expect(preview.startsWith(
+      "New booking request A new request needs review A customer has submitted a booking request with photo ID. Review availability before confirming it.",
+    )).toBe(true);
+    const preheader = document.body.firstElementChild;
+    expect(preheader?.getAttribute("style")).toContain("display:none");
+    expect(preheader?.getAttribute("aria-hidden")).toBe("true");
+    expect(preheader?.firstChild?.nodeType).toBe(Node.TEXT_NODE);
+    expect(preheader?.querySelector("span")?.textContent?.length).toBeGreaterThanOrEqual(300);
+  });
+
   it("keeps booking preview text separated when inter-tag whitespace is removed", () => {
     const html = emailLayout({
       eyebrow: "New booking request",
@@ -14,6 +37,7 @@ describe("email template", () => {
       ])),
     });
     const document = new DOMParser().parseFromString(html.replace(/>\s+</g, "><"), "text/html");
+    document.body.firstElementChild?.remove();
     const preview = document.body.textContent?.replace(/\s+/g, " ").trim();
 
     expect(preview).toContain(
@@ -28,7 +52,29 @@ describe("email template", () => {
     });
     const document = new DOMParser().parseFromString(html.replace(/>\s+</g, "><"), "text/html");
 
-    expect(document.body.textContent).toContain("Invoice Customer <Alex> ");
+    expect(document.body.textContent?.replace(/\s+/g, " ")).toContain("Invoice Customer <Alex> ");
+  });
+
+  it("preserves separators in fallback body previews and table cells when ordinary boundary spaces are stripped", () => {
+    const html = emailLayout({
+      eyebrow: "Booking received",
+      title: "Thanks for your request",
+      intro: "We have received your booking request.",
+      content: emailDetailsTable([
+        { label: "Booking Reference:", value: "PA-EXAMPLE" },
+        { label: "Customer", value: "Alex & Co" },
+      ]),
+    });
+    const document = new DOMParser().parseFromString(html, "text/html");
+    document.body.firstElementChild?.remove();
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const parts: string[] = [];
+    while (walker.nextNode()) {
+      parts.push((walker.currentNode.textContent ?? "").replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, ""));
+    }
+    expect(parts.join("").replace(/\s+/g, " ")).toContain(
+      "Booking received Thanks for your request We have received your booking request. Booking Reference: PA-EXAMPLE Customer Alex & Co",
+    );
   });
 
   it("escapes dynamic values and preserves the shared brand shell", () => {
