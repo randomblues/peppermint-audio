@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { equipmentCatalog } from "../../lib/site-content";
 
 test("combines instant search and category filters with a useful empty-state recovery", async ({ page }) => {
   await page.goto("/equipment");
@@ -19,9 +20,62 @@ test("combines instant search and category filters with a useful empty-state rec
 
   await page.getByRole("button", { name: "Reset filters" }).click();
   await expect(search).toHaveValue("");
-  await expect(results.getByRole("button", { name: "Add to cart", exact: true })).toHaveCount(18);
+  await expect(results.getByRole("button", { name: "Add to cart", exact: true })).toHaveCount(equipmentCatalog.length);
   await expect(page).toHaveURL(/\/equipment$/);
 });
+
+for (const width of [360, 390, 412, 540, 768, 1024, 1280, 1920]) {
+  test(`hires the FLX4 from its category and detail page at ${width}px`, async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium");
+    await page.setViewportSize({ width, height: 900 });
+    const errors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+    page.on("pageerror", (error) => errors.push(error.message));
+
+    async function checkLayout() {
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      for (const control of await page.locator("main button:visible, main input:visible, main select:visible").all()) {
+        const bounds = await control.boundingBox();
+        expect(bounds).not.toBeNull();
+        expect(bounds!.x).toBeGreaterThanOrEqual(0);
+        expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+      }
+    }
+
+    await page.goto("/equipment");
+    await page.getByRole("combobox", { name: "Equipment category" }).selectOption("dj-controllers");
+    await page.getByRole("textbox", { name: "Search equipment" }).fill("flx4");
+    const results = page.getByRole("region", { name: "Equipment results" });
+    await expect(results.getByRole("link", { name: "Pioneer DDJ-FLX4 DJ Controller", exact: true })).toBeVisible();
+    await expect(results.getByRole("button", { name: "Single controller $40 / night" })).toBeVisible();
+    const image = results.getByRole("img", { name: "Pioneer DDJ-FLX4 DJ Controller" });
+    await expect(image).toBeVisible();
+    await expect.poll(() => image.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+    await checkLayout();
+    await page.screenshot({ path: testInfo.outputPath("flx4-catalogue.png"), fullPage: true });
+
+    await results.getByRole("button", { name: "Add to cart", exact: true }).click();
+    await expect(results.getByLabel("Quantity in cart: 1")).toBeVisible();
+    await results.getByRole("button", { name: "View details" }).click();
+    await expect(page.getByRole("heading", { name: "Pioneer DDJ-FLX4 DJ Controller", exact: true })).toBeVisible();
+    await expect(page.getByText(/USB cable, RCA audio cable & carry case included/)).toBeVisible();
+    await expect(page.getByText(/Bring your own compatible laptop and headphones/)).toBeVisible();
+    await expect(page.getByRole("radio", { name: "Single controller $40 / night" })).toBeVisible();
+    await checkLayout();
+    await page.screenshot({ path: testInfo.outputPath("flx4-detail.png"), fullPage: true });
+
+    await page.getByRole("button", { name: /Open cart/ }).click();
+    await expect(page).toHaveURL(/\/cart$/);
+    await expect(page.getByRole("main").getByText("Pioneer DDJ-FLX4 DJ Controller", { exact: true })).toBeVisible();
+    await expect(page.getByText("$40 each / night", { exact: true })).toBeVisible();
+    await checkLayout();
+    await page.getByRole("button", { name: "Clear cart", exact: true }).click();
+    await expect(page.getByText("Your cart is empty", { exact: true })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+}
 
 test("restores shared filters through reload and browser Back from product details", async ({ page }) => {
   await page.goto("/equipment?q=wireless+mic&category=microphones&sort=price-asc");

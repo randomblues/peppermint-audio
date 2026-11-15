@@ -37,6 +37,9 @@ describe("equipment catalogue filters", () => {
     ["bluetooth", ["bose-s1-pro"]],
     ["scene recall", ["hire-behringer-x32"]],
     ["x32 16", ["hire-behringer-x32"]],
+    ["dj controller", ["pioneer-ddj-flx4"]],
+    ["Pioneer FLX4", ["pioneer-ddj-flx4"]],
+    ["rekordbox", ["pioneer-ddj-flx4"]],
   ])("matches customer search %j across names, uses, and product features", (query, expected) => {
     expect(search(query).map((item) => item.slug)).toEqual(expected);
   });
@@ -67,6 +70,9 @@ describe("equipment catalogue filters", () => {
   });
 
   it("combines category and search filters", () => {
+    expect(filterEquipment(equipmentCatalog, {
+      ...defaultEquipmentFilters, category: "dj-controllers", query: "flx4",
+    }).map((item) => item.slug)).toEqual(["pioneer-ddj-flx4"]);
     expect(filterEquipment(equipmentCatalog, {
       ...defaultEquipmentFilters, category: "microphones", query: "shure",
     }).map((item) => item.slug)).toEqual(["shure-sm58", "shure-sm57", "shure-sm7b"]);

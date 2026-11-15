@@ -51,7 +51,7 @@ describe("EquipmentCatalogue", () => {
     expect(screen.getByRole("textbox", { name: "Search equipment" })).toHaveAttribute("placeholder", "Search gear or brands...");
     expect(screen.getByRole("combobox", { name: "Equipment category" })).toHaveValue("all");
     expect(screen.getByRole("combobox", { name: "Sort equipment" })).toHaveValue("recommended");
-    expect(screen.getByRole("status")).toHaveTextContent("18 items");
+    expect(screen.getByRole("status")).toHaveTextContent(`${equipmentCatalog.length} items`);
     expect(screen.getByRole("status").parentElement).toHaveClass("sr-only");
     expect(screen.queryByText("18 items to explore")).not.toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Equipment categories" })).not.toBeInTheDocument();
@@ -64,7 +64,7 @@ describe("EquipmentCatalogue", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Search equipment" }), { target: { value: "wireless mic" } });
     expect(results().getByRole("link", { name: "K60 Wireless Microphone" })).toBeInTheDocument();
     expect(results().getAllByRole("button", { name: "Add to cart" })).toHaveLength(1);
-    expect(screen.getByRole("status")).toHaveTextContent("1 item of 18");
+    expect(screen.getByRole("status")).toHaveTextContent(`1 item of ${equipmentCatalog.length}`);
     expect(screen.getByRole("option", { name: "Microphones" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Speakers" })).toBeInTheDocument();
     expect(window.history.replaceState).toHaveBeenLastCalledWith(null, "", "/equipment?q=wireless+mic");
@@ -74,7 +74,12 @@ describe("EquipmentCatalogue", () => {
   it("filters through one category dropdown, including effects and subwoofers", () => {
     renderCatalogue();
     const category = screen.getByRole("combobox", { name: "Equipment category" });
-    expect(within(category).getAllByRole("option")).toHaveLength(9);
+    expect(within(category).getAllByRole("option")).toHaveLength(
+      new Set(equipmentCatalog.map((item) => item.category)).size + 1,
+    );
+    fireEvent.change(category, { target: { value: "dj-controllers" } });
+    expect(results().getByRole("link", { name: "Pioneer DDJ-FLX4 DJ Controller" })).toBeInTheDocument();
+    expect(results().getAllByRole("button", { name: "Add to cart" })).toHaveLength(1);
     fireEvent.change(category, { target: { value: "effects" } });
     expect(category).toHaveValue("effects");
     expect(results().getByRole("link", { name: "BeamZ S1500 Smoke Machine" })).toBeInTheDocument();

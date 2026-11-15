@@ -39,7 +39,7 @@ export const inventoryCatalogOptions = [
   })),
 ];
 
-const categoryOrder = ["Packages", "Speakers", "Subwoofers", "Microphones", "Effects", "Mixers", "DI boxes", "Lighting", "Accessories"];
+const categoryOrder = ["Packages", "Speakers", "Subwoofers", "Microphones", "Effects", "Mixers", "DJ Controllers", "DI boxes", "Lighting", "Accessories"];
 
 export const inventoryCatalogCategories = categoryOrder.filter((category) =>
   inventoryCatalogOptions.some((option) => option.category === category),

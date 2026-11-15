@@ -11,6 +11,19 @@ import {
 } from "@/lib/inventory";
 
 describe("inventory validation", () => {
+  it("allows mapping the DJ controller to a stock product in its own category", () => {
+    expect(inventoryProductSchema.safeParse({
+      name: "Pioneer DDJ-FLX4 DJ Controller",
+      category: "DJ Controllers",
+      openingQuantity: 1,
+      mappings: [{
+        catalogKey: "equipment:pioneer-ddj-flx4:Single controller",
+        unitsPerLineItem: 1,
+      }],
+    }).success).toBe(true);
+    expect(inventoryProductCategory("Pioneer DDJ-FLX4 DJ Controller", null)).toBe("DJ Controllers");
+  });
+
   it("offers package, equipment-option, and add-on keys for internal stock mapping", () => {
     expect(inventoryCatalogCategories).toContain("Speakers");
     expect(inventoryCatalogCategories).toContain("Microphones");

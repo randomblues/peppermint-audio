@@ -340,6 +340,20 @@ export const equipmentCatalog: EquipmentItem[] = [
       "Supplied pre-filled with smoke liquid",
     ],
   },
+  {
+    slug: "pioneer-ddj-flx4",
+    name: "Pioneer DDJ-FLX4 DJ Controller",
+    category: "DJ Controllers",
+    description: "Compact 2-channel DJ controller for mixing music at parties and events with your own compatible laptop.",
+    image: "/pioneer-ddj-flx4.png",
+    options: [{ label: "Single controller", price: 40 }],
+    details: [
+      "2-channel DJ controller compatible with rekordbox and Serato DJ Lite",
+      "USB cable, RCA audio cable & carry case included",
+      "Bring your own compatible laptop and headphones",
+      "Speakers hired separately",
+    ],
+  },
   ...Object.entries(addOnCatalog)
     .filter(([slug]) => slug !== "wireless-microphones")
     .map(([slug, addOn]) => ({

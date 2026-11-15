@@ -6,6 +6,27 @@ import { CartProvider } from "./cart-provider";
 import { equipmentCatalog } from "@/lib/site-content";
 
 describe("EquipmentDetail", () => {
+  it("adds the FLX4 to the cart at its advertised nightly price", () => {
+    localStorage.clear();
+    const item = equipmentCatalog.find((item) => item.slug === "pioneer-ddj-flx4");
+    if (!item) throw new Error("FLX4 is missing from the equipment catalogue.");
+    render(<CartProvider><EquipmentDetail item={item} /></CartProvider>);
+
+    expect(screen.getByRole("radio", { name: "Single controller $40 / night" })).toBeInTheDocument();
+    expect(screen.getByText(/USB cable, RCA audio cable & carry case included/)).toBeInTheDocument();
+    expect(screen.getByText(/Bring your own compatible laptop and headphones/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add to cart" }));
+    expect(JSON.parse(localStorage.getItem("peppermint-audio-cart") ?? "[]")).toEqual([{
+      id: "equipment:pioneer-ddj-flx4:Single controller",
+      name: "Pioneer DDJ-FLX4 DJ Controller",
+      kind: "equipment",
+      option: "Single controller",
+      price: 40,
+      quantity: 1,
+    }]);
+    localStorage.clear();
+  });
+
   it.each(equipmentCatalog)("shows the catalogue features for $slug", (item) => {
     render(<EquipmentDetail item={item} />);
 
